@@ -17,6 +17,7 @@ const MaterialModal: React.FC<{ material: Partial<Material> | null; onClose: () 
         materialType: material?.materialType || '',
         category: material?.category || '',
         specifications: material?.specifications || '',
+        supplier: material?.supplier || '',
         barcode: material?.barcode || '',
         unit: material?.unit || '',
         minStock: material?.minStock || 0,
@@ -43,6 +44,7 @@ const MaterialModal: React.FC<{ material: Partial<Material> | null; onClose: () 
                 <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="اسم المادة" required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" />
                 <input type="text" name="materialType" value={formData.materialType} onChange={handleChange} placeholder="نوع المادة" required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" />
                 <input type="text" name="category" value={formData.category} onChange={handleChange} placeholder="الفئة" required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" />
+                <input type="text" name="supplier" value={formData.supplier} onChange={handleChange} placeholder="المورد" required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" />
                 <input type="text" name="barcode" value={formData.barcode} onChange={handleChange} placeholder="الباركود" required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" />
                 <textarea name="specifications" value={formData.specifications} onChange={handleChange} placeholder="المواصفات" required rows={3} className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" />
                 <input type="text" name="unit" value={formData.unit} onChange={handleChange} placeholder="الوحدة (كرتونة، حبة)" required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" />
@@ -90,6 +92,7 @@ const Materials: React.FC<MaterialsProps> = ({ materials, onDataChange, userRole
         "اسم المادة": m.name,
         "نوع المادة": m.materialType,
         "الفئة": m.category,
+        "المورد": m.supplier,
         "الباركود": m.barcode,
         "الوحدة": m.unit,
         "الكمية الحالية": m.currentStock,
@@ -136,13 +139,13 @@ const Materials: React.FC<MaterialsProps> = ({ materials, onDataChange, userRole
           <table>
             <thead>
               <tr>
-                <th>اسم المادة</th><th>نوع المادة</th><th>الفئة</th><th>الباركود</th><th>الكمية الحالية</th><th>الحد الأدنى</th>
+                <th>اسم المادة</th><th>نوع المادة</th><th>الفئة</th><th>المورد</th><th>الباركود</th><th>الكمية الحالية</th><th>الحد الأدنى</th>
               </tr>
             </thead>
             <tbody>
               ${materials.map(m => `
                 <tr>
-                  <td>${m.name}</td><td>${m.materialType}</td><td>${m.category}</td><td>${m.barcode}</td><td>${m.currentStock} ${m.unit}</td><td>${m.minStock} ${m.unit}</td>
+                  <td>${m.name}</td><td>${m.materialType}</td><td>${m.category}</td><td>${m.supplier}</td><td>${m.barcode}</td><td>${m.currentStock} ${m.unit}</td><td>${m.minStock} ${m.unit}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -174,6 +177,7 @@ const Materials: React.FC<MaterialsProps> = ({ materials, onDataChange, userRole
               <th scope="col" className="px-6 py-3">اسم المادة</th>
               <th scope="col" className="px-6 py-3">نوع المادة</th>
               <th scope="col" className="px-6 py-3">الفئة</th>
+              <th scope="col" className="px-6 py-3">المورد</th>
               <th scope="col" className="px-6 py-3">الباركود</th>
               <th scope="col" className="px-6 py-3">الكمية الحالية</th>
               <th scope="col" className="px-6 py-3">الحد الأدنى</th>
@@ -187,6 +191,7 @@ const Materials: React.FC<MaterialsProps> = ({ materials, onDataChange, userRole
                 <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{material.name}</td>
                 <td className="px-6 py-4">{material.materialType}</td>
                 <td className="px-6 py-4">{material.category}</td>
+                <td className="px-6 py-4">{material.supplier}</td>
                 <td className="px-6 py-4 font-mono">{material.barcode}</td>
                 <td className={`px-6 py-4 font-bold ${material.currentStock < material.minStock ? 'text-red-500' : 'text-emerald-500'}`}>
                     {material.currentStock} {material.unit}

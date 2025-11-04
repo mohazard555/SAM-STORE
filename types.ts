@@ -4,6 +4,7 @@ export interface Material {
   materialType: string; // Renamed from code
   category: string;
   specifications: string;
+  supplier: string;
   barcode: string;
   unit: string;
   minStock: number;
@@ -15,7 +16,11 @@ export interface Transaction {
   id: string;
   materialId: string;
   materialName: string;
+  supplier: string;
+  category: string;
+  barcode: string;
   quantity: number;
+  unit: string;
   recipient: string;
   notes?: string;
   date: string;

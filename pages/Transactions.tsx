@@ -10,7 +10,7 @@ interface TransactionsProps {
   userRole: 'admin' | 'visitor';
 }
 
-const TransactionModal: React.FC<{ materials: Material[], onClose: () => void; onSave: (transaction: Omit<Transaction, 'id' | 'materialName' | 'date'>) => void; }> = ({ materials, onClose, onSave }) => {
+const TransactionModal: React.FC<{ materials: Material[], onClose: () => void; onSave: (transaction: Omit<Transaction, 'id' | 'materialName' | 'date' | 'supplier' | 'category' | 'barcode' | 'unit'>) => void; }> = ({ materials, onClose, onSave }) => {
     const [materialId, setMaterialId] = useState(materials[0]?.id || '');
     const [quantity, setQuantity] = useState(1);
     const [recipient, setRecipient] = useState('');
@@ -45,6 +45,12 @@ const TransactionModal: React.FC<{ materials: Material[], onClose: () => void; o
                         {materials.length > 0 ? materials.map(m => <option key={m.id} value={m.id}>{m.name} (المتاح: {m.currentStock} {m.unit})</option>) : <option disabled>لا توجد مواد</option>}
                     </select>
                 </div>
+                 {selectedMaterial && (
+                    <div className="mt-2 p-3 bg-gray-100 dark:bg-gray-700/50 rounded text-sm space-y-1 border border-gray-200 dark:border-gray-600">
+                        <p><span className="font-semibold text-gray-600 dark:text-gray-300">الفئة:</span> {selectedMaterial.category}</p>
+                        <p><span className="font-semibold text-gray-600 dark:text-gray-300">الباركود:</span> <span className="font-mono">{selectedMaterial.barcode}</span></p>
+                    </div>
+                )}
                 <input type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} placeholder="الكمية المسحوبة" min="1" max={selectedMaterial?.currentStock} required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" />
                 <input type="text" value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder="اسم المستلم" required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" />
                 <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="ملاحظات" className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"></textarea>
@@ -63,7 +69,7 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, on
   const [isModalOpen, setIsModalOpen] = useState(false);
   const sortedTransactions = [...transactions].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  const handleSave = (transaction: Omit<Transaction, 'id' | 'materialName' | 'date'>) => {
+  const handleSave = (transaction: Omit<Transaction, 'id' | 'materialName' | 'date' | 'supplier' | 'category' | 'barcode' | 'unit'>) => {
     addTransaction(transaction);
     onDataChange();
     setIsModalOpen(false);
@@ -87,6 +93,9 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, on
             <tr>
               <th scope="col" className="px-6 py-3">التاريخ والوقت</th>
               <th scope="col" className="px-6 py-3">اسم المادة</th>
+              <th scope="col" className="px-6 py-3">الفئة</th>
+              <th scope="col" className="px-6 py-3">الباركود</th>
+              <th scope="col" className="px-6 py-3">المورد</th>
               <th scope="col" className="px-6 py-3">الكمية المسحوبة</th>
               <th scope="col" className="px-6 py-3">المستلم</th>
               <th scope="col" className="px-6 py-3">ملاحظات</th>
@@ -97,7 +106,10 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, on
               <tr key={transaction.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                 <td className="px-6 py-4">{new Date(transaction.date).toLocaleString('ar-EG')}</td>
                 <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{transaction.materialName}</td>
-                <td className="px-6 py-4">{transaction.quantity}</td>
+                <td className="px-6 py-4">{transaction.category}</td>
+                <td className="px-6 py-4 font-mono">{transaction.barcode}</td>
+                <td className="px-6 py-4">{transaction.supplier}</td>
+                <td className="px-6 py-4">{transaction.quantity} {transaction.unit}</td>
                 <td className="px-6 py-4">{transaction.recipient}</td>
                 <td className="px-6 py-4">{transaction.notes}</td>
               </tr>

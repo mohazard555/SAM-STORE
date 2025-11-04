@@ -95,6 +95,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
             "اسم المادة": m.name,
             "نوع المادة": m.materialType,
             "الفئة": m.category,
+            "المورد": m.supplier,
             "الباركود": m.barcode,
             "الكمية الحالية": m.currentStock,
             "وحدة القياس": m.unit,
@@ -104,6 +105,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
         dataToExport = sortedTransactions.map(t => ({
             'التاريخ والوقت': new Date(t.date).toLocaleString('ar-EG'),
             'اسم المادة': t.materialName,
+            'المورد': t.supplier,
             'الكمية المسحوبة': t.quantity,
             'المستلم': t.recipient,
             'ملاحظات': t.notes || '',
@@ -131,21 +133,23 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
 
     if (filterType === 'totalCount') {
         reportTitle = 'تقرير إجمالي عددي للمخزون';
-        tableHeaders = `<th>اسم المادة</th><th>الفئة</th><th>الباركود</th><th>الكمية الحالية</th>`;
+        tableHeaders = `<th>اسم المادة</th><th>الفئة</th><th>المورد</th><th>الباركود</th><th>الكمية الحالية</th>`;
         tableContent = materials.map(m => `
             <tr>
                 <td>${m.name}</td>
                 <td>${m.category}</td>
+                <td>${m.supplier}</td>
                 <td>${m.barcode}</td>
                 <td>${m.currentStock} ${m.unit}</td>
             </tr>
         `).join('');
     } else {
-        tableHeaders = `<th>التاريخ والوقت</th><th>اسم المادة</th><th>الكمية</th><th>المستلم</th><th>ملاحظات</th>`;
+        tableHeaders = `<th>التاريخ والوقت</th><th>اسم المادة</th><th>المورد</th><th>الكمية</th><th>المستلم</th><th>ملاحظات</th>`;
         tableContent = sortedTransactions.map(t => `
             <tr>
               <td>${new Date(t.date).toLocaleString('ar-EG')}</td>
               <td>${t.materialName}</td>
+              <td>${t.supplier}</td>
               <td>${t.quantity}</td>
               <td>${t.recipient}</td>
               <td>${t.notes || ''}</td>
@@ -266,6 +270,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
                     <tr>
                         <th scope="col" className="px-6 py-3">اسم المادة</th>
                         <th scope="col" className="px-6 py-3">الفئة</th>
+                        <th scope="col" className="px-6 py-3">المورد</th>
                         <th scope="col" className="px-6 py-3">الباركود</th>
                         <th scope="col" className="px-6 py-3">الكمية الحالية</th>
                         <th scope="col" className="px-6 py-3">الحد الأدنى للمخزون</th>
@@ -276,6 +281,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
                         <tr key={material.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                             <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{material.name}</td>
                             <td className="px-6 py-4">{material.category}</td>
+                            <td className="px-6 py-4">{material.supplier}</td>
                             <td className="px-6 py-4 font-mono">{material.barcode}</td>
                             <td className={`px-6 py-4 font-bold ${material.currentStock < material.minStock ? 'text-red-500' : 'text-emerald-500'}`}>
                                 {material.currentStock} {material.unit}
@@ -291,6 +297,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
                     <tr>
                     <th scope="col" className="px-6 py-3">التاريخ والوقت</th>
                     <th scope="col" className="px-6 py-3">اسم المادة</th>
+                    <th scope="col" className="px-6 py-3">المورد</th>
                     <th scope="col" className="px-6 py-3">الكمية المسحوبة</th>
                     <th scope="col" className="px-6 py-3">المستلم</th>
                     <th scope="col" className="px-6 py-3">ملاحظات</th>
@@ -301,6 +308,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
                     <tr key={transaction.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                         <td className="px-6 py-4">{new Date(transaction.date).toLocaleString('ar-EG')}</td>
                         <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{transaction.materialName}</td>
+                        <td className="px-6 py-4">{transaction.supplier}</td>
                         <td className="px-6 py-4">{transaction.quantity}</td>
                         <td className="px-6 py-4">{transaction.recipient}</td>
                         <td className="px-6 py-4">{transaction.notes}</td>

@@ -42,7 +42,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, onLogout }) => {
       m.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
       m.materialType.toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.barcode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.category.toLowerCase().includes(searchTerm.toLowerCase())
+      m.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      m.supplier.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const filteredTransactions = transactions.filter(t => 

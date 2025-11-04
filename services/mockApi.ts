@@ -9,7 +9,7 @@ const SETTINGS_KEY = 'warehouse_settings';
 const CURRENT_USER_KEY = 'currentUser';
 
 // Default warehouse SVG logo
-const defaultLogoSvg = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTIxIDExLjVMMTIgNkwzIDExLjVWMTlIMjFWMS41WiIgc3Ryb2tlPSIjM2JjM2Y0IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8cGF0aCBkPSJNMjIgMTAuNUwxMiA1TDIgMTAuNSIgc3Ryb2tlPSIjM2JjM2Y0IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8cGF0aCBkPSJNOSAxOFE5IDE1IDEyIDE1QzE1IDE1IDE1IDE4IDE1IDE4VjIySDlWMThaIiBzdHJva2U9IiMwMmFkZTYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtaW5lam9pbj0icm91bmQiLz4KPC9zdmc+';
+const defaultLogoSvg = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTIxIDExLjVMMTIgNkwzIDExLjVWMTlIMjFWMS41WiIgc3Ryb2tlPSIjM2JjM2Y0IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8cGF0aCBkPSJNMjIgMTAuNUwxMiA1TDIgMTAuNSIgc3Ryb2tlPSIjM2JjM2Y0IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8cGF0aCBkPSJNOSAxOFE5IDE1IDEyIDE1QzE1IDE1IDE1IDE4IDE1IDE4VjIySDlWMThaIiBzdHJva2U9IiMwMmFkZTYiIHN0cm9rZS1-aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtaW5lam9pbj0icm91bmQiLz4KPC9zdmc+';
 
 const getFromStorage = <T>(key: string, defaultValue: T): T => {
   try {
@@ -43,11 +43,11 @@ const initializeData = () => {
     // Materials
     if (!localStorage.getItem(MATERIALS_KEY)) {
         const initialMaterials: Material[] = [
-            { id: 'm1', name: 'لابتوب ديل', materialType: 'DELL-LT-001', unit: 'حبة', category: 'أجهزة إلكترونية', specifications: 'Core i7, 16GB RAM, 512GB SSD', barcode: '1234567890123', minStock: 5, currentStock: 15, isNew: false },
-            { id: 'm2', name: 'شاشة سامسونج 24 بوصة', materialType: 'SAM-SC-024', unit: 'حبة', category: 'أجهزة إلكترونية', specifications: '24" Full HD, 75Hz', barcode: '1234567890124', minStock: 10, currentStock: 8, isNew: false },
-            { id: 'm3', name: 'كرتونة ورق A4', materialType: 'PAP-A4-500', unit: 'كرتونة', category: 'مواد مكتبية', specifications: '80gsm, 500 sheets', barcode: '1234567890125', minStock: 20, currentStock: 50, isNew: false },
-            { id: 'm4', name: 'فأرة لاسلكية', materialType: 'LOG-MS-W01', unit: 'حبة', category: 'ملحقات كمبيوتر', specifications: 'Optical, 3 buttons', barcode: '1234567890126', minStock: 15, currentStock: 30, isNew: false },
-            { id: 'm5', name: 'لوحة مفاتيح', materialType: 'LOG-KB-01', unit: 'حبة', category: 'ملحقات كمبيوتر', specifications: 'Arabic/English, Wired', barcode: '1234567890127', minStock: 15, currentStock: 25, isNew: false },
+            { id: 'm1', name: 'لابتوب ديل', materialType: 'DELL-LT-001', unit: 'حبة', category: 'أجهزة إلكترونية', specifications: 'Core i7, 16GB RAM, 512GB SSD', supplier: 'شركة التكنولوجيا الحديثة', barcode: '1234567890123', minStock: 5, currentStock: 15, isNew: false },
+            { id: 'm2', name: 'شاشة سامسونج 24 بوصة', materialType: 'SAM-SC-024', unit: 'حبة', category: 'أجهزة إلكترونية', specifications: '24" Full HD, 75Hz', supplier: 'سامسونج العالمية', barcode: '1234567890124', minStock: 10, currentStock: 8, isNew: false },
+            { id: 'm3', name: 'كرتونة ورق A4', materialType: 'PAP-A4-500', unit: 'كرتونة', category: 'مواد مكتبية', specifications: '80gsm, 500 sheets', supplier: 'الشركة المتحدة للورق', barcode: '1234567890125', minStock: 20, currentStock: 50, isNew: false },
+            { id: 'm4', name: 'فأرة لاسلكية', materialType: 'LOG-MS-W01', unit: 'حبة', category: 'ملحقات كمبيوتر', specifications: 'Optical, 3 buttons', supplier: 'لوجيتك للتوزيع', barcode: '1234567890126', minStock: 15, currentStock: 30, isNew: false },
+            { id: 'm5', name: 'لوحة مفاتيح', materialType: 'LOG-KB-01', unit: 'حبة', category: 'ملحقات كمبيوتر', specifications: 'Arabic/English, Wired', supplier: 'لوجيتك للتوزيع', barcode: '1234567890127', minStock: 15, currentStock: 25, isNew: false },
         ];
         saveToStorage(MATERIALS_KEY, initialMaterials);
     }
@@ -191,7 +191,7 @@ export const getTransactions = (): Transaction[] => {
     return getFromStorage<Transaction[]>(TRANSACTIONS_KEY, []);
 };
 
-export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'date' | 'materialName'>): Transaction => {
+export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'date' | 'materialName' | 'supplier' | 'category' | 'barcode' | 'unit'>): Transaction => {
     const transactions = getTransactions();
     const materials = getMaterials();
     const material = materials.find(m => m.id === transactionData.materialId);
@@ -209,6 +209,10 @@ export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'date' 
         id: `t${Date.now()}`,
         date: new Date().toISOString(),
         materialName: material.name,
+        supplier: material.supplier,
+        category: material.category,
+        barcode: material.barcode,
+        unit: material.unit,
     };
     
     // Update stock

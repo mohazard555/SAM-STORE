@@ -27,6 +27,7 @@ const NewEntries: React.FC<NewEntriesProps> = ({ materials }) => {
               <th scope="col" className="px-6 py-3">الفئة</th>
               <th scope="col" className="px-6 py-3">الباركود</th>
               <th scope="col" className="px-6 py-3">الكمية المدخلة</th>
+              <th scope="col" className="px-6 py-3">الوحدة</th>
               <th scope="col" className="px-6 py-3">المواصفات</th>
             </tr>
           </thead>
@@ -38,9 +39,10 @@ const NewEntries: React.FC<NewEntriesProps> = ({ materials }) => {
                 <td className="px-6 py-4">{material.category}</td>
                 <td className="px-6 py-4 font-mono">{material.barcode}</td>
                 <td className={`px-6 py-4 font-bold ${material.currentStock < material.minStock ? 'text-red-500' : 'text-emerald-500'}`}>
-                    {material.currentStock} {material.unit}
+                    {material.currentStock}
                     {material.currentStock < material.minStock && <AlertTriangle className="inline-block mr-1 text-red-500" size={16}/>}
                 </td>
+                <td className="px-6 py-4">{material.unit}</td>
                 <td className="px-6 py-4 whitespace-pre-wrap max-w-xs">{material.specifications}</td>
               </tr>
             ))}
