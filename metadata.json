@@ -1,0 +1,5 @@
+{
+  "name": "أمين المستودع (Warehouse Keeper)",
+  "description": "A professional Warehouse Management System to help warehouse keepers track daily material movements, monitor real-time stock levels, and generate inventory reports. Built with Vite, React, TypeScript, and Tailwind CSS.",
+  "requestFramePermissions": []
+}
