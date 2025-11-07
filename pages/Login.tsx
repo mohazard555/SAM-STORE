@@ -78,11 +78,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             </button>
           </div>
         </form>
-         <div className="text-center text-sm text-gray-500 dark:text-gray-400">
-            <p>للتجربة:</p>
-            <p>أمين مستودع: <span className="font-mono">admin</span> / <span className="font-mono">admin123</span></p>
-            <p>زائر (للاطلاع): <span className="font-mono">user</span> / <span className="font-mono">user123</span></p>
-         </div>
       </div>
     </div>
   );

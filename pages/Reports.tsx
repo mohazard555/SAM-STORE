@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Transaction, Material, SettingsData } from '@/types';
 import { Download, Printer } from 'lucide-react';
@@ -149,7 +148,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
             dataToExport = (reportData as Transaction[]).map(t => ({
                 'التاريخ والوقت': new Date(t.date).toLocaleString('ar-EG'), 'اسم المادة': t.materialName,
                 'نوع المادة': t.materialType, 'الفئة': t.category, 'الباركود': t.barcode,
-                'المورد': t.supplier, 'الكمية المسحوبة': t.quantity, 'المستلم': t.recipient,
+                'المورد': t.supplier, 'الكمية المسحوبة': `${t.quantity} ${t.unit}`, 'المستلم': t.recipient,
                 'ملاحظات': t.notes || '',
             }));
             fileName = 'transactions_report.xlsx';
@@ -186,7 +185,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
         default: // Transaction reports
             reportTitle = `تقرير حركات`;
             tableHeaders = `<th>التاريخ والوقت</th><th>اسم المادة</th><th>نوع المادة</th><th>المورد</th><th>الكمية</th><th>المستلم</th><th>ملاحظات</th>`;
-            tableContent = (reportData as Transaction[]).map(t => `<tr><td>${new Date(t.date).toLocaleString('ar-EG')}</td><td>${t.materialName}</td><td>${t.materialType}</td><td>${t.supplier}</td><td>${t.quantity}</td><td>${t.recipient}</td><td>${t.notes || ''}</td></tr>`).join('');
+            tableContent = (reportData as Transaction[]).map(t => `<tr><td>${new Date(t.date).toLocaleString('ar-EG')}</td><td>${t.materialName}</td><td>${t.materialType}</td><td>${t.supplier}</td><td>${t.quantity} ${t.unit}</td><td>${t.recipient}</td><td>${t.notes || ''}</td></tr>`).join('');
     }
 
     printWindow.document.write(`
