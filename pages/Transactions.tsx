@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Transaction, Material } from '@/types';
 import { addTransaction } from '@/services/mockApi';
@@ -10,7 +11,7 @@ interface TransactionsProps {
   userRole: 'admin' | 'visitor';
 }
 
-const TransactionModal: React.FC<{ materials: Material[], onClose: () => void; onSave: (transaction: Omit<Transaction, 'id' | 'materialName' | 'date' | 'supplier' | 'category' | 'barcode' | 'unit'>) => void; }> = ({ materials, onClose, onSave }) => {
+const TransactionModal: React.FC<{ materials: Material[], onClose: () => void; onSave: (transaction: Omit<Transaction, 'id' | 'materialName' | 'date' | 'supplier' | 'category' | 'barcode' | 'unit' | 'materialType'>) => void; }> = ({ materials, onClose, onSave }) => {
     const [materialId, setMaterialId] = useState(materials[0]?.id || '');
     const [quantity, setQuantity] = useState(1);
     const [recipient, setRecipient] = useState('');
@@ -69,7 +70,7 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, on
   const [isModalOpen, setIsModalOpen] = useState(false);
   const sortedTransactions = [...transactions].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  const handleSave = (transaction: Omit<Transaction, 'id' | 'materialName' | 'date' | 'supplier' | 'category' | 'barcode' | 'unit'>) => {
+  const handleSave = (transaction: Omit<Transaction, 'id' | 'materialName' | 'date' | 'supplier' | 'category' | 'barcode' | 'unit' | 'materialType'>) => {
     addTransaction(transaction);
     onDataChange();
     setIsModalOpen(false);
@@ -93,6 +94,7 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, on
             <tr>
               <th scope="col" className="px-6 py-3">التاريخ والوقت</th>
               <th scope="col" className="px-6 py-3">اسم المادة</th>
+              <th scope="col" className="px-6 py-3">نوع المادة</th>
               <th scope="col" className="px-6 py-3">الفئة</th>
               <th scope="col" className="px-6 py-3">الباركود</th>
               <th scope="col" className="px-6 py-3">المورد</th>
@@ -106,6 +108,7 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, on
               <tr key={transaction.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                 <td className="px-6 py-4">{new Date(transaction.date).toLocaleString('ar-EG')}</td>
                 <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{transaction.materialName}</td>
+                <td className="px-6 py-4">{transaction.materialType}</td>
                 <td className="px-6 py-4">{transaction.category}</td>
                 <td className="px-6 py-4 font-mono">{transaction.barcode}</td>
                 <td className="px-6 py-4">{transaction.supplier}</td>

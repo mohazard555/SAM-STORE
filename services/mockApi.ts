@@ -1,3 +1,4 @@
+
 import { User, Material, Transaction, SettingsData, AllData } from '@/types';
 
 // --- INITIAL DATA & HELPERS ---
@@ -9,7 +10,7 @@ const SETTINGS_KEY = 'warehouse_settings';
 const CURRENT_USER_KEY = 'currentUser';
 
 // Default warehouse SVG logo
-const defaultLogoSvg = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTIxIDExLjVMMTIgNkwzIDExLjVWMTlIMjFWMS41WiIgc3Ryb2tlPSIjM2JjM2Y0IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8cGF0aCBkPSJNMjIgMTAuNUwxMiA1TDIgMTAuNSIgc3Ryb2tlPSIjM2JjM2Y0IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8cGF0aCBkPSJNOSAxOFE5IDE1IDEyIDE1QzE1IDE1IDE1IDE4IDE1IDE4VjIySDlWMThaIiBzdHJva2U9IiMwMmFkZTYiIHN0cm9rZS1-aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtaW5lam9pbj0icm91bmQiLz4KPC9zdmc+';
+const defaultLogoSvg = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTIxIDExLjVMMTIgNkwzIDExLjVWMTlIMjFWMS41WiIgc3Ryb2tlPSIjM2JjM2Y0IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8cGF0aCBkPSJNMjIgMTAuNUwxMiA1TDIgMTAuNSIgc3Ryb2tlPSIjM2JjM2Y0IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8cGF0aCBkPSJNOSAxOFE5IDE1IDEyIDE1QzE1IDE1IDE1IDE4IDE1IDE4VjIySDlWMThaIiBzdHJva2U9IiMwMmFkZTYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtaW5lam9pbj0icm91bmQiLz4KPC9zdmc+';
 
 const getFromStorage = <T>(key: string, defaultValue: T): T => {
   try {
@@ -69,6 +70,8 @@ const initializeData = () => {
                 accountant: 'المحاسب',
                 manager: 'المدير العام',
             },
+            gistUrl: '',
+            githubToken: '',
         };
         saveToStorage(SETTINGS_KEY, initialSettings);
     }
@@ -76,6 +79,70 @@ const initializeData = () => {
 
 // Initialize on load
 initializeData();
+
+// --- GIST SYNCHRONIZATION ---
+
+const syncDataToGist = async () => {
+    const settings = getSettings();
+    if (!settings.gistUrl || !settings.githubToken) {
+        return; // Sync not configured
+    }
+    
+    const match = settings.gistUrl.match(/gist\.github(?:usercontent)?\.com\/[^\/]+\/([a-f0-9]+)/);
+    if (!match) {
+        console.error("Invalid Gist URL format. Could not extract Gist ID.");
+        return;
+    }
+    const gistId = match[1];
+
+    const allData = exportAllData();
+    const filename = settings.gistUrl.split('/').pop() || 'warehouse-data.json';
+
+    try {
+        const response = await fetch(`https://api.github.com/gists/${gistId}`, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `token ${settings.githubToken}`,
+                'Accept': 'application/vnd.github.v3+json',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                files: {
+                    [filename]: {
+                        content: JSON.stringify(allData, null, 2),
+                    },
+                },
+            }),
+        });
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`Failed to update Gist: ${errorData.message}`);
+        }
+        console.log("Data successfully synced to Gist.");
+    } catch (error) {
+        console.error("Gist sync error:", error);
+    }
+};
+
+export const initializeDataSource = async (): Promise<{ success: boolean; message?: string }> => {
+    const settings = getSettings();
+    if (!settings.gistUrl) {
+        return { success: true, message: 'Using local data.' };
+    }
+
+    try {
+        const response = await fetch(settings.gistUrl, { cache: 'no-store' }); // bypass cache to get latest
+        if (!response.ok) {
+            throw new Error(`Failed to fetch data from Gist. Status: ${response.status}`);
+        }
+        const data = await response.json();
+        importAllData(data);
+        return { success: true, message: 'Data loaded from Gist.' };
+    } catch (error) {
+        console.error("Error initializing data from Gist:", error);
+        return { success: false, message: (error as Error).message };
+    }
+};
 
 
 // --- AUTHENTICATION ---
@@ -118,6 +185,7 @@ export const addUser = (userData: Omit<User, 'id'>): User => {
         id: `u${Date.now()}`,
     };
     saveToStorage(USERS_KEY, [...users, newUser]);
+    syncDataToGist();
     return newUser;
 };
 
@@ -132,6 +200,7 @@ export const updateUser = (updatedUser: User): User => {
 
     users = users.map(u => (u.id === updatedUser.id ? updatedUser : u));
     saveToStorage(USERS_KEY, users);
+    syncDataToGist();
 
     // If the updated user is the current user, update session storage
     if (currentUser && currentUser.id === updatedUser.id) {
@@ -144,6 +213,7 @@ export const deleteUser = (userId: string): void => {
     let users = getUsers();
     users = users.filter(u => u.id !== userId);
     saveToStorage(USERS_KEY, users);
+    syncDataToGist();
 };
 
 
@@ -161,6 +231,7 @@ export const addMaterial = (materialData: Omit<Material, 'id' | 'isNew'>): Mater
         isNew: true,
     };
     saveToStorage(MATERIALS_KEY, [...materials, newMaterial]);
+    syncDataToGist();
     return newMaterial;
 };
 
@@ -168,6 +239,7 @@ export const updateMaterial = (updatedMaterial: Material): Material => {
     let materials = getMaterials();
     materials = materials.map(m => m.id === updatedMaterial.id ? updatedMaterial : m);
     saveToStorage(MATERIALS_KEY, materials);
+    syncDataToGist();
     return updatedMaterial;
 };
 
@@ -182,6 +254,7 @@ export const deleteMaterial = (materialId: string): void => {
     let materials = getMaterials();
     materials = materials.filter(m => m.id !== materialId);
     saveToStorage(MATERIALS_KEY, materials);
+    syncDataToGist();
 };
 
 
@@ -191,9 +264,9 @@ export const getTransactions = (): Transaction[] => {
     return getFromStorage<Transaction[]>(TRANSACTIONS_KEY, []);
 };
 
-export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'date' | 'materialName' | 'supplier' | 'category' | 'barcode' | 'unit'>): Transaction => {
+export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'date' | 'materialName' | 'supplier' | 'category' | 'barcode' | 'unit' | 'materialType'>): Transaction => {
     const transactions = getTransactions();
-    const materials = getMaterials();
+    let materials = getMaterials();
     const material = materials.find(m => m.id === transactionData.materialId);
 
     if (!material) {
@@ -209,17 +282,23 @@ export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'date' 
         id: `t${Date.now()}`,
         date: new Date().toISOString(),
         materialName: material.name,
+        materialType: material.materialType,
         supplier: material.supplier,
         category: material.category,
         barcode: material.barcode,
         unit: material.unit,
     };
     
-    // Update stock
+    // Update stock and save both materials and transactions
     const updatedMaterial = { ...material, currentStock: material.currentStock - transactionData.quantity };
-    updateMaterial(updatedMaterial);
+    materials = materials.map(m => m.id === updatedMaterial.id ? updatedMaterial : m);
+    saveToStorage(MATERIALS_KEY, materials);
 
     saveToStorage(TRANSACTIONS_KEY, [...transactions, newTransaction]);
+    
+    // Sync all data to Gist
+    syncDataToGist();
+
     return newTransaction;
 };
 
@@ -229,12 +308,15 @@ export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'date' 
 export const getSettings = (): SettingsData => {
     return getFromStorage<SettingsData>(SETTINGS_KEY, {
         companyName: '', companyAddress: '', companyLogo: '', 
-        signatureNames: { keeper: '', accountant: '', manager: '' }
+        signatureNames: { keeper: '', accountant: '', manager: '' },
+        gistUrl: '',
+        githubToken: '',
     });
 };
 
 export const saveSettings = (settings: SettingsData): void => {
     saveToStorage(SETTINGS_KEY, settings);
+    // No sync here, user should reload to fetch from new Gist URL
 };
 
 export const exportAllData = (): AllData => {
@@ -256,4 +338,12 @@ export const importAllData = (data: AllData): void => {
     saveToStorage(MATERIALS_KEY, data.materials);
     saveToStorage(TRANSACTIONS_KEY, data.transactions);
     // Note: User import is not handled to avoid password conflicts/security issues.
+    // If user data is present in the file, we can add it, excluding passwords
+    if (Array.isArray(data.users)) {
+        const currentUsers = getUsers();
+        // A simple merge: add new users, don't update existing ones
+        const newUsers = data.users.filter(importedUser => !currentUsers.some(u => u.username === importedUser.username));
+        const combinedUsers = [...currentUsers, ...newUsers.map(u => ({...u, password: 'user123'}))]; // Assign default password
+        saveToStorage(USERS_KEY, combinedUsers);
+    }
 };

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { getSettings, saveSettings, exportAllData, importAllData, updateUser, getCurrentUser } from '@/services/mockApi';
 import { SettingsData, AllData, User } from '@/types';
@@ -180,6 +181,39 @@ const Settings: React.FC<SettingsProps> = ({ onDataChange, user }) => {
                         <InputField label="المحاسب" name="accountant" value={settings.signatureNames.accountant} onChange={handleSignatureChange} />
                         <InputField label="المدير العام" name="manager" value={settings.signatureNames.manager} onChange={handleSignatureChange} />
                         </div>
+                    </div>
+
+                    {/* Gist Sync Settings */}
+                    <div className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                        <h2 className="text-xl font-semibold mb-4">المزامنة عبر الإنترنت (GitHub Gist)</h2>
+                        <div className="text-sm text-gray-600 dark:text-gray-300 space-y-2 mb-4">
+                            <p className="font-semibold">لتمكين المزامنة عبر الإنترنت:</p>
+                            <ol className="list-decimal list-inside space-y-1">
+                                <li>الصق Gist Raw URL في الحقل أدناه ليكون مصدر بيانات الموقع.</li>
+                                <li>أنشئ Personal Access Token (Classic) من إعدادات GitHub مع صلاحية `gist` فقط.</li>
+                                <li>الصق الـ Token في الحقل الثاني لتمكين الحفظ والمزامنة.</li>
+                            </ol>
+                        </div>
+                        <div className="space-y-4">
+                            <InputField 
+                                label="رابط Gist Raw للمزامنة" 
+                                name="gistUrl" 
+                                value={settings.gistUrl || ''} 
+                                onChange={handleSettingsChange}
+                                placeholder="https://gist.githubusercontent.com/..."
+                            />
+                            <InputField 
+                                type="password"
+                                label="GitHub Personal Access Token" 
+                                name="githubToken" 
+                                value={settings.githubToken || ''} 
+                                onChange={handleSettingsChange} 
+                                placeholder="••••••••••••••••••••••••••••••••••••••••"
+                            />
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                            <span className="font-bold">ملاحظة:</span> بعد حفظ إعدادات المزامنة، يرجى إعادة تحميل الصفحة لتطبيق التغييرات وسحب البيانات من الرابط.
+                        </p>
                     </div>
                     
                     <div className="flex justify-start">

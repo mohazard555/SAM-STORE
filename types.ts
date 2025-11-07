@@ -1,3 +1,4 @@
+
 export interface Material {
   id: string;
   name: string;
@@ -16,6 +17,7 @@ export interface Transaction {
   id: string;
   materialId: string;
   materialName: string;
+  materialType: string;
   supplier: string;
   category: string;
   barcode: string;
@@ -44,6 +46,8 @@ export interface SettingsData {
     accountant: string;
     manager: string;
   };
+  gistUrl?: string;
+  githubToken?: string;
 }
 
 export interface AllData {
