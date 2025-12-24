@@ -183,18 +183,18 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
         case 'lowStock':
         case 'inactive':
             reportTitle = filterType === 'totalCount' ? 'تقرير إجمالي جرد المخزون' : filterType === 'lowStock' ? 'تقرير المواد منخفضة الكمية' : 'تقرير المواد الراكدة';
-            tableHeaders = `<th>اسم المادة</th><th>الفئة</th><th>المورد</th><th>الباركود</th><th>الكمية الحالية</th><th>الحد الأدنى</th>`;
-            tableContent = (reportData as Material[]).map(m => `<tr><td>${m.name}</td><td>${m.category}</td><td>${m.supplier}</td><td>${m.barcode}</td><td>${m.currentStock} ${m.unit}</td><td>${m.minStock} ${m.unit}</td></tr>`).join('');
+            tableHeaders = `<th>اسم المادة</th><th>الفئة</th><th>الباركود</th><th>المورد</th><th>الكمية الحالية</th><th>الحد الأدنى</th>`;
+            tableContent = (reportData as Material[]).map(m => `<tr><td>${m.name}</td><td>${m.category}</td><td>${m.barcode}</td><td>${m.supplier}</td><td>${m.currentStock} ${m.unit}</td><td>${m.minStock} ${m.unit}</td></tr>`).join('');
             break;
         case 'mostUsed':
             reportTitle = `تقرير المواد الأكثر استخداماً`;
-            tableHeaders = `<th>اسم المادة</th><th>الفئة</th><th>المورد</th><th>الباركود</th><th>إجمالي المسحوب</th>`;
-            tableContent = (reportData as (Material & {totalQuantity: number})[]).map(m => `<tr><td>${m.name}</td><td>${m.category}</td><td>${m.supplier}</td><td>${m.barcode}</td><td>${m.totalQuantity} ${m.unit}</td></tr>`).join('');
+            tableHeaders = `<th>اسم المادة</th><th>الفئة</th><th>الباركود</th><th>المورد</th><th>إجمالي المسحوب</th>`;
+            tableContent = (reportData as (Material & {totalQuantity: number})[]).map(m => `<tr><td>${m.name}</td><td>${m.category}</td><td>${m.barcode}</td><td>${m.supplier}</td><td>${m.totalQuantity} ${m.unit}</td></tr>`).join('');
             break;
         default: // Transaction reports
             reportTitle = `تقرير حركات`;
-            tableHeaders = `<th>التاريخ والوقت</th><th>اسم المادة</th><th>نوع المادة</th><th>المورد</th><th>الكمية</th><th>المستلم</th><th>ملاحظات</th>`;
-            tableContent = (reportData as Transaction[]).map(t => `<tr><td>${new Date(t.date).toLocaleString('ar-EG')}</td><td>${t.materialName}</td><td>${t.materialType}</td><td>${t.supplier}</td><td>${t.quantity} ${t.unit}</td><td>${t.recipient}</td><td>${t.notes || ''}</td></tr>`).join('');
+            tableHeaders = `<th>التاريخ والوقت</th><th>اسم المادة</th><th>الباركود</th><th>المورد</th><th>الكمية</th><th>المستلم</th><th>ملاحظات</th>`;
+            tableContent = (reportData as Transaction[]).map(t => `<tr><td>${new Date(t.date).toLocaleString('ar-EG')}</td><td>${t.materialName}</td><td>${t.barcode}</td><td>${t.supplier}</td><td>${t.quantity} ${t.unit}</td><td>${t.recipient}</td><td>${t.notes || ''}</td></tr>`).join('');
     }
 
     printWindow.document.write(`
@@ -263,19 +263,19 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-gray-900 dark:text-white">التقارير والجرد</h1>
 
-      <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md space-y-4 border dark:border-gray-700">
+      <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md space-y-4 border dark:border-gray-700 transition-colors">
         <div className="flex flex-wrap items-end gap-4">
            <div className="space-y-1">
              <label className="text-xs font-bold text-gray-400">نوع التقرير</label>
              <div className="flex gap-1">
                 <div className="relative">
                     <Search className="absolute right-2 top-2.5 text-gray-400" size={14} />
-                    <input type="text" placeholder="بحث..." value={searchFilterType} onChange={e => setSearchFilterType(e.target.value)} className="w-20 p-1.5 pr-7 border rounded text-xs dark:bg-gray-700 dark:border-gray-600" />
+                    <input type="text" placeholder="بحث..." value={searchFilterType} onChange={e => setSearchFilterType(e.target.value)} className="w-20 p-1.5 pr-7 border rounded text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                 </div>
                 <select 
                     value={filterType} 
                     onChange={(e) => handleFilterChange(e.target.value as ReportType)}
-                    className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 w-48 font-bold"
+                    className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white w-48 font-bold"
                 >
                     {reportOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                 </select>
@@ -286,12 +286,12 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
               <div className="flex gap-2 items-end">
                 <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400">من تاريخ</label>
-                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600" />
+                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                 </div>
                 {filterType !== 'daily' && (
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400">إلى تاريخ</label>
-                    <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600" />
+                    <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                   </div>
                 )}
               </div>
@@ -301,8 +301,8 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
                 <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400">اختر المادة</label>
                     <div className="flex gap-1">
-                        <input type="text" placeholder="بحث..." value={searchMaterial} onChange={e => setSearchMaterial(e.target.value)} className="w-20 p-1.5 border rounded text-xs dark:bg-gray-700 dark:border-gray-600" />
-                        <select value={selectedMaterialId} onChange={e => setSelectedMaterialId(e.target.value)} className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 w-40" disabled={materials.length === 0}>
+                        <input type="text" placeholder="بحث..." value={searchMaterial} onChange={e => setSearchMaterial(e.target.value)} className="w-20 p-1.5 border rounded text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                        <select value={selectedMaterialId} onChange={e => setSelectedMaterialId(e.target.value)} className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white w-40" disabled={materials.length === 0}>
                             {materials.filter(m => m.name.includes(searchMaterial)).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                         </select>
                     </div>
@@ -313,8 +313,8 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
                 <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400">اختر الفئة</label>
                     <div className="flex gap-1">
-                        <input type="text" placeholder="بحث..." value={searchCategory} onChange={e => setSearchCategory(e.target.value)} className="w-20 p-1.5 border rounded text-xs dark:bg-gray-700 dark:border-gray-600" />
-                        <select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)} className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 w-40" disabled={uniqueCategories.length === 0}>
+                        <input type="text" placeholder="بحث..." value={searchCategory} onChange={e => setSearchCategory(e.target.value)} className="w-20 p-1.5 border rounded text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                        <select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)} className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white w-40" disabled={uniqueCategories.length === 0}>
                             <option value="">-- اختر الفئة --</option>
                             {uniqueCategories.filter(c => c.includes(searchCategory)).map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
@@ -326,8 +326,8 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
                 <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400">اختر المورد</label>
                     <div className="flex gap-1">
-                        <input type="text" placeholder="بحث..." value={searchSupplier} onChange={e => setSearchSupplier(e.target.value)} className="w-20 p-1.5 border rounded text-xs dark:bg-gray-700 dark:border-gray-600" />
-                        <select value={selectedSupplier} onChange={e => setSelectedSupplier(e.target.value)} className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 w-40" disabled={uniqueSuppliers.length === 0}>
+                        <input type="text" placeholder="بحث..." value={searchSupplier} onChange={e => setSearchSupplier(e.target.value)} className="w-20 p-1.5 border rounded text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                        <select value={selectedSupplier} onChange={e => setSelectedSupplier(e.target.value)} className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white w-40" disabled={uniqueSuppliers.length === 0}>
                             <option value="">-- اختر المورد --</option>
                             {uniqueSuppliers.filter(s => s.includes(searchSupplier)).map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
@@ -339,8 +339,8 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
                 <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400">اختر الباركود</label>
                     <div className="flex gap-1">
-                        <input type="text" placeholder="بحث..." value={searchBarcode} onChange={e => setSearchBarcode(e.target.value)} className="w-20 p-1.5 border rounded text-xs dark:bg-gray-700 dark:border-gray-600" />
-                        <select value={selectedBarcode} onChange={e => setSelectedBarcode(e.target.value)} className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 w-40" disabled={uniqueBarcodes.length === 0}>
+                        <input type="text" placeholder="بحث..." value={searchBarcode} onChange={e => setSearchBarcode(e.target.value)} className="w-20 p-1.5 border rounded text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                        <select value={selectedBarcode} onChange={e => setSelectedBarcode(e.target.value)} className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white w-40" disabled={uniqueBarcodes.length === 0}>
                             <option value="">-- اختر الباركود --</option>
                             {uniqueBarcodes.filter(b => b.includes(searchBarcode)).map(b => <option key={b} value={b}>{b}</option>)}
                         </select>
@@ -361,15 +361,15 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
         </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg overflow-x-auto border dark:border-gray-700">
+      <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg overflow-x-auto border dark:border-gray-700 transition-colors">
         { (filterType === 'totalCount' || filterType === 'lowStock' || filterType === 'inactive') ? (
              <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
                 <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                     <tr>
                         <th scope="col" className="px-6 py-3">اسم المادة</th>
+                        <th scope="col" className="px-6 py-3">الباركود</th>
                         <th scope="col" className="px-6 py-3">الفئة</th>
                         <th scope="col" className="px-6 py-3">المورد</th>
-                        <th scope="col" className="px-6 py-3">الباركود</th>
                         <th scope="col" className="px-6 py-3">الكمية الحالية</th>
                         <th scope="col" className="px-6 py-3">الحد الأدنى</th>
                     </tr>
@@ -378,9 +378,9 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
                     {(reportData as Material[]).map(material => (
                         <tr key={material.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
                             <td className="px-6 py-4 font-bold text-gray-900 whitespace-nowrap dark:text-white">{material.name}</td>
+                            <td className="px-6 py-4 font-mono text-xs">{material.barcode}</td>
                             <td className="px-6 py-4">{material.category}</td>
                             <td className="px-6 py-4">{material.supplier}</td>
-                            <td className="px-6 py-4 font-mono text-xs">{material.barcode}</td>
                             <td className={`px-6 py-4 font-black ${material.currentStock < material.minStock ? 'text-red-500' : 'text-emerald-500'}`}>
                                 {material.currentStock} {material.unit}
                             </td>
@@ -394,9 +394,9 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
               <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                   <tr>
                       <th scope="col" className="px-6 py-3">اسم المادة</th>
+                      <th scope="col" className="px-6 py-3">الباركود</th>
                       <th scope="col" className="px-6 py-3">الفئة</th>
                       <th scope="col" className="px-6 py-3">المورد</th>
-                      <th scope="col" className="px-6 py-3">الباركود</th>
                       <th scope="col" className="px-6 py-3">إجمالي الكمية المسحوبة</th>
                   </tr>
               </thead>
@@ -404,9 +404,9 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
                   {(reportData as (Material & {totalQuantity: number})[]).map(material => (
                       <tr key={material.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
                           <td className="px-6 py-4 font-bold text-gray-900 whitespace-nowrap dark:text-white">{material.name}</td>
+                          <td className="px-6 py-4 font-mono text-xs">{material.barcode}</td>
                           <td className="px-6 py-4">{material.category}</td>
                           <td className="px-6 py-4">{material.supplier}</td>
-                          <td className="px-6 py-4 font-mono text-xs">{material.barcode}</td>
                           <td className="px-6 py-4 font-black text-blue-500">{material.totalQuantity} {material.unit}</td>
                       </tr>
                   ))}
@@ -418,11 +418,11 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
                     <tr>
                     <th scope="col" className="px-6 py-3 text-xs">التاريخ والوقت</th>
                     <th scope="col" className="px-6 py-3">المادة / اللون</th>
+                    <th scope="col" className="px-6 py-3">الباركود</th>
                     <th scope="col" className="px-6 py-3">الفئة</th>
                     <th scope="col" className="px-6 py-3">المورد</th>
                     <th scope="col" className="px-6 py-3">الكمية</th>
                     <th scope="col" className="px-6 py-3">المستلم</th>
-                    <th scope="col" className="px-6 py-3">ملاحظات</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -433,13 +433,13 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
                             <div className="font-bold text-gray-900 dark:text-white">{transaction.materialName}</div>
                             {transaction.color && <div className="text-[10px] text-gray-400">{transaction.color}</div>}
                         </td>
+                        <td className="px-6 py-4 font-mono text-xs">{transaction.barcode}</td>
                         <td className="px-6 py-4 text-xs">{transaction.category}</td>
                         <td className="px-6 py-4 text-xs">{transaction.supplier}</td>
                         <td className={`px-6 py-4 font-black ${transaction.type === 'in' ? 'text-emerald-500' : 'text-red-500'}`}>
                             {transaction.type === 'in' ? '+' : '-'}{transaction.quantity} {transaction.unit}
                         </td>
                         <td className="px-6 py-4 text-sm font-medium">{transaction.recipient}</td>
-                        <td className="px-6 py-4 text-xs italic">{transaction.notes}</td>
                     </tr>
                     ))}
                 </tbody>

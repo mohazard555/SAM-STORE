@@ -177,7 +177,6 @@ export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'materi
     const newTransaction: Transaction = {
         ...transactionData,
         id: `t${Date.now()}`,
-        // Use provided date or fallback to now
         date: transactionData.date || new Date().toISOString(),
         materialName: material.name,
         materialType: material.materialType,
@@ -185,7 +184,6 @@ export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'materi
         category: material.category,
         barcode: material.barcode,
         unit: material.unit,
-        // Carry over color if not provided explicitly
         color: transactionData.color || material.color
     };
     
@@ -198,6 +196,57 @@ export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'materi
     syncDataToGist();
 
     return newTransaction;
+};
+
+export const deleteTransaction = (transactionId: string): void => {
+    const transactions = getTransactions();
+    const transaction = transactions.find(t => t.id === transactionId);
+    if (!transaction) return;
+
+    let materials = getMaterials();
+    const material = materials.find(m => m.id === transaction.materialId);
+
+    if (material) {
+        // Reverse the stock change: if it was "in", subtract. If it was "out", add back.
+        const reverseStockChange = transaction.type === 'in' ? -transaction.quantity : transaction.quantity;
+        const updatedMaterial = { ...material, currentStock: material.currentStock + reverseStockChange };
+        materials = materials.map(m => m.id === updatedMaterial.id ? updatedMaterial : m);
+        saveToStorage(MATERIALS_KEY, materials);
+    }
+
+    saveToStorage(TRANSACTIONS_KEY, transactions.filter(t => t.id !== transactionId));
+    syncDataToGist();
+};
+
+export const updateTransaction = (updatedTransaction: Transaction): Transaction => {
+    const transactions = getTransactions();
+    const oldTransaction = transactions.find(t => t.id === updatedTransaction.id);
+    if (!oldTransaction) return updatedTransaction;
+
+    let materials = getMaterials();
+    const material = materials.find(m => m.id === updatedTransaction.materialId);
+
+    if (material) {
+        // 1. Reverse old stock change
+        const reverseOldChange = oldTransaction.type === 'in' ? -oldTransaction.quantity : oldTransaction.quantity;
+        let tempStock = material.currentStock + reverseOldChange;
+
+        // 2. Apply new stock change
+        const newStockChange = updatedTransaction.type === 'in' ? updatedTransaction.quantity : -updatedTransaction.quantity;
+        const finalStock = tempStock + newStockChange;
+
+        if (finalStock < 0) throw new Error('تعديل الحركة سيؤدي لنتائج سالبة في المخزون.');
+
+        const updatedMaterial = { ...material, currentStock: finalStock };
+        materials = materials.map(m => m.id === updatedMaterial.id ? updatedMaterial : m);
+        saveToStorage(MATERIALS_KEY, materials);
+    }
+
+    const updatedTransactions = transactions.map(t => t.id === updatedTransaction.id ? updatedTransaction : t);
+    saveToStorage(TRANSACTIONS_KEY, updatedTransactions);
+    syncDataToGist();
+
+    return updatedTransaction;
 };
 
 export const getSettings = (): SettingsData => getFromStorage<SettingsData>(SETTINGS_KEY, { companyName: '', companyAddress: '', companyLogo: '', signatureNames: { keeper: '', accountant: '', manager: '' }, gistUrl: '', githubToken: '' });
