@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Transaction, Material } from '@/types';
 import { addTransaction } from '@/services/mockApi';
-import { Plus, ArrowDownLeft, ArrowUpRight, Calendar, Info } from 'lucide-react';
+import { Plus, ArrowDownLeft, ArrowUpRight, Calendar, Info, Search } from 'lucide-react';
 
 interface TransactionsProps {
   transactions: Transaction[];
@@ -16,7 +16,13 @@ const TransactionModal: React.FC<{
     onClose: () => void; 
     onSave: (transaction: Omit<Transaction, 'id' | 'materialName' | 'supplier' | 'category' | 'barcode' | 'unit' | 'materialType'>) => void; 
 }> = ({ materials, onClose, onSave }) => {
-    const [materialId, setMaterialId] = useState(materials[0]?.id || '');
+    const [searchTerm, setSearchTerm] = useState('');
+    const filteredMaterials = materials.filter(m => 
+        m.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        m.barcode.includes(searchTerm)
+    );
+    
+    const [materialId, setMaterialId] = useState(filteredMaterials[0]?.id || '');
     const [quantity, setQuantity] = useState(1);
     const [recipient, setRecipient] = useState('');
     const [notes, setNotes] = useState('');
@@ -59,20 +65,36 @@ const TransactionModal: React.FC<{
             </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="md:col-span-2">
-                        <label className="block mb-1 text-sm font-medium">المادة</label>
-                        <select 
-                            value={materialId} 
-                            onChange={(e) => setMaterialId(e.target.value)} 
-                            required 
-                            className="w-full p-2 border rounded bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500"
-                        >
-                            {materials.map(m => <option key={m.id} value={m.id}>{m.name} (المتاح: {m.currentStock} {m.unit})</option>)}
-                        </select>
+                    <div className="md:col-span-2 space-y-2">
+                        <label className="block mb-1 text-sm font-medium">اختر المادة</label>
+                        <div className="flex gap-2">
+                            <div className="relative flex-1">
+                                <Search className="absolute right-2 top-2.5 text-gray-400" size={16} />
+                                <input 
+                                    type="text" 
+                                    placeholder="ابحث باسم المادة أو الباركود..." 
+                                    value={searchTerm} 
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full p-2 pr-9 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm"
+                                />
+                            </div>
+                            <select 
+                                value={materialId} 
+                                onChange={(e) => setMaterialId(e.target.value)} 
+                                required 
+                                className="flex-[1.5] p-2 border rounded bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 text-sm"
+                            >
+                                {filteredMaterials.length > 0 ? (
+                                    filteredMaterials.map(m => <option key={m.id} value={m.id}>{m.name} (المتاح: {m.currentStock} {m.unit})</option>)
+                                ) : (
+                                    <option value="">لا توجد نتائج للبحث</option>
+                                )}
+                            </select>
+                        </div>
                     </div>
 
                     {/* Auto-filled fields info section */}
-                    <div className="md:col-span-2 bg-sky-50 dark:bg-sky-900/20 p-3 rounded-lg flex flex-wrap gap-4 text-xs text-sky-800 dark:text-sky-300">
+                    <div className="md:col-span-2 bg-sky-50 dark:bg-sky-900/20 p-3 rounded-lg flex flex-wrap gap-4 text-[10px] md:text-xs text-sky-800 dark:text-sky-300">
                         <div className="flex items-center"><Info size={14} className="ml-1"/> <strong>المورد:</strong> {selectedMaterial?.supplier || '-'}</div>
                         <div className="flex items-center"><Info size={14} className="ml-1"/> <strong>الباركود:</strong> {selectedMaterial?.barcode || '-'}</div>
                         <div className="flex items-center"><Info size={14} className="ml-1"/> <strong>الفئة:</strong> {selectedMaterial?.category || '-'}</div>
@@ -169,11 +191,11 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, on
                     )}
                 </td>
                 <td className="px-6 py-4">
-                    <div className="font-medium text-gray-900 dark:text-white">{transaction.materialName}</div>
+                    <div className="font-bold text-gray-900 dark:text-white">{transaction.materialName}</div>
                     {transaction.color && <div className="text-[10px] text-gray-400">اللون: {transaction.color}</div>}
                 </td>
                 <td className="px-6 py-4 font-mono text-xs">{transaction.barcode}</td>
-                <td className={`px-6 py-4 font-bold ${transaction.type === 'in' ? 'text-emerald-500' : 'text-red-500'}`}>
+                <td className={`px-6 py-4 font-black ${transaction.type === 'in' ? 'text-emerald-500' : 'text-red-500'}`}>
                     {transaction.type === 'in' ? '+' : '-'}{transaction.quantity} {transaction.unit}
                 </td>
                 <td className="px-6 py-4">

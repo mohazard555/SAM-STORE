@@ -1,6 +1,7 @@
+
 import React, { useState, useMemo } from 'react';
 import { Transaction, Material, SettingsData } from '@/types';
-import { Download, Printer } from 'lucide-react';
+import { Download, Printer, Search } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface ReportsProps {
@@ -16,9 +17,16 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedMaterialId, setSelectedMaterialId] = useState(materials[0]?.id || '');
-  const [barcode, setBarcode] = useState('');
+  const [selectedBarcode, setSelectedBarcode] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState('');
+
+  // Search terms for dropdowns
+  const [searchFilterType, setSearchFilterType] = useState('');
+  const [searchMaterial, setSearchMaterial] = useState('');
+  const [searchCategory, setSearchCategory] = useState('');
+  const [searchSupplier, setSearchSupplier] = useState('');
+  const [searchBarcode, setSearchBarcode] = useState('');
 
   const uniqueCategories = useMemo(() => {
     const categories = materials.map(m => m.category);
@@ -28,6 +36,11 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
   const uniqueSuppliers = useMemo(() => {
     const suppliers = materials.map(m => m.supplier);
     return [...new Set(suppliers)].filter(Boolean);
+  }, [materials]);
+
+  const uniqueBarcodes = useMemo(() => {
+    const barcodes = materials.map(m => m.barcode);
+    return [...new Set(barcodes)].filter(Boolean);
   }, [materials]);
 
   const handleFilterChange = (type: ReportType) => {
@@ -44,15 +57,11 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
       const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
       setStartDate(firstDay.toISOString().split('T')[0]);
       setEndDate(lastDay.toISOString().split('T')[0]);
-    } else if (type === 'byCategory') {
-      setSelectedCategory(uniqueCategories[0] || '');
-    } else if (type === 'bySupplier') {
-      setSelectedSupplier(uniqueSuppliers[0] || '');
     }
   }
 
   const dateFilteredTransactions = useMemo(() => {
-    const timeSensitiveReports: ReportType[] = ['daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byBarcode', 'bySupplier', 'mostUsed', 'inactive'];
+    const timeSensitiveReports: ReportType[] = ['daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byBarcode', 'bySupplier', 'mostUsed', 'all'];
     if (!timeSensitiveReports.includes(filterType)) {
         return transactions;
     }
@@ -61,7 +70,6 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
     start.setHours(0, 0, 0, 0);
 
     let end: Date;
-
     if (filterType === 'daily') {
         end = new Date(start);
         end.setHours(23, 59, 59, 999);
@@ -78,26 +86,29 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
 
   const reportData = useMemo(() => {
     switch(filterType) {
+      case 'totalCount':
+        return materials;
+      
       case 'lowStock':
         return materials.filter(m => m.currentStock < m.minStock);
       
       case 'mostUsed': {
         const usage = dateFilteredTransactions.reduce((acc, t) => {
-            acc[t.materialId] = (acc[t.materialId] || 0) + t.quantity;
+            if (t.type === 'out') acc[t.materialId] = (acc[t.materialId] || 0) + t.quantity;
             return acc;
         }, {} as Record<string, number>);
 
         return Object.entries(usage)
             .map(([materialId, totalQuantity]) => {
                 const material = materials.find(m => m.id === materialId);
-                return { ...material, totalQuantity };
+                return material ? { ...material, totalQuantity } : null;
             })
-            .filter(item => item.id)
+            .filter((item): item is (Material & {totalQuantity: number}) => item !== null)
             .sort((a, b) => b.totalQuantity - a.totalQuantity);
       }
       
       case 'inactive': {
-        const activeMaterialIds = new Set(dateFilteredTransactions.map(t => t.materialId));
+        const activeMaterialIds = new Set(transactions.map(t => t.materialId));
         return materials.filter(m => !activeMaterialIds.has(m.id));
       }
 
@@ -114,13 +125,12 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
             const materialIdsFromSupplier = materials.filter(m => m.supplier === selectedSupplier).map(m => m.id);
             result = result.filter(t => materialIdsFromSupplier.includes(t.materialId));
         }
-        if (filterType === 'byBarcode' && barcode) {
-            const material = materials.find(m => m.barcode === barcode);
-            result = material ? result.filter(t => t.materialId === material.id) : [];
+        if (filterType === 'byBarcode' && selectedBarcode) {
+            result = result.filter(t => t.barcode === selectedBarcode);
         }
         return [...result].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }
-  }, [materials, dateFilteredTransactions, filterType, selectedMaterialId, selectedCategory, selectedSupplier, barcode]);
+  }, [materials, transactions, dateFilteredTransactions, filterType, selectedMaterialId, selectedCategory, selectedSupplier, selectedBarcode]);
   
   const exportToXLSX = () => {
     let dataToExport: any[] = [];
@@ -162,7 +172,6 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
   
   const handlePrint = () => {
     let reportTitle = `تقرير`;
-    
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
@@ -232,80 +241,127 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
   };
   
   const canPerformAction = reportData && reportData.length > 0;
-  const showDatePickers = ['daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byBarcode', 'bySupplier', 'mostUsed', 'inactive'].includes(filterType);
+  const showDatePickers = ['all', 'daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byBarcode', 'bySupplier', 'mostUsed'].includes(filterType);
+
+  // Helper for filtered report options
+  const reportOptions = [
+    { value: 'all', label: 'كل الحركات' },
+    { value: 'daily', label: 'تقرير يومي' },
+    { value: 'weekly', label: 'تقرير أسبوعي' },
+    { value: 'monthly', label: 'تقرير شهري' },
+    { value: 'byMaterial', label: 'تقرير حسب المادة' },
+    { value: 'byCategory', label: 'تقرير حسب الفئة' },
+    { value: 'bySupplier', label: 'تقرير حسب المورد' },
+    { value: 'byBarcode', label: 'تقرير حسب الباركود' },
+    { value: 'totalCount', label: 'جرد إجمالي للمخزون' },
+    { value: 'mostUsed', label: 'تقرير بالمواد الأكثر استخداماً' },
+    { value: 'inactive', label: 'تقرير بالمواد الراكدة' },
+    { value: 'lowStock', label: 'تقرير بالمواد منخفضة الكمية' },
+  ].filter(opt => opt.label.includes(searchFilterType));
 
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-gray-900 dark:text-white">التقارير والجرد</h1>
 
-      <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md space-y-4">
-        <div className="flex flex-wrap items-center gap-4">
-           <select 
-             value={filterType} 
-             onChange={(e) => handleFilterChange(e.target.value as ReportType)}
-             className="p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
-           >
-                <option value="all">كل الحركات</option>
-                <option value="daily">تقرير يومي</option>
-                <option value="weekly">تقرير أسبوعي</option>
-                <option value="monthly">تقرير شهري</option>
-                <option value="byMaterial">تقرير حسب المادة</option>
-                <option value="byCategory">تقرير حسب الفئة</option>
-                <option value="bySupplier">تقرير حسب المورد</option>
-                <option value="byBarcode">تقرير حسب الباركود</option>
-                <option value="totalCount">جرد إجمالي للمخزون</option>
-                <option value="mostUsed">تقرير بالمواد الأكثر استخداماً</option>
-                <option value="inactive">تقرير بالمواد الراكدة</option>
-                <option value="lowStock">تقرير بالمواد منخفضة الكمية</option>
-            </select>
+      <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md space-y-4 border dark:border-gray-700">
+        <div className="flex flex-wrap items-end gap-4">
+           <div className="space-y-1">
+             <label className="text-xs font-bold text-gray-400">نوع التقرير</label>
+             <div className="flex gap-1">
+                <div className="relative">
+                    <Search className="absolute right-2 top-2.5 text-gray-400" size={14} />
+                    <input type="text" placeholder="بحث..." value={searchFilterType} onChange={e => setSearchFilterType(e.target.value)} className="w-20 p-1.5 pr-7 border rounded text-xs dark:bg-gray-700 dark:border-gray-600" />
+                </div>
+                <select 
+                    value={filterType} 
+                    onChange={(e) => handleFilterChange(e.target.value as ReportType)}
+                    className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 w-48 font-bold"
+                >
+                    {reportOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                </select>
+             </div>
+           </div>
             
             {showDatePickers && (
-              <>
-                <label>من:</label>
-                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="p-2 border rounded dark:bg-gray-700 dark:border-gray-600" />
+              <div className="flex gap-2 items-end">
+                <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-400">من تاريخ</label>
+                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600" />
+                </div>
                 {filterType !== 'daily' && (
-                  <>
-                  <label>إلى:</label>
-                  <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="p-2 border rounded dark:bg-gray-700 dark:border-gray-600" />
-                  </>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-400">إلى تاريخ</label>
+                    <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600" />
+                  </div>
                 )}
-              </>
+              </div>
             )}
 
             {filterType === 'byMaterial' && (
-                 <select value={selectedMaterialId} onChange={e => setSelectedMaterialId(e.target.value)} className="p-2 border rounded dark:bg-gray-700 dark:border-gray-600" disabled={materials.length === 0}>
-                    {materials.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                 </select>
+                <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-400">اختر المادة</label>
+                    <div className="flex gap-1">
+                        <input type="text" placeholder="بحث..." value={searchMaterial} onChange={e => setSearchMaterial(e.target.value)} className="w-20 p-1.5 border rounded text-xs dark:bg-gray-700 dark:border-gray-600" />
+                        <select value={selectedMaterialId} onChange={e => setSelectedMaterialId(e.target.value)} className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 w-40" disabled={materials.length === 0}>
+                            {materials.filter(m => m.name.includes(searchMaterial)).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                        </select>
+                    </div>
+                </div>
             )}
             
             {filterType === 'byCategory' && (
-                 <select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)} className="p-2 border rounded dark:bg-gray-700 dark:border-gray-600" disabled={uniqueCategories.length === 0}>
-                    {uniqueCategories.map(c => <option key={c} value={c}>{c}</option>)}
-                 </select>
+                <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-400">اختر الفئة</label>
+                    <div className="flex gap-1">
+                        <input type="text" placeholder="بحث..." value={searchCategory} onChange={e => setSearchCategory(e.target.value)} className="w-20 p-1.5 border rounded text-xs dark:bg-gray-700 dark:border-gray-600" />
+                        <select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)} className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 w-40" disabled={uniqueCategories.length === 0}>
+                            <option value="">-- اختر الفئة --</option>
+                            {uniqueCategories.filter(c => c.includes(searchCategory)).map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                    </div>
+                </div>
             )}
 
             {filterType === 'bySupplier' && (
-                 <select value={selectedSupplier} onChange={e => setSelectedSupplier(e.target.value)} className="p-2 border rounded dark:bg-gray-700 dark:border-gray-600" disabled={uniqueSuppliers.length === 0}>
-                    {uniqueSuppliers.map(s => <option key={s} value={s}>{s}</option>)}
-                 </select>
+                <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-400">اختر المورد</label>
+                    <div className="flex gap-1">
+                        <input type="text" placeholder="بحث..." value={searchSupplier} onChange={e => setSearchSupplier(e.target.value)} className="w-20 p-1.5 border rounded text-xs dark:bg-gray-700 dark:border-gray-600" />
+                        <select value={selectedSupplier} onChange={e => setSelectedSupplier(e.target.value)} className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 w-40" disabled={uniqueSuppliers.length === 0}>
+                            <option value="">-- اختر المورد --</option>
+                            {uniqueSuppliers.filter(s => s.includes(searchSupplier)).map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                    </div>
+                </div>
             )}
 
             {filterType === 'byBarcode' && (
-                 <input type="text" value={barcode} onChange={e => setBarcode(e.target.value)} placeholder="أدخل الباركود" className="p-2 border rounded dark:bg-gray-700 dark:border-gray-600" />
+                <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-400">اختر الباركود</label>
+                    <div className="flex gap-1">
+                        <input type="text" placeholder="بحث..." value={searchBarcode} onChange={e => setSearchBarcode(e.target.value)} className="w-20 p-1.5 border rounded text-xs dark:bg-gray-700 dark:border-gray-600" />
+                        <select value={selectedBarcode} onChange={e => setSelectedBarcode(e.target.value)} className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 w-40" disabled={uniqueBarcodes.length === 0}>
+                            <option value="">-- اختر الباركود --</option>
+                            {uniqueBarcodes.filter(b => b.includes(searchBarcode)).map(b => <option key={b} value={b}>{b}</option>)}
+                        </select>
+                    </div>
+                </div>
             )}
 
-            <button onClick={exportToXLSX} className="flex items-center px-4 py-2 bg-emerald-500 text-white rounded-lg shadow hover:bg-emerald-600 disabled:bg-emerald-300" disabled={!canPerformAction}>
-                <Download className="ml-2" size={20}/>
-                تصدير XLSX
-            </button>
-             <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-sky-500 text-white rounded-lg shadow hover:bg-sky-600 disabled:bg-sky-300" disabled={!canPerformAction}>
-                <Printer className="ml-2" size={20}/>
-                طباعة التقرير
-            </button>
+            <div className="flex gap-2">
+                <button onClick={exportToXLSX} className="flex items-center px-4 py-2 bg-emerald-500 text-white rounded-lg shadow hover:bg-emerald-600 disabled:bg-emerald-300 transition-colors" disabled={!canPerformAction}>
+                    <Download className="ml-2" size={18}/>
+                    تصدير XLSX
+                </button>
+                <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-sky-500 text-white rounded-lg shadow hover:bg-sky-600 disabled:bg-sky-300 transition-colors" disabled={!canPerformAction}>
+                    <Printer className="ml-2" size={18}/>
+                    طباعة التقرير
+                </button>
+            </div>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg overflow-x-auto">
+      <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg overflow-x-auto border dark:border-gray-700">
         { (filterType === 'totalCount' || filterType === 'lowStock' || filterType === 'inactive') ? (
              <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
                 <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
@@ -315,20 +371,20 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
                         <th scope="col" className="px-6 py-3">المورد</th>
                         <th scope="col" className="px-6 py-3">الباركود</th>
                         <th scope="col" className="px-6 py-3">الكمية الحالية</th>
-                        <th scope="col" className="px-6 py-3">الحد الأدنى للمخزون</th>
+                        <th scope="col" className="px-6 py-3">الحد الأدنى</th>
                     </tr>
                 </thead>
                 <tbody>
                     {(reportData as Material[]).map(material => (
-                        <tr key={material.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                            <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{material.name}</td>
+                        <tr key={material.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                            <td className="px-6 py-4 font-bold text-gray-900 whitespace-nowrap dark:text-white">{material.name}</td>
                             <td className="px-6 py-4">{material.category}</td>
                             <td className="px-6 py-4">{material.supplier}</td>
-                            <td className="px-6 py-4 font-mono">{material.barcode}</td>
-                            <td className={`px-6 py-4 font-bold ${material.currentStock < material.minStock ? 'text-red-500' : 'text-emerald-500'}`}>
+                            <td className="px-6 py-4 font-mono text-xs">{material.barcode}</td>
+                            <td className={`px-6 py-4 font-black ${material.currentStock < material.minStock ? 'text-red-500' : 'text-emerald-500'}`}>
                                 {material.currentStock} {material.unit}
                             </td>
-                            <td className="px-6 py-4">{material.minStock} {material.unit}</td>
+                            <td className="px-6 py-4 text-gray-400">{material.minStock} {material.unit}</td>
                         </tr>
                     ))}
                 </tbody>
@@ -346,12 +402,12 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
               </thead>
               <tbody>
                   {(reportData as (Material & {totalQuantity: number})[]).map(material => (
-                      <tr key={material.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                          <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{material.name}</td>
+                      <tr key={material.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                          <td className="px-6 py-4 font-bold text-gray-900 whitespace-nowrap dark:text-white">{material.name}</td>
                           <td className="px-6 py-4">{material.category}</td>
                           <td className="px-6 py-4">{material.supplier}</td>
-                          <td className="px-6 py-4 font-mono">{material.barcode}</td>
-                          <td className="px-6 py-4 font-bold text-blue-500">{material.totalQuantity} {material.unit}</td>
+                          <td className="px-6 py-4 font-mono text-xs">{material.barcode}</td>
+                          <td className="px-6 py-4 font-black text-blue-500">{material.totalQuantity} {material.unit}</td>
                       </tr>
                   ))}
               </tbody>
@@ -360,33 +416,36 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
             <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
                 <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                     <tr>
-                    <th scope="col" className="px-6 py-3">التاريخ والوقت</th>
-                    <th scope="col" className="px-6 py-3">اسم المادة</th>
-                    <th scope="col" className="px-6 py-3">نوع المادة</th>
+                    <th scope="col" className="px-6 py-3 text-xs">التاريخ والوقت</th>
+                    <th scope="col" className="px-6 py-3">المادة / اللون</th>
                     <th scope="col" className="px-6 py-3">الفئة</th>
                     <th scope="col" className="px-6 py-3">المورد</th>
-                    <th scope="col" className="px-6 py-3">الكمية المسحوبة</th>
+                    <th scope="col" className="px-6 py-3">الكمية</th>
                     <th scope="col" className="px-6 py-3">المستلم</th>
                     <th scope="col" className="px-6 py-3">ملاحظات</th>
                     </tr>
                 </thead>
                 <tbody>
                     {(reportData as Transaction[]).map(transaction => (
-                    <tr key={transaction.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                        <td className="px-6 py-4">{new Date(transaction.date).toLocaleString('ar-EG')}</td>
-                        <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{transaction.materialName}</td>
-                        <td className="px-6 py-4">{transaction.materialType}</td>
-                        <td className="px-6 py-4">{transaction.category}</td>
-                        <td className="px-6 py-4">{transaction.supplier}</td>
-                        <td className="px-6 py-4">{transaction.quantity} {transaction.unit}</td>
-                        <td className="px-6 py-4">{transaction.recipient}</td>
-                        <td className="px-6 py-4">{transaction.notes}</td>
+                    <tr key={transaction.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                        <td className="px-6 py-4 text-xs">{new Date(transaction.date).toLocaleString('ar-EG')}</td>
+                        <td className="px-6 py-4">
+                            <div className="font-bold text-gray-900 dark:text-white">{transaction.materialName}</div>
+                            {transaction.color && <div className="text-[10px] text-gray-400">{transaction.color}</div>}
+                        </td>
+                        <td className="px-6 py-4 text-xs">{transaction.category}</td>
+                        <td className="px-6 py-4 text-xs">{transaction.supplier}</td>
+                        <td className={`px-6 py-4 font-black ${transaction.type === 'in' ? 'text-emerald-500' : 'text-red-500'}`}>
+                            {transaction.type === 'in' ? '+' : '-'}{transaction.quantity} {transaction.unit}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-medium">{transaction.recipient}</td>
+                        <td className="px-6 py-4 text-xs italic">{transaction.notes}</td>
                     </tr>
                     ))}
                 </tbody>
             </table>
         )}
-        {!canPerformAction && <p className="text-center p-4">لا توجد بيانات لعرضها حسب الفلتر المختار.</p>}
+        {!canPerformAction && <div className="p-12 text-center text-gray-400">لا توجد بيانات تطابق الفلتر المختار.</div>}
       </div>
     </div>
   );
