@@ -1,16 +1,18 @@
 
 import React, { useState } from 'react';
 import { User } from '@/types';
-import { Search, LogOut, User as UserIcon, Menu } from 'lucide-react';
+import { Search, LogOut, User as UserIcon, Menu, Moon, Sun } from 'lucide-react';
 
 interface HeaderProps {
   user: User;
   onLogout: () => void;
   toggleSidebar: () => void;
   onSearch: (term: string) => void;
+  darkMode: boolean;
+  setDarkMode: (dark: boolean) => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ user, onLogout, toggleSidebar, onSearch }) => {
+const Header: React.FC<HeaderProps> = ({ user, onLogout, toggleSidebar, onSearch, darkMode, setDarkMode }) => {
   const [isDropdownOpen, setDropdownOpen] = useState(false);
 
   return (
@@ -32,33 +34,43 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, toggleSidebar, onSearch
         </div>
       </div>
 
-      <div className="relative">
-        <button
-          onClick={() => setDropdownOpen(!isDropdownOpen)}
-          className="flex items-center space-x-2 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+      <div className="flex items-center gap-2">
+        <button 
+          onClick={() => setDarkMode(!darkMode)} 
+          className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors"
+          title={darkMode ? "تبديل للوضع المضيء" : "تبديل للوضع المظلم"}
         >
-          <UserIcon className="w-6 h-6" />
-          <span className="hidden sm:inline">{user.username}</span>
+          {darkMode ? <Sun size={20} /> : <Moon size={20} />}
         </button>
-        {isDropdownOpen && (
-          <div className="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 dark:bg-gray-700 z-20">
-            <div className="px-4 py-3 text-sm text-gray-900 dark:text-white">
-              <div>{user.username}</div>
-              <div className="font-medium truncate">{user.role === 'admin' ? 'أمين مستودع' : 'مستخدم'}</div>
+
+        <div className="relative">
+          <button
+            onClick={() => setDropdownOpen(!isDropdownOpen)}
+            className="flex items-center space-x-2 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          >
+            <UserIcon className="w-6 h-6" />
+            <span className="hidden sm:inline mr-2">{user.username}</span>
+          </button>
+          {isDropdownOpen && (
+            <div className="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 dark:bg-gray-700 z-20 border dark:border-gray-600">
+              <div className="px-4 py-3 text-sm text-gray-900 dark:text-white border-b dark:border-gray-600">
+                <div className="font-bold">{user.username}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">{user.role === 'admin' ? 'أمين مستودع' : 'مستخدم'}</div>
+              </div>
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  onLogout();
+                }}
+                className="flex items-center w-full text-right px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+              >
+                <LogOut className="w-4 h-4 ml-2" />
+                تسجيل الخروج
+              </a>
             </div>
-            <a
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                onLogout();
-              }}
-              className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600 dark:hover:text-white"
-            >
-              <LogOut className="w-4 h-4 ml-2" />
-              تسجيل الخروج
-            </a>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </header>
   );

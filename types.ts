@@ -2,11 +2,12 @@
 export interface Material {
   id: string;
   name: string;
-  materialType: string; // Renamed from code
+  materialType: string;
   category: string;
   specifications: string;
   supplier: string;
   barcode: string;
+  color?: string; // Added color field
   unit: string;
   minStock: number;
   currentStock: number;
@@ -15,12 +16,14 @@ export interface Material {
 
 export interface Transaction {
   id: string;
+  type: 'in' | 'out';
   materialId: string;
   materialName: string;
   materialType: string;
+  category: string; // Added category field
   supplier: string;
-  category: string;
   barcode: string;
+  color?: string; // Added color field
   quantity: number;
   unit: string;
   recipient: string;
@@ -40,7 +43,7 @@ export type Page = 'dashboard' | 'materials' | 'transactions' | 'reports' | 'set
 export interface SettingsData {
   companyName: string;
   companyAddress: string;
-  companyLogo: string; // Base64 encoded image
+  companyLogo: string;
   signatureNames: {
     keeper: string;
     accountant: string;

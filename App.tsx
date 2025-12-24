@@ -9,6 +9,10 @@ function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [darkMode, setDarkMode] = useState(() => {
+    return localStorage.getItem('theme') === 'dark' || 
+      (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  });
 
   useEffect(() => {
     const initApp = async () => {
@@ -26,6 +30,16 @@ function App() {
     initApp();
   }, []);
 
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [darkMode]);
+
   const handleLogin = (loggedInUser: User) => {
     setUser(loggedInUser);
   };
@@ -36,13 +50,27 @@ function App() {
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center h-screen bg-gray-100"><p>جار التحميل...</p></div>;
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-500 mb-4"></div>
+        <p className="text-gray-600 dark:text-gray-400">جار تحضير المستودع...</p>
+      </div>
+    );
   }
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-900 min-h-screen font-sans">
-      {error && <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 text-center" role="alert"><p>{error}</p></div>}
-      {user ? <MainLayout user={user} onLogout={handleLogout} /> : <Login onLogin={handleLogin} />}
+    <div className="bg-gray-50 dark:bg-gray-900 min-h-screen font-sans transition-colors duration-300">
+      {error && <div className="bg-red-100 dark:bg-red-900/30 border-l-4 border-red-500 text-red-700 dark:text-red-300 p-4 text-center" role="alert"><p>{error}</p></div>}
+      {user ? (
+        <MainLayout 
+          user={user} 
+          onLogout={handleLogout} 
+          darkMode={darkMode} 
+          setDarkMode={setDarkMode} 
+        />
+      ) : (
+        <Login onLogin={handleLogin} />
+      )}
     </div>
   );
 }
