@@ -57,7 +57,7 @@ const initializeData = () => {
             companyAddress: 'العنوان هنا',
             companyLogo: defaultLogoSvg,
             signatureNames: { keeper: 'أمين المستودع', accountant: 'المحاسب', manager: 'المدير العام' },
-            gistUrl: '',
+            gistUrl: 'https://gist.githubusercontent.com/mohazard555/6da370385392ac7cd27e034efe4b7d7c/raw/amenstor.json',
             githubToken: '',
         };
         saveToStorage(SETTINGS_KEY, initialSettings);
@@ -83,29 +83,56 @@ const syncDataToGist = async () => {
     } catch (error) { console.error("Gist sync error:", error); }
 };
 
-export const initializeDataSource = async (): Promise<{ success: boolean; message?: string }> => {
+export const initializeDataSource = async (overrideUrl?: string): Promise<{ success: boolean; message?: string }> => {
     const settings = getSettings();
-    if (!settings.gistUrl) return { success: true, message: 'Using local data.' };
+    const fetchUrl = overrideUrl || settings.gistUrl;
     
-    // If it's a raw URL with a commit hash, try to strip the hash to get the latest version
-    let fetchUrl = settings.gistUrl;
-    if (fetchUrl.includes('/raw/') && fetchUrl.split('/raw/')[1]?.includes('/')) {
-        const parts = fetchUrl.split('/raw/');
-        const pathParts = parts[1].split('/');
-        if (pathParts.length > 1) {
-            // It has a hash, e.g., raw/hash/filename.json -> raw/filename.json
-            fetchUrl = `${parts[0]}/raw/${pathParts[pathParts.length - 1]}`;
-        }
-    }
+    if (!fetchUrl) return { success: true, message: 'Using local data.' };
+    
+    // Try to extract Gist ID to use the API for fresher data
+    const gistIdMatch = fetchUrl.match(/gist\.github(?:usercontent)?\.com\/[^\/]+\/([a-f0-9]+)/);
+    const gistId = gistIdMatch ? gistIdMatch[1] : null;
 
     try {
-        const response = await fetch(fetchUrl, { cache: 'no-store' });
-        if (!response.ok) throw new Error(`Failed to fetch data from Gist (Status: ${response.status}).`);
+        let dataText = '';
         
-        const text = await response.text();
-        if (!text || text.trim() === '' || text.trim() === '{}' || text.trim() === '[]') {
-            // Gist is empty or just an empty object/array. 
-            // We should try to push our local data to it if we have a token.
+        if (gistId) {
+            // Use Gist API for fresher data (less caching than raw URL)
+            try {
+                const apiResponse = await fetch(`https://api.github.com/gists/${gistId}`, { 
+                    cache: 'no-store',
+                    headers: settings.githubToken ? { 'Authorization': `token ${settings.githubToken}` } : {}
+                });
+                if (apiResponse.ok) {
+                    const gistData = await apiResponse.json();
+                    const filename = fetchUrl.split('/').pop() || Object.keys(gistData.files)[0];
+                    const file = gistData.files[filename] || Object.values(gistData.files)[0];
+                    if (file && file.content) {
+                        dataText = file.content;
+                    }
+                }
+            } catch (apiErr) {
+                console.warn("Gist API fetch failed, falling back to raw URL:", apiErr);
+            }
+        }
+
+        if (!dataText) {
+            // Fallback to Raw URL if API failed or no Gist ID found
+            let rawUrl = fetchUrl;
+            if (rawUrl.includes('/raw/') && rawUrl.split('/raw/')[1]?.includes('/')) {
+                const parts = rawUrl.split('/raw/');
+                const pathParts = parts[1].split('/');
+                if (pathParts.length > 1) {
+                    rawUrl = `${parts[0]}/raw/${pathParts[pathParts.length - 1]}`;
+                }
+            }
+            
+            const response = await fetch(rawUrl, { cache: 'no-store' });
+            if (!response.ok) throw new Error(`Failed to fetch data from Gist (Status: ${response.status}).`);
+            dataText = await response.text();
+        }
+        
+        if (!dataText || dataText.trim() === '' || dataText.trim() === '{}' || dataText.trim() === '[]') {
             if (settings.githubToken) {
                 syncDataToGist();
                 return { success: true, message: 'Gist was empty. Local data has been queued for sync.' };
@@ -114,13 +141,16 @@ export const initializeDataSource = async (): Promise<{ success: boolean; messag
         }
         
         try {
-            const data = JSON.parse(text);
+            const data = JSON.parse(dataText);
             importAllData(data);
             return { success: true, message: 'Data loaded from Gist.' };
         } catch (e) {
             throw new Error('Gist content is not valid JSON.');
         }
-    } catch (error) { return { success: false, message: (error as Error).message }; }
+    } catch (error) { 
+        console.error("Initialize data source error:", error);
+        return { success: false, message: (error as Error).message }; 
+    }
 };
 
 export const authenticateUser = (username: string, password: string): User | null => {
@@ -278,7 +308,24 @@ export const updateTransaction = (updatedTransaction: Transaction): Transaction 
     return updatedTransaction;
 };
 
-export const getSettings = (): SettingsData => getFromStorage<SettingsData>(SETTINGS_KEY, { companyName: '', companyAddress: '', companyLogo: '', signatureNames: { keeper: '', accountant: '', manager: '' }, gistUrl: '', githubToken: '' });
+export const getSettings = (): SettingsData => {
+    const defaultGistUrl = 'https://gist.githubusercontent.com/mohazard555/6da370385392ac7cd27e034efe4b7d7c/raw/amenstor.json';
+    const settings = getFromStorage<SettingsData>(SETTINGS_KEY, { 
+        companyName: '', 
+        companyAddress: '', 
+        companyLogo: '', 
+        signatureNames: { keeper: '', accountant: '', manager: '' }, 
+        gistUrl: defaultGistUrl, 
+        githubToken: '' 
+    });
+    
+    // If gistUrl is empty in storage, use the default one
+    if (!settings.gistUrl) {
+        settings.gistUrl = defaultGistUrl;
+    }
+    
+    return settings;
+};
 export const saveSettings = (settings: SettingsData): void => { 
     saveToStorage(SETTINGS_KEY, settings); 
     syncDataToGist(); // Sync immediately when settings are saved
@@ -315,4 +362,25 @@ export const importAllData = (data: any): void => {
     if (actualData.settings) saveToStorage(SETTINGS_KEY, actualData.settings);
     if (actualData.materials) saveToStorage(MATERIALS_KEY, actualData.materials);
     if (actualData.transactions) saveToStorage(TRANSACTIONS_KEY, actualData.transactions);
+    
+    // Handle users - merge with existing to preserve passwords if missing
+    if (actualData.users && Array.isArray(actualData.users)) {
+        const existingUsers = getUsers();
+        const mergedUsers = actualData.users.map((importedUser: any) => {
+            const existing = existingUsers.find(u => u.id === importedUser.id || u.username === importedUser.username);
+            if (existing && !importedUser.password) {
+                return { ...importedUser, password: existing.password };
+            }
+            return importedUser;
+        });
+        
+        // Add any existing users that weren't in the import
+        existingUsers.forEach(u => {
+            if (!mergedUsers.find(mu => mu.id === u.id)) {
+                mergedUsers.push(u);
+            }
+        });
+        
+        saveToStorage(USERS_KEY, mergedUsers);
+    }
 };
