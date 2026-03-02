@@ -104,18 +104,20 @@ export const initializeDataSource = async (overrideUrl?: string): Promise<{ succ
     
     if (!fetchUrl) return { success: true, message: 'Using local data.' };
     
-    // Try to extract Gist ID to use the API for fresher data
     const gistIdMatch = fetchUrl.match(/gist\.github(?:usercontent)?\.com\/[^\/]+\/([a-f0-9]+)/);
     const gistId = gistIdMatch ? gistIdMatch[1] : null;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // Increased to 20 seconds timeout
 
     try {
         let dataText = '';
         
         if (gistId) {
-            // Use Gist API for fresher data (less caching than raw URL)
             try {
                 const apiResponse = await fetch(`https://api.github.com/gists/${gistId}`, { 
                     cache: 'no-store',
+                    signal: controller.signal,
                     headers: settings.githubToken ? { 'Authorization': `token ${settings.githubToken}` } : {}
                 });
                 if (apiResponse.ok) {
@@ -126,13 +128,16 @@ export const initializeDataSource = async (overrideUrl?: string): Promise<{ succ
                         dataText = file.content;
                     }
                 }
-            } catch (apiErr) {
-                console.warn("Gist API fetch failed, falling back to raw URL:", apiErr);
+            } catch (apiErr: any) {
+                if (apiErr.name === 'AbortError') {
+                    console.warn("Gist API fetch timed out.");
+                } else {
+                    console.warn("Gist API fetch failed:", apiErr);
+                }
             }
         }
 
-        if (!dataText) {
-            // Fallback to Raw URL if API failed or no Gist ID found
+        if (!dataText && !controller.signal.aborted) {
             let rawUrl = fetchUrl;
             if (rawUrl.includes('/raw/') && rawUrl.split('/raw/')[1]?.includes('/')) {
                 const parts = rawUrl.split('/raw/');
@@ -142,11 +147,24 @@ export const initializeDataSource = async (overrideUrl?: string): Promise<{ succ
                 }
             }
             
-            const response = await fetch(rawUrl, { cache: 'no-store' });
-            if (!response.ok) throw new Error(`Failed to fetch data from Gist (Status: ${response.status}).`);
-            dataText = await response.text();
+            try {
+                const response = await fetch(rawUrl, { cache: 'no-store', signal: controller.signal });
+                if (!response.ok) throw new Error(`Failed to fetch data from Gist (Status: ${response.status}).`);
+                dataText = await response.text();
+            } catch (rawErr: any) {
+                if (rawErr.name === 'AbortError') {
+                    console.warn("Raw Gist fetch timed out.");
+                } else {
+                    throw rawErr;
+                }
+            }
         }
         
+        clearTimeout(timeoutId);
+
+        if (controller.signal.aborted) {
+            return { success: true, message: 'الاتصال ضعيف، يتم استخدام البيانات المحلية حالياً.' };
+        }
         if (!dataText || dataText.trim() === '' || dataText.trim() === '{}' || dataText.trim() === '[]') {
             if (settings.githubToken) {
                 syncDataToGist();
@@ -351,7 +369,12 @@ export const saveSettings = (settings: SettingsData): void => {
 };
 
 export const exportAllData = (): AllData => {
-    return { settings: getSettings(), materials: getMaterials(), transactions: getTransactions(), users: getUsers().map(({ password, ...user }) => user) };
+    return { 
+        settings: getSettings(), 
+        materials: getMaterials(), 
+        transactions: getTransactions(), 
+        users: getUsers() // Include passwords for full sync across devices
+    };
 };
 
 export const importAllData = (data: any): void => {
@@ -387,10 +410,17 @@ export const importAllData = (data: any): void => {
         const existingUsers = getUsers();
         const mergedUsers = actualData.users.map((importedUser: any) => {
             const existing = existingUsers.find(u => u.id === importedUser.id || u.username === importedUser.username);
+            
+            // Ensure permissions are present, defaulting if missing in import
+            const userWithPermissions = {
+                ...importedUser,
+                permissions: importedUser.permissions || (existing?.permissions) || getDefaultPermissions(importedUser.role)
+            };
+
             if (existing && !importedUser.password) {
-                return { ...importedUser, password: existing.password };
+                return { ...userWithPermissions, password: existing.password };
             }
-            return importedUser;
+            return userWithPermissions;
         });
         
         // Add any existing users that weren't in the import
