@@ -32,11 +32,18 @@ export interface Transaction {
   date: string;
 }
 
+export interface UserPermissions {
+  canPrint: boolean;
+  canExport: boolean;
+  allowedPages: Page[];
+}
+
 export interface User {
   id:string;
   username: string;
   password?: string;
   role: 'admin' | 'visitor';
+  permissions?: UserPermissions;
 }
 
 export type Page = 'dashboard' | 'materials' | 'transactions' | 'reports' | 'settings' | 'new-entries' | 'users';

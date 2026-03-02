@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Transaction, Material, SettingsData } from '@/types';
+import { Transaction, Material, SettingsData, User } from '@/types';
 import { addTransaction, deleteTransaction, updateTransaction, getSettings } from '@/services/mockApi';
 import { Plus, ArrowDownLeft, ArrowUpRight, Calendar, Info, Search, Edit, Trash2, Printer } from 'lucide-react';
 
@@ -8,7 +8,7 @@ interface TransactionsProps {
   transactions: Transaction[];
   materials: Material[];
   onDataChange: () => void;
-  userRole: 'admin' | 'visitor';
+  user: User;
 }
 
 const TransactionModal: React.FC<{ 
@@ -160,12 +160,15 @@ const TransactionModal: React.FC<{
     );
 };
 
-const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, onDataChange, userRole }) => {
+const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, onDataChange, user }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
+
+  const canPrint = user.role === 'admin' || user.permissions?.canPrint;
+  const isAdmin = user.role === 'admin';
 
   const filteredTransactions = useMemo(() => {
       let result = [...transactions];
@@ -264,7 +267,7 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, on
     <div className="space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-4">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">الحركات اليومية</h1>
-        {userRole === 'admin' && (
+        {isAdmin && (
             <button onClick={() => { setEditingTransaction(null); setIsModalOpen(true); }} className="flex items-center px-4 py-2 bg-sky-500 text-white rounded-lg shadow hover:bg-sky-600 disabled:bg-sky-300 transition-all" disabled={materials.length === 0}>
                 <Plus className="ml-2" size={20} /> إضافة حركة صرف
             </button>
@@ -328,8 +331,8 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, on
                     <div className="font-medium text-gray-700 dark:text-gray-300">{transaction.recipient}</div>
                 </td>
                 <td className="px-6 py-4 flex items-center gap-3">
-                    <button onClick={() => handlePrintVoucher(transaction)} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" title="طباعة سند"><Printer size={18}/></button>
-                    {userRole === 'admin' && (
+                    {canPrint && <button onClick={() => handlePrintVoucher(transaction)} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" title="طباعة سند"><Printer size={18}/></button>}
+                    {isAdmin && (
                         <>
                             <button onClick={() => { setEditingTransaction(transaction); setIsModalOpen(true); }} className="text-blue-500 hover:text-blue-700" title="تعديل"><Edit size={18}/></button>
                             <button onClick={() => setDeleteConfirm(transaction.id)} className="text-red-500 hover:text-red-700" title="حذف"><Trash2 size={18}/></button>

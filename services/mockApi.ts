@@ -1,5 +1,5 @@
 
-import { User, Material, Transaction, SettingsData, AllData } from '@/types';
+import { User, Material, Transaction, SettingsData, AllData, UserPermissions, Page } from '@/types';
 
 // --- INITIAL DATA & HELPERS ---
 
@@ -8,6 +8,21 @@ const MATERIALS_KEY = 'warehouse_materials';
 const TRANSACTIONS_KEY = 'warehouse_transactions';
 const SETTINGS_KEY = 'warehouse_settings';
 const CURRENT_USER_KEY = 'currentUser';
+
+const getDefaultPermissions = (role: 'admin' | 'visitor'): UserPermissions => {
+  if (role === 'admin') {
+    return {
+      canPrint: true,
+      canExport: true,
+      allowedPages: ['dashboard', 'materials', 'transactions', 'reports', 'settings', 'new-entries', 'users']
+    };
+  }
+  return {
+    canPrint: false,
+    canExport: false,
+    allowedPages: ['dashboard', 'materials', 'transactions']
+  };
+};
 
 const defaultLogoSvg = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTIxIDExLjVMMTIgNkwzIDExLjVWMTlIMjFWMS41WiIgc3Ryb2tlPSIjM2JjM2Y0IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8cGF0aCBkPSJNMjIgMTAuNUwxMiA1TDIgMTAuNSIgc3Ryb2tlPSIjM2JjM2Y0IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8cGF0aCBkPSJNOSAxOFE5IDE1IDEyIDE1QzE1IDE1IDE1IDE4IDE1IDE4VjIySDlWMThaIiBzdHJva2U9IiMwMmFkZTYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtaW5lam9pbj0icm91bmQiLz4KPC9zdmc+';
 
@@ -33,8 +48,8 @@ const saveToStorage = <T>(key: string, value: T) => {
 const initializeData = () => {
     if (!localStorage.getItem(USERS_KEY)) {
         const initialUsers: User[] = [
-            { id: '1', username: 'admin', password: 'admin123', role: 'admin' },
-            { id: '2', username: 'user', password: 'user123', role: 'visitor' },
+            { id: '1', username: 'admin', password: 'admin123', role: 'admin', permissions: getDefaultPermissions('admin') },
+            { id: '2', username: 'user', password: 'user123', role: 'visitor', permissions: getDefaultPermissions('visitor') },
         ];
         saveToStorage(USERS_KEY, initialUsers);
     }
@@ -171,7 +186,11 @@ export const getUsers = (): User[] => getFromStorage<User[]>(USERS_KEY, []);
 export const addUser = (userData: Omit<User, 'id'>): User => {
     const users = getUsers();
     if (users.some(u => u.username === userData.username)) throw new Error('Username already exists');
-    const newUser: User = { ...userData, id: `u${Date.now()}` };
+    const newUser: User = { 
+        ...userData, 
+        id: `u${Date.now()}`,
+        permissions: userData.permissions || getDefaultPermissions(userData.role)
+    };
     saveToStorage(USERS_KEY, [...users, newUser]);
     syncDataToGist();
     return newUser;
@@ -376,7 +395,7 @@ export const importAllData = (data: any): void => {
         
         // Add any existing users that weren't in the import
         existingUsers.forEach(u => {
-            if (!mergedUsers.find(mu => mu.id === u.id)) {
+            if (!mergedUsers.find((mu: User) => mu.id === u.id)) {
                 mergedUsers.push(u);
             }
         });

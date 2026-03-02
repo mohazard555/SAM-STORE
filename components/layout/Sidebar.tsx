@@ -59,16 +59,28 @@ const Sidebar: React.FC<SidebarProps> = ({ user, currentPage, onNavigate, isOpen
               </button>
           </div>
           <ul className="space-y-2">
-            <NavItem icon={<BarChart2 />} label="الرئيسية" isActive={currentPage === 'dashboard'} onClick={() => handleNavigation('dashboard')} />
-            <NavItem icon={<Package />} label="إدارة المواد" isActive={currentPage === 'materials'} onClick={() => handleNavigation('materials')} />
-            <NavItem icon={<Archive />} label="ادخالات جديدة" isActive={currentPage === 'new-entries'} onClick={() => handleNavigation('new-entries')} />
-            <NavItem icon={<Truck />} label="الحركات اليومية" isActive={currentPage === 'transactions'} onClick={() => handleNavigation('transactions')} />
-            <NavItem icon={<FileText />} label="التقارير" isActive={currentPage === 'reports'} onClick={() => handleNavigation('reports')} />
+            {(user.role === 'admin' || user.permissions?.allowedPages.includes('dashboard')) && (
+              <NavItem icon={<BarChart2 />} label="الرئيسية" isActive={currentPage === 'dashboard'} onClick={() => handleNavigation('dashboard')} />
+            )}
+            {(user.role === 'admin' || user.permissions?.allowedPages.includes('materials')) && (
+              <NavItem icon={<Package />} label="إدارة المواد" isActive={currentPage === 'materials'} onClick={() => handleNavigation('materials')} />
+            )}
+            {(user.role === 'admin' || user.permissions?.allowedPages.includes('new-entries')) && (
+              <NavItem icon={<Archive />} label="ادخالات جديدة" isActive={currentPage === 'new-entries'} onClick={() => handleNavigation('new-entries')} />
+            )}
+            {(user.role === 'admin' || user.permissions?.allowedPages.includes('transactions')) && (
+              <NavItem icon={<Truck />} label="الحركات اليومية" isActive={currentPage === 'transactions'} onClick={() => handleNavigation('transactions')} />
+            )}
+            {(user.role === 'admin' || user.permissions?.allowedPages.includes('reports')) && (
+              <NavItem icon={<FileText />} label="التقارير" isActive={currentPage === 'reports'} onClick={() => handleNavigation('reports')} />
+            )}
             <hr className="my-2 border-gray-200 dark:border-gray-600" />
-            {user.role === 'admin' && (
+            {(user.role === 'admin' || user.permissions?.allowedPages.includes('users')) && (
               <NavItem icon={<Users />} label="إدارة المستخدمين" isActive={currentPage === 'users'} onClick={() => handleNavigation('users')} />
             )}
-            <NavItem icon={<Settings />} label="الإعدادات" isActive={currentPage === 'settings'} onClick={() => handleNavigation('settings')} />
+            {(user.role === 'admin' || user.permissions?.allowedPages.includes('settings')) && (
+              <NavItem icon={<Settings />} label="الإعدادات" isActive={currentPage === 'settings'} onClick={() => handleNavigation('settings')} />
+            )}
           </ul>
         </div>
       </aside>

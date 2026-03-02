@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Material, SettingsData, Transaction } from '@/types';
+import { Material, SettingsData, Transaction, User } from '@/types';
 import { addMaterial, updateMaterial, deleteMaterial, acknowledgeNewMaterial, addTransaction } from '@/services/mockApi';
 import { Plus, Edit, Trash2, AlertTriangle, Printer, Download, CheckCircle, PlusCircle, RotateCcw, Upload } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -8,7 +8,7 @@ import * as XLSX from 'xlsx';
 interface MaterialsProps {
   materials: Material[];
   onDataChange: () => void;
-  userRole: 'admin' | 'visitor';
+  user: User;
   settings: SettingsData | null;
 }
 
@@ -132,12 +132,16 @@ const MaterialModal: React.FC<{ material: Partial<Material> | null; onClose: () 
     );
 };
 
-const Materials: React.FC<MaterialsProps> = ({ materials, onDataChange, userRole, settings }) => {
+const Materials: React.FC<MaterialsProps> = ({ materials, onDataChange, user, settings }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isStockInModalOpen, setIsStockInModalOpen] = useState(false);
   const [stockActionType, setStockActionType] = useState<'supply' | 'return'>('supply');
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
   const [materialToDelete, setMaterialToDelete] = useState<Material | null>(null);
+
+  const canPrint = user.role === 'admin' || user.permissions?.canPrint;
+  const canExport = user.role === 'admin' || user.permissions?.canExport;
+  const isAdmin = user.role === 'admin';
 
   const handleSave = (material: Omit<Material, 'id' | 'isNew'> | Material) => {
     if ('id' in material) { updateMaterial(material); } else { addMaterial(material); }
@@ -248,18 +252,30 @@ const Materials: React.FC<MaterialsProps> = ({ materials, onDataChange, userRole
     <div className="space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-4">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">إدارة المواد</h1>
-        {userRole === 'admin' && (
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
+          {isAdmin && (
             <label className="flex items-center px-4 py-2 bg-amber-500 text-white rounded-lg shadow hover:bg-amber-600 transition-colors cursor-pointer">
               <Upload className="ml-2" size={18} />
               استيراد XLSX
               <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleImport} />
             </label>
-            <button onClick={handleExport} className="flex items-center px-4 py-2 bg-emerald-500 text-white rounded-lg shadow hover:bg-emerald-600 transition-colors"><Download className="ml-2" size={18} />تصدير XLSX</button>
-            <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-sky-500 text-white rounded-lg shadow hover:bg-sky-600 transition-colors"><Printer className="ml-2" size={18} />طباعة</button>
-            <button onClick={() => { setSelectedMaterial(null); setIsModalOpen(true); }} className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition-colors"><Plus className="ml-2" size={20} />إضافة مادة</button>
-          </div>
-        )}
+          )}
+          {canExport && (
+            <button onClick={handleExport} className="flex items-center px-4 py-2 bg-emerald-500 text-white rounded-lg shadow hover:bg-emerald-600 transition-colors">
+              <Download className="ml-2" size={18} />تصدير XLSX
+            </button>
+          )}
+          {canPrint && (
+            <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-sky-500 text-white rounded-lg shadow hover:bg-sky-600 transition-colors">
+              <Printer className="ml-2" size={18} />طباعة
+            </button>
+          )}
+          {isAdmin && (
+            <button onClick={() => { setSelectedMaterial(null); setIsModalOpen(true); }} className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition-colors">
+              <Plus className="ml-2" size={20} />إضافة مادة
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg overflow-x-auto border dark:border-gray-700 transition-colors">
@@ -271,8 +287,8 @@ const Materials: React.FC<MaterialsProps> = ({ materials, onDataChange, userRole
               <th scope="col" className="px-6 py-3">الكمية الحالية</th>
               <th scope="col" className="px-6 py-3">الحد الأدنى</th>
               <th scope="col" className="px-6 py-3">المورد</th>
-              {userRole === 'admin' && <th scope="col" className="px-6 py-3 text-center">عمليات سريعة</th>}
-              {userRole === 'admin' && <th scope="col" className="px-6 py-3 text-center">إدارة</th>}
+              {isAdmin && <th scope="col" className="px-6 py-3 text-center">عمليات سريعة</th>}
+              {isAdmin && <th scope="col" className="px-6 py-3 text-center">إدارة</th>}
             </tr>
           </thead>
           <tbody>
@@ -289,7 +305,7 @@ const Materials: React.FC<MaterialsProps> = ({ materials, onDataChange, userRole
                 </td>
                 <td className="px-6 py-4">{material.minStock} {material.unit}</td>
                 <td className="px-6 py-4 text-xs">{material.supplier}</td>
-                {userRole === 'admin' && (
+                {isAdmin && (
                   <td className="px-6 py-4 flex items-center justify-center gap-4">
                     <button onClick={() => openStockModal(material, 'supply')} className="text-emerald-500 hover:text-emerald-700 flex flex-col items-center transition-colors" title="توريد جديد">
                         <PlusCircle size={22}/>
@@ -301,7 +317,7 @@ const Materials: React.FC<MaterialsProps> = ({ materials, onDataChange, userRole
                     </button>
                   </td>
                 )}
-                {userRole === 'admin' && (
+                {isAdmin && (
                   <td className="px-6 py-4 flex items-center justify-center gap-3 border-r dark:border-gray-700">
                     {material.isNew && (
                         <button onClick={() => handleAcknowledge(material.id)} className="text-sky-500 hover:text-sky-700" title="تأكيد الاستلام"><CheckCircle size={22}/></button>

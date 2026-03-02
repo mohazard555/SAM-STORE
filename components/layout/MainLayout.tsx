@@ -12,6 +12,7 @@ import NewEntries from '@/pages/NewEntries';
 import Users from '@/pages/Users';
 import { User, Page, Material, Transaction, SettingsData } from '@/types';
 import { getMaterials, getTransactions, getSettings } from '@/services/mockApi';
+import { Archive } from 'lucide-react';
 
 interface MainLayoutProps {
   user: User;
@@ -54,23 +55,43 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, onLogout, darkMode, setDa
       t.recipient.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    const isAllowed = (page: Page) => {
+      if (user.role === 'admin') return true;
+      return user.permissions?.allowedPages.includes(page);
+    };
+
+    if (!isAllowed(currentPage)) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-center p-8">
+          <div className="bg-red-100 dark:bg-red-900/20 p-6 rounded-full mb-4">
+            <Archive className="w-12 h-12 text-red-500" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">غير مصرح لك بالوصول</h2>
+          <p className="text-gray-600 dark:text-gray-400">ليس لديك الصلاحيات الكافية لعرض هذه الصفحة.</p>
+          <button 
+            onClick={() => setCurrentPage('dashboard')}
+            className="mt-6 px-4 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 transition-colors"
+          >
+            العودة للرئيسية
+          </button>
+        </div>
+      );
+    }
+
     switch (currentPage) {
       case 'dashboard':
         return <Dashboard materials={materials} transactions={transactions} />;
       case 'materials':
-        return <Materials materials={filteredMaterials} onDataChange={refreshData} userRole={user.role} settings={settings} />;
+        return <Materials materials={filteredMaterials} onDataChange={refreshData} user={user} settings={settings} />;
       case 'transactions':
-        return <Transactions transactions={filteredTransactions} materials={materials} onDataChange={refreshData} userRole={user.role} />;
+        return <Transactions transactions={filteredTransactions} materials={materials} onDataChange={refreshData} user={user} />;
       case 'reports':
-        return <Reports transactions={transactions} materials={materials} settings={settings} />;
+        return <Reports transactions={transactions} materials={materials} settings={settings} user={user} />;
       case 'settings':
         return <Settings onDataChange={refreshData} user={user} />;
       case 'new-entries':
         return <NewEntries materials={materials.filter(m => m.isNew)} />;
       case 'users':
-        if (user.role !== 'admin') {
-          return <div className="text-center p-8"><h2 className="text-2xl font-bold text-red-500">غير مصرح لك بالوصول</h2></div>;
-        }
         return <Users />;
       default:
         return <Dashboard materials={materials} transactions={transactions} />;

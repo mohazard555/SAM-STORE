@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Transaction, Material, SettingsData } from '@/types';
+import { Transaction, Material, SettingsData, User } from '@/types';
 import { Download, Printer, Search } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -8,11 +8,12 @@ interface ReportsProps {
   transactions: Transaction[];
   materials: Material[];
   settings: SettingsData | null;
+  user: User;
 }
 
 type ReportType = 'daily' | 'weekly' | 'monthly' | 'byMaterial' | 'byCategory' | 'byBarcode' | 'byItemBarcode' | 'totalCount' | 'all' | 'bySupplier' | 'mostUsed' | 'inactive' | 'lowStock';
 
-const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) => {
+const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings, user }) => {
   const [filterType, setFilterType] = useState<ReportType>('all');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
@@ -21,6 +22,9 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
   const [selectedItemBarcode, setSelectedItemBarcode] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState('');
+
+  const canPrint = user.role === 'admin' || user.permissions?.canPrint;
+  const canExport = user.role === 'admin' || user.permissions?.canExport;
 
   // Search terms for dropdowns
   const [searchFilterType, setSearchFilterType] = useState('');
@@ -374,14 +378,18 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
             )}
 
             <div className="flex gap-2">
-                <button onClick={exportToXLSX} className="flex items-center px-4 py-2 bg-emerald-500 text-white rounded-lg shadow hover:bg-emerald-600 disabled:bg-emerald-300 transition-colors" disabled={!canPerformAction}>
-                    <Download className="ml-2" size={18}/>
-                    تصدير XLSX
-                </button>
-                <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-sky-500 text-white rounded-lg shadow hover:bg-sky-600 disabled:bg-sky-300 transition-colors" disabled={!canPerformAction}>
-                    <Printer className="ml-2" size={18}/>
-                    طباعة التقرير
-                </button>
+                {canExport && (
+                    <button onClick={exportToXLSX} className="flex items-center px-4 py-2 bg-emerald-500 text-white rounded-lg shadow hover:bg-emerald-600 disabled:bg-emerald-300 transition-colors" disabled={!canPerformAction}>
+                        <Download className="ml-2" size={18}/>
+                        تصدير XLSX
+                    </button>
+                )}
+                {canPrint && (
+                    <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-sky-500 text-white rounded-lg shadow hover:bg-sky-600 disabled:bg-sky-300 transition-colors" disabled={!canPerformAction}>
+                        <Printer className="ml-2" size={18}/>
+                        طباعة التقرير
+                    </button>
+                )}
             </div>
         </div>
       </div>
