@@ -86,12 +86,40 @@ const syncDataToGist = async () => {
 export const initializeDataSource = async (): Promise<{ success: boolean; message?: string }> => {
     const settings = getSettings();
     if (!settings.gistUrl) return { success: true, message: 'Using local data.' };
+    
+    // If it's a raw URL with a commit hash, try to strip the hash to get the latest version
+    let fetchUrl = settings.gistUrl;
+    if (fetchUrl.includes('/raw/') && fetchUrl.split('/raw/')[1]?.includes('/')) {
+        const parts = fetchUrl.split('/raw/');
+        const pathParts = parts[1].split('/');
+        if (pathParts.length > 1) {
+            // It has a hash, e.g., raw/hash/filename.json -> raw/filename.json
+            fetchUrl = `${parts[0]}/raw/${pathParts[pathParts.length - 1]}`;
+        }
+    }
+
     try {
-        const response = await fetch(settings.gistUrl, { cache: 'no-store' });
-        if (!response.ok) throw new Error(`Failed to fetch data from Gist.`);
-        const data = await response.json();
-        importAllData(data);
-        return { success: true, message: 'Data loaded from Gist.' };
+        const response = await fetch(fetchUrl, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`Failed to fetch data from Gist (Status: ${response.status}).`);
+        
+        const text = await response.text();
+        if (!text || text.trim() === '' || text.trim() === '{}' || text.trim() === '[]') {
+            // Gist is empty or just an empty object/array. 
+            // We should try to push our local data to it if we have a token.
+            if (settings.githubToken) {
+                syncDataToGist();
+                return { success: true, message: 'Gist was empty. Local data has been queued for sync.' };
+            }
+            return { success: true, message: 'Gist is empty. Sync will start on next change.' };
+        }
+        
+        try {
+            const data = JSON.parse(text);
+            importAllData(data);
+            return { success: true, message: 'Data loaded from Gist.' };
+        } catch (e) {
+            throw new Error('Gist content is not valid JSON.');
+        }
     } catch (error) { return { success: false, message: (error as Error).message }; }
 };
 
@@ -251,15 +279,40 @@ export const updateTransaction = (updatedTransaction: Transaction): Transaction 
 };
 
 export const getSettings = (): SettingsData => getFromStorage<SettingsData>(SETTINGS_KEY, { companyName: '', companyAddress: '', companyLogo: '', signatureNames: { keeper: '', accountant: '', manager: '' }, gistUrl: '', githubToken: '' });
-export const saveSettings = (settings: SettingsData): void => { saveToStorage(SETTINGS_KEY, settings); };
+export const saveSettings = (settings: SettingsData): void => { 
+    saveToStorage(SETTINGS_KEY, settings); 
+    syncDataToGist(); // Sync immediately when settings are saved
+};
 
 export const exportAllData = (): AllData => {
     return { settings: getSettings(), materials: getMaterials(), transactions: getTransactions(), users: getUsers().map(({ password, ...user }) => user) };
 };
 
-export const importAllData = (data: AllData): void => {
-    if (!data || !data.settings) throw new Error('Invalid data format');
-    saveToStorage(SETTINGS_KEY, data.settings);
-    saveToStorage(MATERIALS_KEY, data.materials);
-    saveToStorage(TRANSACTIONS_KEY, data.transactions);
+export const importAllData = (data: any): void => {
+    if (!data || typeof data !== 'object') return;
+    
+    // Handle case where data might be wrapped in a 'files' object (GitHub Gist API response)
+    let actualData = data;
+    if (data.files) {
+        const firstFile = Object.values(data.files)[0] as any;
+        if (firstFile && firstFile.content) {
+            try {
+                actualData = JSON.parse(firstFile.content);
+            } catch (e) {
+                // Not JSON content
+            }
+        }
+    }
+
+    if (Object.keys(actualData).length === 0) return;
+    
+    // If it doesn't look like our data format, don't throw, just ignore
+    if (!actualData.settings && !actualData.materials && !actualData.transactions) {
+        console.warn('Imported data does not match expected format.');
+        return;
+    }
+    
+    if (actualData.settings) saveToStorage(SETTINGS_KEY, actualData.settings);
+    if (actualData.materials) saveToStorage(MATERIALS_KEY, actualData.materials);
+    if (actualData.transactions) saveToStorage(TRANSACTIONS_KEY, actualData.transactions);
 };
