@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Material, SettingsData, Transaction } from '@/types';
 import { addMaterial, updateMaterial, deleteMaterial, acknowledgeNewMaterial, addTransaction } from '@/services/mockApi';
-import { Plus, Edit, Trash2, AlertTriangle, Printer, Download, CheckCircle, PlusCircle, RotateCcw } from 'lucide-react';
+import { Plus, Edit, Trash2, AlertTriangle, Printer, Download, CheckCircle, PlusCircle, RotateCcw, Upload } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface MaterialsProps {
@@ -178,6 +178,55 @@ const Materials: React.FC<MaterialsProps> = ({ materials, onDataChange, userRole
     XLSX.writeFile(workbook, "materials_report.xlsx");
   };
 
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = new Uint8Array(evt.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+        if (jsonData.length === 0) {
+          alert("الملف فارغ أو غير صالح");
+          return;
+        }
+
+        jsonData.forEach((row: any) => {
+          const name = row["اسم المادة"] || row["name"];
+          if (!name) return;
+
+          const materialData: Omit<Material, 'id' | 'isNew'> = {
+            name: String(name),
+            materialType: String(row["نوع المادة"] || row["النوع"] || row["materialType"] || "غير محدد"),
+            category: String(row["الفئة"] || row["category"] || "عام"),
+            specifications: String(row["المواصفات"] || row["specifications"] || "-"),
+            supplier: String(row["المورد"] || row["supplier"] || "-"),
+            barcode: String(row["الباركود"] || row["barcode"] || `BC-${Date.now()}-${Math.floor(Math.random() * 1000)}`),
+            unit: String(row["الوحدة"] || row["unit"] || "حبة"),
+            minStock: Number(row["الحد الأدنى"] || row["minStock"] || 0),
+            currentStock: Number(row["الكمية الحالية"] || row["الكمية"] || row["currentStock"] || 0),
+            color: String(row["اللون"] || row["color"] || ""),
+          };
+          addMaterial(materialData);
+        });
+
+        onDataChange();
+        alert(`تم استيراد ${jsonData.length} مادة بنجاح`);
+      } catch (error) {
+        console.error("Error importing Excel:", error);
+        alert("حدث خطأ أثناء استيراد الملف. تأكد من تنسيق الملف.");
+      }
+      // Reset input
+      e.target.value = '';
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
   const handlePrint = () => {
     const reportTitle = `تقرير جرد المواد`;
     const printWindow = window.open('', '_blank');
@@ -201,6 +250,11 @@ const Materials: React.FC<MaterialsProps> = ({ materials, onDataChange, userRole
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">إدارة المواد</h1>
         {userRole === 'admin' && (
           <div className="flex items-center gap-2">
+            <label className="flex items-center px-4 py-2 bg-amber-500 text-white rounded-lg shadow hover:bg-amber-600 transition-colors cursor-pointer">
+              <Upload className="ml-2" size={18} />
+              استيراد XLSX
+              <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleImport} />
+            </label>
             <button onClick={handleExport} className="flex items-center px-4 py-2 bg-emerald-500 text-white rounded-lg shadow hover:bg-emerald-600 transition-colors"><Download className="ml-2" size={18} />تصدير XLSX</button>
             <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-sky-500 text-white rounded-lg shadow hover:bg-sky-600 transition-colors"><Printer className="ml-2" size={18} />طباعة</button>
             <button onClick={() => { setSelectedMaterial(null); setIsModalOpen(true); }} className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition-colors"><Plus className="ml-2" size={20} />إضافة مادة</button>

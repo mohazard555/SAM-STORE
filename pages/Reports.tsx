@@ -10,7 +10,7 @@ interface ReportsProps {
   settings: SettingsData | null;
 }
 
-type ReportType = 'daily' | 'weekly' | 'monthly' | 'byMaterial' | 'byCategory' | 'byBarcode' | 'totalCount' | 'all' | 'bySupplier' | 'mostUsed' | 'inactive' | 'lowStock';
+type ReportType = 'daily' | 'weekly' | 'monthly' | 'byMaterial' | 'byCategory' | 'byBarcode' | 'byItemBarcode' | 'totalCount' | 'all' | 'bySupplier' | 'mostUsed' | 'inactive' | 'lowStock';
 
 const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) => {
   const [filterType, setFilterType] = useState<ReportType>('all');
@@ -18,6 +18,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedMaterialId, setSelectedMaterialId] = useState(materials[0]?.id || '');
   const [selectedBarcode, setSelectedBarcode] = useState('');
+  const [selectedItemBarcode, setSelectedItemBarcode] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState('');
 
@@ -27,6 +28,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
   const [searchCategory, setSearchCategory] = useState('');
   const [searchSupplier, setSearchSupplier] = useState('');
   const [searchBarcode, setSearchBarcode] = useState('');
+  const [searchItemBarcode, setSearchItemBarcode] = useState('');
 
   const uniqueCategories = useMemo(() => {
     const categories = materials.map(m => m.category);
@@ -42,6 +44,11 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
     const barcodes = materials.map(m => m.barcode);
     return [...new Set(barcodes)].filter(Boolean);
   }, [materials]);
+
+  const uniqueItemBarcodes = useMemo(() => {
+    const barcodes = transactions.map(t => t.itemBarcode);
+    return [...new Set(barcodes)].filter(Boolean);
+  }, [transactions]);
 
   const handleFilterChange = (type: ReportType) => {
     setFilterType(type);
@@ -61,7 +68,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
   }
 
   const dateFilteredTransactions = useMemo(() => {
-    const timeSensitiveReports: ReportType[] = ['daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byBarcode', 'bySupplier', 'mostUsed', 'all'];
+    const timeSensitiveReports: ReportType[] = ['daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byBarcode', 'byItemBarcode', 'bySupplier', 'mostUsed', 'all'];
     if (!timeSensitiveReports.includes(filterType)) {
         return transactions;
     }
@@ -128,6 +135,9 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
         if (filterType === 'byBarcode' && selectedBarcode) {
             result = result.filter(t => t.barcode === selectedBarcode);
         }
+        if (filterType === 'byItemBarcode' && selectedItemBarcode) {
+            result = result.filter(t => t.itemBarcode === selectedItemBarcode);
+        }
         return [...result].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }
   }, [materials, transactions, dateFilteredTransactions, filterType, selectedMaterialId, selectedCategory, selectedSupplier, selectedBarcode]);
@@ -158,6 +168,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
             dataToExport = (reportData as Transaction[]).map(t => ({
                 'التاريخ والوقت': new Date(t.date).toLocaleString('ar-EG'), 'اسم المادة': t.materialName,
                 'نوع المادة': t.materialType, 'الفئة': t.category, 'الباركود': t.barcode,
+                'باركود الصنف': t.itemBarcode || '-',
                 'المورد': t.supplier, 'الكمية المسحوبة': `${t.quantity} ${t.unit}`, 'المستلم': t.recipient,
                 'ملاحظات': t.notes || '',
             }));
@@ -193,8 +204,8 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
             break;
         default: // Transaction reports
             reportTitle = `تقرير حركات`;
-            tableHeaders = `<th>التاريخ والوقت</th><th>اسم المادة</th><th>الباركود</th><th>المورد</th><th>الكمية</th><th>المستلم</th><th>ملاحظات</th>`;
-            tableContent = (reportData as Transaction[]).map(t => `<tr><td>${new Date(t.date).toLocaleString('ar-EG')}</td><td>${t.materialName}</td><td>${t.barcode}</td><td>${t.supplier}</td><td>${t.quantity} ${t.unit}</td><td>${t.recipient}</td><td>${t.notes || ''}</td></tr>`).join('');
+            tableHeaders = `<th>التاريخ والوقت</th><th>اسم المادة</th><th>باركود المادة</th><th>باركود الصنف</th><th>المورد</th><th>الكمية</th><th>المستلم</th><th>ملاحظات</th>`;
+            tableContent = (reportData as Transaction[]).map(t => `<tr><td>${new Date(t.date).toLocaleString('ar-EG')}</td><td>${t.materialName}</td><td>${t.barcode}</td><td>${t.itemBarcode || '-'}</td><td>${t.supplier}</td><td>${t.quantity} ${t.unit}</td><td>${t.recipient}</td><td>${t.notes || ''}</td></tr>`).join('');
     }
 
     printWindow.document.write(`
@@ -241,7 +252,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
   };
   
   const canPerformAction = reportData && reportData.length > 0;
-  const showDatePickers = ['all', 'daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byBarcode', 'bySupplier', 'mostUsed'].includes(filterType);
+  const showDatePickers = ['all', 'daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byBarcode', 'byItemBarcode', 'bySupplier', 'mostUsed'].includes(filterType);
 
   // Helper for filtered report options
   const reportOptions = [
@@ -252,7 +263,8 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
     { value: 'byMaterial', label: 'تقرير حسب المادة' },
     { value: 'byCategory', label: 'تقرير حسب الفئة' },
     { value: 'bySupplier', label: 'تقرير حسب المورد' },
-    { value: 'byBarcode', label: 'تقرير حسب الباركود' },
+    { value: 'byBarcode', label: 'تقرير حسب باركود المادة' },
+    { value: 'byItemBarcode', label: 'تقرير حسب باركود الصنف/القصة' },
     { value: 'totalCount', label: 'جرد إجمالي للمخزون' },
     { value: 'mostUsed', label: 'تقرير بالمواد الأكثر استخداماً' },
     { value: 'inactive', label: 'تقرير بالمواد الراكدة' },
@@ -337,12 +349,25 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
 
             {filterType === 'byBarcode' && (
                 <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400">اختر الباركود</label>
+                    <label className="text-xs font-bold text-gray-400">اختر باركود المادة</label>
                     <div className="flex gap-1">
                         <input type="text" placeholder="بحث..." value={searchBarcode} onChange={e => setSearchBarcode(e.target.value)} className="w-20 p-1.5 border rounded text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                         <select value={selectedBarcode} onChange={e => setSelectedBarcode(e.target.value)} className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white w-40" disabled={uniqueBarcodes.length === 0}>
                             <option value="">-- اختر الباركود --</option>
                             {uniqueBarcodes.filter(b => b.includes(searchBarcode)).map(b => <option key={b} value={b}>{b}</option>)}
+                        </select>
+                    </div>
+                </div>
+            )}
+
+            {filterType === 'byItemBarcode' && (
+                <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-400">اختر باركود الصنف</label>
+                    <div className="flex gap-1">
+                        <input type="text" placeholder="بحث..." value={searchItemBarcode} onChange={e => setSearchItemBarcode(e.target.value)} className="w-20 p-1.5 border rounded text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                        <select value={selectedItemBarcode} onChange={e => setSelectedItemBarcode(e.target.value)} className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white w-40" disabled={uniqueItemBarcodes.length === 0}>
+                            <option value="">-- اختر الباركود --</option>
+                            {uniqueItemBarcodes.filter(b => b && b.includes(searchItemBarcode)).map(b => <option key={b} value={b}>{b}</option>)}
                         </select>
                     </div>
                 </div>
@@ -418,7 +443,8 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
                     <tr>
                     <th scope="col" className="px-6 py-3 text-xs">التاريخ والوقت</th>
                     <th scope="col" className="px-6 py-3">المادة / اللون</th>
-                    <th scope="col" className="px-6 py-3">الباركود</th>
+                    <th scope="col" className="px-6 py-3">باركود المادة</th>
+                    <th scope="col" className="px-6 py-3">باركود الصنف</th>
                     <th scope="col" className="px-6 py-3">الفئة</th>
                     <th scope="col" className="px-6 py-3">المورد</th>
                     <th scope="col" className="px-6 py-3">الكمية</th>
@@ -434,6 +460,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings }) 
                             {transaction.color && <div className="text-[10px] text-gray-400">{transaction.color}</div>}
                         </td>
                         <td className="px-6 py-4 font-mono text-xs">{transaction.barcode}</td>
+                        <td className="px-6 py-4 font-mono text-xs text-blue-500 font-bold">{transaction.itemBarcode || '-'}</td>
                         <td className="px-6 py-4 text-xs">{transaction.category}</td>
                         <td className="px-6 py-4 text-xs">{transaction.supplier}</td>
                         <td className={`px-6 py-4 font-black ${transaction.type === 'in' ? 'text-emerald-500' : 'text-red-500'}`}>

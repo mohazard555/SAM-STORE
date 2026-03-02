@@ -183,6 +183,7 @@ export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'materi
         supplier: material.supplier,
         category: material.category,
         barcode: material.barcode,
+        itemBarcode: transactionData.itemBarcode,
         unit: material.unit,
         color: transactionData.color || material.color
     };

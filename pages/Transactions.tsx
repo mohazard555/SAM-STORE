@@ -26,6 +26,7 @@ const TransactionModal: React.FC<{
     const [materialId, setMaterialId] = useState(editTransaction?.materialId || filteredMaterials[0]?.id || '');
     const [quantity, setQuantity] = useState(editTransaction?.quantity || 1);
     const [recipient, setRecipient] = useState(editTransaction?.recipient || '');
+    const [itemBarcode, setItemBarcode] = useState(editTransaction?.itemBarcode || '');
     const [notes, setNotes] = useState(editTransaction?.notes || '');
     const [color, setColor] = useState(editTransaction?.color || '');
     const [date, setDate] = useState(editTransaction ? new Date(editTransaction.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
@@ -53,6 +54,7 @@ const TransactionModal: React.FC<{
             materialId, 
             quantity, 
             recipient, 
+            itemBarcode,
             notes, 
             color,
             date: new Date(date).toISOString() 
@@ -123,6 +125,11 @@ const TransactionModal: React.FC<{
                     <div>
                         <label className="block mb-1 text-sm font-medium dark:text-gray-200">اسم المستلم</label>
                         <input type="text" value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder="الجهة أو الشخص" required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                    </div>
+
+                    <div>
+                        <label className="block mb-1 text-sm font-medium dark:text-gray-200">باركود الصنف / القصة</label>
+                        <input type="text" value={itemBarcode} onChange={(e) => setItemBarcode(e.target.value)} placeholder="باركود الصنف المراد تسليمه" className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                     </div>
 
                     <div>
@@ -235,6 +242,7 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, on
             <div class="detail-item"><span class="detail-label">تاريخ الحركة:</span> <span>${new Date(t.date).toLocaleDateString('ar-EG')}</span></div>
             <div class="detail-item"><span class="detail-label">اسم المادة:</span> <span>${t.materialName}</span></div>
             <div class="detail-item"><span class="detail-label">الباركود:</span> <span>${t.barcode}</span></div>
+            <div class="detail-item"><span class="detail-label">باركود الصنف/القصة:</span> <span>${t.itemBarcode || '-'}</span></div>
             <div class="detail-item"><span class="detail-label">اللون:</span> <span>${t.color || '-'}</span></div>
             <div class="detail-item"><span class="detail-label">الكمية:</span> <strong>${t.quantity} ${t.unit}</strong></div>
             <div class="detail-item"><span class="detail-label">${t.type === 'in' ? 'المورد:' : 'المستلم:'}</span> <span>${t.recipient}</span></div>
@@ -285,7 +293,8 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, on
               <th scope="col" className="px-6 py-3">التاريخ</th>
               <th scope="col" className="px-6 py-3">النوع</th>
               <th scope="col" className="px-6 py-3">المادة / اللون</th>
-              <th scope="col" className="px-6 py-3">الباركود</th>
+              <th scope="col" className="px-6 py-3">باركود المادة</th>
+              <th scope="col" className="px-6 py-3">باركود الصنف</th>
               <th scope="col" className="px-6 py-3">الكمية</th>
               <th scope="col" className="px-6 py-3">المستلم / المورد</th>
               <th scope="col" className="px-6 py-3">إجراءات</th>
@@ -311,6 +320,7 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, on
                     {transaction.color && <div className="text-[10px] text-gray-400">اللون: {transaction.color}</div>}
                 </td>
                 <td className="px-6 py-4 font-mono text-xs">{transaction.barcode}</td>
+                <td className="px-6 py-4 font-mono text-xs text-blue-500 font-bold">{transaction.itemBarcode || '-'}</td>
                 <td className={`px-6 py-4 font-black ${transaction.type === 'in' ? 'text-emerald-500' : 'text-red-500'}`}>
                     {transaction.type === 'in' ? '+' : '-'}{transaction.quantity} {transaction.unit}
                 </td>

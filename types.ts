@@ -23,6 +23,7 @@ export interface Transaction {
   category: string; // Added category field
   supplier: string;
   barcode: string;
+  itemBarcode?: string; // Added itemBarcode field (Story/Item Barcode)
   color?: string; // Added color field
   quantity: number;
   unit: string;
