@@ -15,12 +15,15 @@ interface MaterialsProps {
 // Modal for Adding/Returning Stock (Incremental)
 const StockInModal: React.FC<{ 
     material: Material; 
-    actionType: 'supply' | 'return';
+    actionType: 'supply' | 'return' | 'supplier-return';
     onClose: () => void; 
     onSave: (amount: number, reason: string, note: string) => void; 
 }> = ({ material, actionType, onClose, onSave }) => {
     const [amount, setAmount] = useState(1);
-    const [reason, setReason] = useState(actionType === 'supply' ? 'توريد جديد' : 'مرتجع من مستلم');
+    const [reason, setReason] = useState(
+        actionType === 'supply' ? 'توريد جديد' : 
+        actionType === 'return' ? 'مرتجع من مستلم' : 'مرتجع للمورد'
+    );
     const [note, setNote] = useState('');
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -32,8 +35,13 @@ const StockInModal: React.FC<{
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md">
                 <div className="flex items-center gap-2 mb-2">
-                    {actionType === 'supply' ? <PlusCircle className="text-emerald-500" /> : <RotateCcw className="text-amber-500" />}
-                    <h2 className="text-xl font-bold dark:text-white">{actionType === 'supply' ? 'توريد كمية جديدة' : 'إرجاع مادة للمستودع'}</h2>
+                    {actionType === 'supply' ? <PlusCircle className="text-emerald-500" /> : 
+                     actionType === 'return' ? <RotateCcw className="text-amber-500" /> :
+                     <RotateCcw className="text-red-500" />}
+                    <h2 className="text-xl font-bold dark:text-white">
+                        {actionType === 'supply' ? 'توريد كمية جديدة' : 
+                         actionType === 'return' ? 'إرجاع مادة للمستودع' : 'إرجاع مادة للمورد'}
+                    </h2>
                 </div>
                 <p className="text-sm text-gray-500 mb-4">المادة: <span className="font-bold text-gray-800 dark:text-white">{material.name}</span></p>
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -49,11 +57,17 @@ const StockInModal: React.FC<{
                                     <option value="توريد جديد">توريد جديد</option>
                                     <option value="تصحيح مخزون">تصحيح مخزون (+)</option>
                                 </>
-                            ) : (
+                            ) : actionType === 'return' ? (
                                 <>
                                     <option value="مرتجع من مستلم">مرتجع من مستلم</option>
                                     <option value="مرتجع تالف">مرتجع تالف</option>
                                     <option value="إلغاء عملية صرف">إلغاء عملية صرف</option>
+                                </>
+                            ) : (
+                                <>
+                                    <option value="مرتجع للمورد">مرتجع للمورد</option>
+                                    <option value="بضاعة تالفة للمورد">بضاعة تالفة للمورد</option>
+                                    <option value="انتهاء صلاحية">انتهاء صلاحية</option>
                                 </>
                             )}
                             <option value="أخرى">أخرى</option>
@@ -65,8 +79,10 @@ const StockInModal: React.FC<{
                     </div>
                     <div className="flex justify-end space-x-2 space-x-reverse pt-2">
                         <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-300 dark:bg-gray-600 dark:text-white rounded transition-colors">إلغاء</button>
-                        <button type="submit" className={`px-4 py-2 text-white rounded transition-colors ${actionType === 'supply' ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-amber-500 hover:bg-amber-600'}`}>
-                            تأكيد {actionType === 'supply' ? 'التوريد' : 'المرتجع'}
+                        <button type="submit" className={`px-4 py-2 text-white rounded transition-colors ${
+                            actionType === 'supply' ? 'bg-emerald-500 hover:bg-emerald-600' : 
+                            actionType === 'return' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-red-500 hover:bg-red-600'}`}>
+                            تأكيد {actionType === 'supply' ? 'التوريد' : actionType === 'return' ? 'المرتجع' : 'الإرجاع للمورد'}
                         </button>
                     </div>
                 </form>
@@ -87,6 +103,7 @@ const MaterialModal: React.FC<{ material: Partial<Material> | null; onClose: () 
         unit: material?.unit || '',
         minStock: material?.minStock || 0,
         currentStock: material?.currentStock || 0,
+        weightFormula: material?.weightFormula || { pieces: 100, weight: 5 },
     });
     
     const isEditing = !!material?.id;
@@ -122,6 +139,31 @@ const MaterialModal: React.FC<{ material: Partial<Material> | null; onClose: () 
                     <input type="number" name="minStock" value={formData.minStock} onChange={handleChange} placeholder="الحد الأدنى" required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                     <input type="number" name="currentStock" value={formData.currentStock} onChange={handleChange} placeholder="الكمية" required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                 </div>
+                
+                <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-dashed border-gray-300 dark:border-gray-600">
+                    <label className="block text-xs font-bold mb-2 text-gray-500 dark:text-gray-400">معادلة الوزن (لحاسبة الوزن)</label>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-[10px] mb-1 dark:text-gray-400">عدد القطع</label>
+                            <input 
+                                type="number" 
+                                value={formData.weightFormula.pieces} 
+                                onChange={(e) => setFormData(prev => ({ ...prev, weightFormula: { ...prev.weightFormula, pieces: Number(e.target.value) } }))}
+                                className="w-full p-2 text-sm border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[10px] mb-1 dark:text-gray-400">الوزن المقابل (كغم)</label>
+                            <input 
+                                type="number" 
+                                step="0.01"
+                                value={formData.weightFormula.weight} 
+                                onChange={(e) => setFormData(prev => ({ ...prev, weightFormula: { ...prev.weightFormula, weight: Number(e.target.value) } }))}
+                                className="w-full p-2 text-sm border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
+                            />
+                        </div>
+                    </div>
+                </div>
                 <div className="flex justify-end space-x-2 space-x-reverse pt-2">
                     <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-300 dark:bg-gray-600 dark:text-white rounded">إلغاء</button>
                     <button type="submit" className="px-4 py-2 bg-sky-500 text-white rounded hover:bg-sky-600">{isEditing ? 'حفظ التعديلات' : 'إضافة'}</button>
@@ -135,7 +177,7 @@ const MaterialModal: React.FC<{ material: Partial<Material> | null; onClose: () 
 const Materials: React.FC<MaterialsProps> = ({ materials, onDataChange, user, settings }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isStockInModalOpen, setIsStockInModalOpen] = useState(false);
-  const [stockActionType, setStockActionType] = useState<'supply' | 'return'>('supply');
+  const [stockActionType, setStockActionType] = useState<'supply' | 'return' | 'supplier-return'>('supply');
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
   const [materialToDelete, setMaterialToDelete] = useState<Material | null>(null);
 
@@ -152,7 +194,7 @@ const Materials: React.FC<MaterialsProps> = ({ materials, onDataChange, user, se
   const handleStockIn = (amount: number, reason: string, note: string) => {
     if (!selectedMaterial) return;
     addTransaction({
-        type: 'in',
+        type: stockActionType === 'supplier-return' ? 'return' : 'in',
         materialId: selectedMaterial.id,
         quantity: amount,
         recipient: reason,
@@ -165,7 +207,7 @@ const Materials: React.FC<MaterialsProps> = ({ materials, onDataChange, user, se
     setSelectedMaterial(null);
   };
 
-  const openStockModal = (material: Material, type: 'supply' | 'return') => {
+  const openStockModal = (material: Material, type: 'supply' | 'return' | 'supplier-return') => {
       setSelectedMaterial(material);
       setStockActionType(type);
       setIsStockInModalOpen(true);
@@ -314,6 +356,10 @@ const Materials: React.FC<MaterialsProps> = ({ materials, onDataChange, user, se
                     <button onClick={() => openStockModal(material, 'return')} className="text-amber-500 hover:text-amber-700 flex flex-col items-center transition-colors" title="مرتجع من مستلم">
                         <RotateCcw size={22}/>
                         <span className="text-[10px] mt-0.5 font-bold">مرتجع</span>
+                    </button>
+                    <button onClick={() => openStockModal(material, 'supplier-return')} className="text-red-500 hover:text-red-700 flex flex-col items-center transition-colors" title="مرتجع للمورد">
+                        <RotateCcw size={22} className="rotate-180"/>
+                        <span className="text-[10px] mt-0.5 font-bold">للمورد</span>
                     </button>
                   </td>
                 )}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Page, User } from '@/types';
-import { BarChart2, Package, Truck, FileText, X, Settings, Archive, Users } from 'lucide-react';
+import { BarChart2, Package, Truck, FileText, X, Settings, Archive, Users, RotateCcw, Calculator, Weight } from 'lucide-react';
 
 interface SidebarProps {
   user: User;
@@ -70,6 +70,16 @@ const Sidebar: React.FC<SidebarProps> = ({ user, currentPage, onNavigate, isOpen
             )}
             {(user.role === 'admin' || user.permissions?.allowedPages.includes('transactions')) && (
               <NavItem icon={<Truck />} label="الحركات اليومية" isActive={currentPage === 'transactions'} onClick={() => handleNavigation('transactions')} />
+            )}
+            {(user.role === 'admin' || user.permissions?.allowedPages.includes('supplier-returns')) && (
+              <NavItem icon={<RotateCcw />} label="مرتجعات الموردين" isActive={currentPage === 'supplier-returns'} onClick={() => handleNavigation('supplier-returns')} />
+            )}
+            <hr className="my-2 border-gray-200 dark:border-gray-600" />
+            {(user.role === 'admin' || user.permissions?.allowedPages.includes('cost-meter')) && (
+              <NavItem icon={<Calculator />} label="حاسبة الكلف بالمتر" isActive={currentPage === 'cost-meter'} onClick={() => handleNavigation('cost-meter')} />
+            )}
+            {(user.role === 'admin' || user.permissions?.allowedPages.includes('cost-weight')) && (
+              <NavItem icon={<Weight />} label="حاسبة الكلف بالوزن" isActive={currentPage === 'cost-weight'} onClick={() => handleNavigation('cost-weight')} />
             )}
             {(user.role === 'admin' || user.permissions?.allowedPages.includes('reports')) && (
               <NavItem icon={<FileText />} label="التقارير" isActive={currentPage === 'reports'} onClick={() => handleNavigation('reports')} />

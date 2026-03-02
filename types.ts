@@ -7,24 +7,29 @@ export interface Material {
   specifications: string;
   supplier: string;
   barcode: string;
-  color?: string; // Added color field
+  color?: string;
   unit: string;
   minStock: number;
   currentStock: number;
   isNew: boolean;
+  // Weight formula: X pieces = Y kg
+  weightFormula?: {
+    pieces: number;
+    weight: number;
+  };
 }
 
 export interface Transaction {
   id: string;
-  type: 'in' | 'out';
+  type: 'in' | 'out' | 'return'; // Added 'return' for supplier returns
   materialId: string;
   materialName: string;
   materialType: string;
-  category: string; // Added category field
+  category: string;
   supplier: string;
   barcode: string;
-  itemBarcode?: string; // Added itemBarcode field (Story/Item Barcode)
-  color?: string; // Added color field
+  itemBarcode?: string;
+  color?: string;
   quantity: number;
   unit: string;
   recipient: string;
@@ -46,7 +51,17 @@ export interface User {
   permissions?: UserPermissions;
 }
 
-export type Page = 'dashboard' | 'materials' | 'transactions' | 'reports' | 'settings' | 'new-entries' | 'users';
+export type Page = 
+  | 'dashboard' 
+  | 'materials' 
+  | 'transactions' 
+  | 'reports' 
+  | 'settings' 
+  | 'new-entries' 
+  | 'users'
+  | 'supplier-returns'
+  | 'cost-meter'
+  | 'cost-weight';
 
 export interface SettingsData {
   companyName: string;
@@ -61,9 +76,46 @@ export interface SettingsData {
   githubToken?: string;
 }
 
+export interface CostPart {
+  id: string;
+  name: string;
+  valuePerPiece: number;
+  materialId?: string;
+  materialName?: string;
+}
+
+export interface CostCalculation {
+  id: string;
+  title: string;
+  description?: string;
+  measurement?: string;
+  materialId: string;
+  materialName: string;
+  pieceCount: number;
+  baseCostPerPiece: number;
+  parts: CostPart[];
+  totalCost: number;
+  date: string;
+}
+
+export interface WeightCalculation {
+  id: string;
+  title: string;
+  materialId: string;
+  materialName: string;
+  pieceCount: number;
+  standardPieces: number;
+  standardWeight: number;
+  totalWeight: number;
+  date: string;
+  notes?: string;
+}
+
 export interface AllData {
   settings: SettingsData;
   materials: Material[];
   transactions: Transaction[];
   users: Omit<User, 'password'>[];
+  costCalculations?: CostCalculation[];
+  weightCalculations?: WeightCalculation[];
 }

@@ -1,5 +1,5 @@
 
-import { User, Material, Transaction, SettingsData, AllData, UserPermissions, Page } from '@/types';
+import { User, Material, Transaction, SettingsData, AllData, UserPermissions, Page, CostCalculation, WeightCalculation } from '@/types';
 
 // --- INITIAL DATA & HELPERS ---
 
@@ -8,19 +8,32 @@ const MATERIALS_KEY = 'warehouse_materials';
 const TRANSACTIONS_KEY = 'warehouse_transactions';
 const SETTINGS_KEY = 'warehouse_settings';
 const CURRENT_USER_KEY = 'currentUser';
+const COST_CALCULATIONS_KEY = 'warehouse_cost_calculations';
+const WEIGHT_CALCULATIONS_KEY = 'warehouse_weight_calculations';
 
 const getDefaultPermissions = (role: 'admin' | 'visitor'): UserPermissions => {
   if (role === 'admin') {
     return {
       canPrint: true,
       canExport: true,
-      allowedPages: ['dashboard', 'materials', 'transactions', 'reports', 'settings', 'new-entries', 'users']
+      allowedPages: [
+        'dashboard', 
+        'materials', 
+        'transactions', 
+        'reports', 
+        'settings', 
+        'new-entries', 
+        'users',
+        'supplier-returns',
+        'cost-meter',
+        'cost-weight'
+      ]
     };
   }
   return {
     canPrint: false,
     canExport: false,
-    allowedPages: ['dashboard', 'materials', 'transactions']
+    allowedPages: ['dashboard', 'materials', 'transactions', 'supplier-returns', 'cost-meter', 'cost-weight']
   };
 };
 
@@ -269,6 +282,10 @@ export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'materi
         throw new Error('Not enough stock available');
     }
 
+    if (transactionData.type === 'return' && material.currentStock < transactionData.quantity) {
+        throw new Error('لا يوجد رصيد كافي لإتمام عملية المرتجع للمورد.');
+    }
+
     const newTransaction: Transaction = {
         ...transactionData,
         id: `t${Date.now()}`,
@@ -283,6 +300,10 @@ export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'materi
         color: transactionData.color || material.color
     };
     
+    // Calculate new stock based on type
+    // in -> +
+    // out -> -
+    // return -> -
     const stockChange = transactionData.type === 'in' ? transactionData.quantity : -transactionData.quantity;
     const updatedMaterial = { ...material, currentStock: material.currentStock + stockChange };
     materials = materials.map(m => m.id === updatedMaterial.id ? updatedMaterial : m);
@@ -368,13 +389,71 @@ export const saveSettings = (settings: SettingsData): void => {
     syncDataToGist(); // Sync immediately when settings are saved
 };
 
+export const getCostCalculations = (): CostCalculation[] => getFromStorage<CostCalculation[]>(COST_CALCULATIONS_KEY, []);
+
+export const addCostCalculation = (calc: Omit<CostCalculation, 'id' | 'date'>): CostCalculation => {
+    const calcs = getCostCalculations();
+    const newCalc: CostCalculation = {
+        ...calc,
+        id: `calc${Date.now()}`,
+        date: new Date().toISOString()
+    };
+    saveToStorage(COST_CALCULATIONS_KEY, [...calcs, newCalc]);
+    syncDataToGist();
+    return newCalc;
+};
+
+export const deleteCostCalculation = (id: string): void => {
+    saveToStorage(COST_CALCULATIONS_KEY, getCostCalculations().filter(c => c.id !== id));
+    syncDataToGist();
+};
+
+export const getWeightCalculations = (): WeightCalculation[] => getFromStorage<WeightCalculation[]>(WEIGHT_CALCULATIONS_KEY, []);
+
+export const addWeightCalculation = (calc: Omit<WeightCalculation, 'id' | 'date'>): WeightCalculation => {
+    const calcs = getWeightCalculations();
+    const newCalc: WeightCalculation = {
+        ...calc,
+        id: `wcalc${Date.now()}`,
+        date: new Date().toISOString()
+    };
+    saveToStorage(WEIGHT_CALCULATIONS_KEY, [...calcs, newCalc]);
+    syncDataToGist();
+    return newCalc;
+};
+
+export const deleteWeightCalculation = (id: string): void => {
+    saveToStorage(WEIGHT_CALCULATIONS_KEY, getWeightCalculations().filter(c => c.id !== id));
+    syncDataToGist();
+};
+
 export const exportAllData = (): AllData => {
     return { 
         settings: getSettings(), 
         materials: getMaterials(), 
         transactions: getTransactions(), 
-        users: getUsers() // Include passwords for full sync across devices
+        users: getUsers(), // Include passwords for full sync across devices
+        costCalculations: getCostCalculations(),
+        weightCalculations: getWeightCalculations()
     };
+};
+
+export const resetAllData = (): void => {
+    const users = getUsers();
+    const adminUser = users.find(u => u.role === 'admin');
+    
+    // Keep at least one admin
+    const initialUsers: User[] = adminUser ? [adminUser] : [
+        { id: '1', username: 'admin', password: 'admin123', role: 'admin', permissions: getDefaultPermissions('admin') }
+    ];
+    
+    saveToStorage(USERS_KEY, initialUsers);
+    saveToStorage(MATERIALS_KEY, []);
+    saveToStorage(TRANSACTIONS_KEY, []);
+    saveToStorage(COST_CALCULATIONS_KEY, []);
+    saveToStorage(WEIGHT_CALCULATIONS_KEY, []);
+    
+    syncDataToGist();
 };
 
 export const importAllData = (data: any): void => {
@@ -404,30 +483,20 @@ export const importAllData = (data: any): void => {
     if (actualData.settings) saveToStorage(SETTINGS_KEY, actualData.settings);
     if (actualData.materials) saveToStorage(MATERIALS_KEY, actualData.materials);
     if (actualData.transactions) saveToStorage(TRANSACTIONS_KEY, actualData.transactions);
+    if (actualData.costCalculations) saveToStorage(COST_CALCULATIONS_KEY, actualData.costCalculations);
+    if (actualData.weightCalculations) saveToStorage(WEIGHT_CALCULATIONS_KEY, actualData.weightCalculations);
     
-    // Handle users - merge with existing to preserve passwords if missing
+    // Handle users - overwrite with Gist data but preserve passwords if missing
     if (actualData.users && Array.isArray(actualData.users)) {
         const existingUsers = getUsers();
         const mergedUsers = actualData.users.map((importedUser: any) => {
             const existing = existingUsers.find(u => u.id === importedUser.id || u.username === importedUser.username);
             
-            // Ensure permissions are present, defaulting if missing in import
-            const userWithPermissions = {
+            return {
                 ...importedUser,
+                password: importedUser.password || existing?.password,
                 permissions: importedUser.permissions || (existing?.permissions) || getDefaultPermissions(importedUser.role)
             };
-
-            if (existing && !importedUser.password) {
-                return { ...userWithPermissions, password: existing.password };
-            }
-            return userWithPermissions;
-        });
-        
-        // Add any existing users that weren't in the import
-        existingUsers.forEach(u => {
-            if (!mergedUsers.find((mu: User) => mu.id === u.id)) {
-                mergedUsers.push(u);
-            }
         });
         
         saveToStorage(USERS_KEY, mergedUsers);

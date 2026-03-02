@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { getSettings, saveSettings, exportAllData, importAllData, updateUser, getCurrentUser } from '@/services/mockApi';
+import { getSettings, saveSettings, exportAllData, importAllData, updateUser, getCurrentUser, resetAllData } from '@/services/mockApi';
 import { SettingsData, AllData, User } from '@/types';
-import { Save, Upload, Download, Image, User as UserIcon } from 'lucide-react';
+import { Save, Upload, Download, Image, User as UserIcon, RefreshCcw } from 'lucide-react';
 
 interface SettingsProps {
     onDataChange: () => void;
@@ -127,6 +127,15 @@ const Settings: React.FC<SettingsProps> = ({ onDataChange, user }) => {
         }
     };
 
+    const handleReset = () => {
+        if (window.confirm("تحذير: هل أنت متأكد من تصفير جميع البيانات؟ سيتم حذف جميع المواد والحركات والحسابات نهائياً.")) {
+            resetAllData();
+            onDataChange();
+            setMessage('تم تصفير البيانات بنجاح!');
+            setTimeout(() => setMessage(''), 3000);
+        }
+    };
+
     return (
         <div className="space-y-8">
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">الإعدادات</h1>
@@ -237,6 +246,10 @@ const Settings: React.FC<SettingsProps> = ({ onDataChange, user }) => {
                                 استيراد البيانات (JSON)
                                 <input type="file" accept=".json" onChange={handleImport} className="hidden" />
                             </label>
+                            <button onClick={handleReset} className="flex items-center px-4 py-2 bg-red-500 text-white rounded-lg shadow hover:bg-red-600">
+                                <RefreshCcw className="ml-2" size={20}/>
+                                تصفير البيانات
+                            </button>
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                             <span className="font-bold text-red-500">تحذير:</span> استيراد البيانات سيحذف جميع المواد والحركات الحالية ويستبدلها بالبيانات من الملف المرفوع.

@@ -10,6 +10,9 @@ import Reports from '@/pages/Reports';
 import Settings from '@/pages/Settings';
 import NewEntries from '@/pages/NewEntries';
 import Users from '@/pages/Users';
+import SupplierReturns from '@/pages/SupplierReturns';
+import CostMeter from '@/pages/CostMeter';
+import CostWeight from '@/pages/CostWeight';
 import { User, Page, Material, Transaction, SettingsData } from '@/types';
 import { getMaterials, getTransactions, getSettings } from '@/services/mockApi';
 import { Archive } from 'lucide-react';
@@ -93,6 +96,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, onLogout, darkMode, setDa
         return <NewEntries materials={materials.filter(m => m.isNew)} />;
       case 'users':
         return <Users />;
+      case 'supplier-returns':
+        return <SupplierReturns materials={materials} transactions={transactions} user={user} />;
+      case 'cost-meter':
+        return <CostMeter materials={materials} user={user} />;
+      case 'cost-weight':
+        return <CostWeight materials={materials} user={user} onMaterialUpdate={refreshData} />;
       default:
         return <Dashboard materials={materials} transactions={transactions} />;
     }
