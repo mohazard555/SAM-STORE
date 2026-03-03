@@ -141,7 +141,8 @@ let syncTimeout: NodeJS.Timeout | null = null;
 
 export const syncDataToGist = async (): Promise<boolean> => {
     const settings = getSettings();
-    if (!settings.gistUrl || !settings.githubToken) {
+    const token = settings.githubToken ? settings.githubToken.trim() : '';
+    if (!settings.gistUrl || !token) {
         updateSyncStatus({ state: 'error', error: 'إعدادات Gist غير مكتملة (الرابط أو التوكن مفقود).' });
         return false;
     }
@@ -167,7 +168,7 @@ export const syncDataToGist = async (): Promise<boolean> => {
         // 1. Get Gist info to find the correct filename
         const getResponse = await fetch(`https://api.github.com/gists/${gistId}`, {
             headers: { 
-                'Authorization': `token ${settings.githubToken}`, 
+                'Authorization': `token ${token}`, 
                 'Accept': 'application/vnd.github.v3+json' 
             }
         });
@@ -181,17 +182,17 @@ export const syncDataToGist = async (): Promise<boolean> => {
                 const firstFilename = Object.keys(gistInfo.files)[0];
                 if (firstFilename) filename = firstFilename;
             }
-        } else if (getResponse.status === 404) {
-            throw new Error('لم يتم العثور على Gist. يرجى التأكد من الرابط.');
-        } else if (getResponse.status === 401) {
-            throw new Error('التوكن غير صالح أو منتهي الصلاحية.');
+        } else {
+            const errData = await getResponse.json().catch(() => ({}));
+            const errorMsg = `GitHub Error (${getResponse.status}): ${errData.message || getResponse.statusText}`;
+            throw new Error(errorMsg);
         }
 
         // 2. Perform the update
         const response = await fetch(`https://api.github.com/gists/${gistId}`, {
             method: 'PATCH',
             headers: { 
-                'Authorization': `token ${settings.githubToken}`, 
+                'Authorization': `token ${token}`, 
                 'Accept': 'application/vnd.github.v3+json', 
                 'Content-Type': 'application/json' 
             },
@@ -216,8 +217,8 @@ export const syncDataToGist = async (): Promise<boolean> => {
             }
             return true;
         } else {
-            const errData = await response.json();
-            const errorMsg = errData.message || 'فشل تحديث Gist.';
+            const errData = await response.json().catch(() => ({}));
+            const errorMsg = `GitHub Error (${response.status}): ${errData.message || response.statusText}`;
             throw new Error(errorMsg);
         }
     } catch (error: any) { 

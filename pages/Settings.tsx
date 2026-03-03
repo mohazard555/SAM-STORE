@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { getSettings, saveSettings, exportAllData, importAllData, updateUser, getCurrentUser, resetAllData, syncDataToGist } from '@/services/mockApi';
 import { SettingsData, AllData, User } from '@/types';
-import { Save, Upload, Download, Image, User as UserIcon, RefreshCcw, RefreshCw } from 'lucide-react';
+import { Save, Upload, Download, Image, User as UserIcon, RefreshCcw, RefreshCw, Lock, Unlock } from 'lucide-react';
 
 interface SettingsProps {
     onDataChange: () => void;
@@ -19,6 +19,10 @@ const Settings: React.FC<SettingsProps> = ({ onDataChange, user }) => {
     const [profileMessage, setProfileMessage] = useState('');
     const [profileError, setProfileError] = useState('');
     const [isSyncing, setIsSyncing] = useState(false);
+    const [isTokenUnlocked, setIsTokenUnlocked] = useState(false);
+    const [showPasswordInput, setShowPasswordInput] = useState(false);
+    const [unlockPassword, setUnlockPassword] = useState('');
+    const [unlockError, setUnlockError] = useState(false);
 
     useEffect(() => {
         setSettings(getSettings());
@@ -52,23 +56,51 @@ const Settings: React.FC<SettingsProps> = ({ onDataChange, user }) => {
 
     const handleSaveSettings = () => {
         if (settings) {
-            saveSettings(settings);
+            const settingsToSave = {
+                ...settings,
+                githubToken: settings.githubToken ? settings.githubToken.trim() : ''
+            };
+            saveSettings(settingsToSave);
+            setSettings(settingsToSave);
             onDataChange();
+            setIsTokenUnlocked(false);
             setMessage('تم حفظ الإعدادات بنجاح!');
             setTimeout(() => setMessage(''), 3000);
         }
     };
 
     const handleSyncNow = async () => {
+        if (settings) {
+            const settingsToSave = {
+                ...settings,
+                githubToken: settings.githubToken ? settings.githubToken.trim() : ''
+            };
+            saveSettings(settingsToSave);
+            setSettings(settingsToSave);
+            onDataChange();
+        }
         setIsSyncing(true);
         const success = await syncDataToGist();
         setIsSyncing(false);
+        setIsTokenUnlocked(false);
         if (success) {
             setMessage('تمت المزامنة مع Gist بنجاح!');
         } else {
             setMessage('فشل المزامنة. يرجى التحقق من الإعدادات.');
         }
         setTimeout(() => setMessage(''), 3000);
+    };
+
+    const handleUnlockToken = () => {
+        if (unlockPassword === 'sam1993') {
+            setIsTokenUnlocked(true);
+            setShowPasswordInput(false);
+            setUnlockPassword('');
+            setUnlockError(false);
+        } else {
+            setUnlockError(true);
+            setTimeout(() => setUnlockError(false), 2000);
+        }
     };
     
     const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -224,14 +256,75 @@ const Settings: React.FC<SettingsProps> = ({ onDataChange, user }) => {
                                 onChange={handleSettingsChange}
                                 placeholder="https://gist.githubusercontent.com/..."
                             />
-                            <InputField 
-                                type="password"
-                                label="GitHub Personal Access Token" 
-                                name="githubToken" 
-                                value={settings.githubToken || ''} 
-                                onChange={handleSettingsChange} 
-                                placeholder="••••••••••••••••••••••••••••••••••••••••"
-                            />
+                            
+                            <div className="space-y-2">
+                                <label className="block font-medium">GitHub Personal Access Token</label>
+                                <div className="flex gap-2">
+                                    <div className="relative flex-1">
+                                        <input 
+                                            type="password"
+                                            name="githubToken" 
+                                            value={settings.githubToken || ''} 
+                                            onChange={handleSettingsChange} 
+                                            disabled={!isTokenUnlocked}
+                                            placeholder="••••••••••••••••••••••••••••••••••••••••"
+                                            className={`w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 ${!isTokenUnlocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                        />
+                                        {!isTokenUnlocked && (
+                                            <div className="absolute inset-0 flex items-center justify-center bg-gray-100/50 dark:bg-gray-800/50 rounded pointer-events-none">
+                                                <Lock size={16} className="text-gray-400" />
+                                            </div>
+                                        )}
+                                    </div>
+                                    {!isTokenUnlocked ? (
+                                        <div className="flex flex-col gap-2">
+                                            {!showPasswordInput ? (
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => setShowPasswordInput(true)}
+                                                    className="px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center gap-1"
+                                                    title="فتح القفل لتعديل التوكن"
+                                                >
+                                                    <Lock size={18} />
+                                                    تعديل
+                                                </button>
+                                            ) : (
+                                                <div className="flex gap-1 items-center animate-in fade-in slide-in-from-right-2 duration-200">
+                                                    <input 
+                                                        type="password"
+                                                        value={unlockPassword}
+                                                        onChange={(e) => setUnlockPassword(e.target.value)}
+                                                        placeholder="كلمة المرور"
+                                                        autoFocus
+                                                        className={`w-24 p-1.5 text-xs border rounded dark:bg-gray-800 ${unlockError ? 'border-red-500 animate-shake' : 'dark:border-gray-600'}`}
+                                                        onKeyDown={(e) => e.key === 'Enter' && handleUnlockToken()}
+                                                    />
+                                                    <button 
+                                                        type="button"
+                                                        onClick={handleUnlockToken}
+                                                        className="p-1.5 bg-sky-500 text-white rounded hover:bg-sky-600"
+                                                    >
+                                                        <Save size={14} />
+                                                    </button>
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => { setShowPasswordInput(false); setUnlockPassword(''); }}
+                                                        className="p-1.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded"
+                                                    >
+                                                        إلغاء
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="px-3 py-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded flex items-center gap-1">
+                                            <Unlock size={18} />
+                                            مفتوح
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
                             <div className="flex gap-2">
                                 <button 
                                     onClick={handleSyncNow} 
