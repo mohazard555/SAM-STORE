@@ -149,3 +149,11 @@ export interface AllData {
   weightCalculations?: WeightCalculation[];
   costTemplates?: CostTemplate[];
 }
+
+export type SyncState = 'idle' | 'syncing' | 'success' | 'error';
+
+export interface SyncStatus {
+  state: SyncState;
+  lastSync?: string;
+  error?: string;
+}

@@ -23,8 +23,8 @@ function App() {
       setSuccessMessage(null);
       setLoading(true);
       
-      // Pass the GIST_URL to ensure visitors get the right data source
-      const dataSourceResult = await initializeDataSource(GIST_URL);
+      // Initialize data source (uses URL from settings by default)
+      const dataSourceResult = await initializeDataSource();
       
       if (!dataSourceResult.success) {
           setError(`فشل تحميل البيانات من Gist: ${dataSourceResult.message}. يتم استخدام البيانات المحلية.`);

@@ -1,7 +1,8 @@
 
-import React, { useState } from 'react';
-import { User } from '@/types';
-import { Search, LogOut, User as UserIcon, Menu, Moon, Sun } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { User, SyncStatus } from '@/types';
+import { Search, LogOut, User as UserIcon, Menu, Moon, Sun, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
+import { subscribeToSyncStatus } from '@/services/mockApi';
 
 interface HeaderProps {
   user: User;
@@ -14,6 +15,36 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ user, onLogout, toggleSidebar, onSearch, darkMode, setDarkMode }) => {
   const [isDropdownOpen, setDropdownOpen] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>({ state: 'idle' });
+
+  useEffect(() => {
+    return subscribeToSyncStatus((status) => {
+      setSyncStatus(status);
+    });
+  }, []);
+
+  const getSyncIcon = () => {
+    switch (syncStatus.state) {
+      case 'syncing':
+        return <RefreshCw className="w-5 h-5 text-blue-500 animate-spin" />;
+      case 'success':
+        return <CheckCircle2 className="w-5 h-5 text-green-500" />;
+      case 'error':
+        return <AlertCircle className="w-5 h-5 text-red-500" />;
+      default:
+        return <RefreshCw className="w-5 h-5 text-gray-400" />;
+    }
+  };
+
+  const getSyncText = () => {
+    if (syncStatus.state === 'syncing') return 'جاري المزامنة...';
+    if (syncStatus.state === 'error') return syncStatus.error || 'فشل المزامنة';
+    if (syncStatus.lastSync) {
+      const date = new Date(syncStatus.lastSync);
+      return `آخر مزامنة: ${date.toLocaleTimeString('ar-EG')}`;
+    }
+    return 'المزامنة جاهزة';
+  };
 
   return (
     <header className="bg-white dark:bg-gray-800 shadow-md p-4 flex items-center justify-between border-b dark:border-gray-700">
@@ -34,7 +65,14 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, toggleSidebar, onSearch
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-4">
+        {/* Sync Status Indicator */}
+        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-50 dark:bg-gray-700/50 border dark:border-gray-600" title={syncStatus.error}>
+          {getSyncIcon()}
+          <span className={`text-xs font-medium ${syncStatus.state === 'error' ? 'text-red-500' : 'text-gray-600 dark:text-gray-400'}`}>
+            {getSyncText()}
+          </span>
+        </div>
         <button 
           onClick={() => setDarkMode(!darkMode)} 
           className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors"

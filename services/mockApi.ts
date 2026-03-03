@@ -1,5 +1,5 @@
 
-import { User, Material, Transaction, SettingsData, AllData, UserPermissions, Page, CostCalculation, WeightCalculation, Warehouse, CostTemplate } from '@/types';
+import { User, Material, Transaction, SettingsData, AllData, UserPermissions, Page, CostCalculation, WeightCalculation, Warehouse, CostTemplate, SyncStatus, SyncState } from '@/types';
 
 // --- INITIAL DATA & HELPERS ---
 
@@ -13,6 +13,30 @@ const WEIGHT_CALCULATIONS_KEY = 'warehouse_weight_calculations';
 const WAREHOUSES_KEY = 'warehouse_warehouses';
 const COST_TEMPLATES_KEY = 'warehouse_cost_templates';
 const UNSYNCED_CHANGES_KEY = 'warehouse_unsynced_changes';
+const LAST_SYNC_KEY = 'warehouse_last_sync';
+
+// --- Sync Status Management ---
+let currentSyncStatus: SyncStatus = {
+  state: 'idle',
+  lastSync: localStorage.getItem(LAST_SYNC_KEY) || undefined
+};
+
+type SyncListener = (status: SyncStatus) => void;
+const syncListeners: Set<SyncListener> = new Set();
+
+export const subscribeToSyncStatus = (listener: SyncListener) => {
+  syncListeners.add(listener);
+  listener(currentSyncStatus);
+  return () => { syncListeners.delete(listener); };
+};
+
+const updateSyncStatus = (status: Partial<SyncStatus>) => {
+  currentSyncStatus = { ...currentSyncStatus, ...status };
+  if (status.lastSync) {
+    localStorage.setItem(LAST_SYNC_KEY, status.lastSync);
+  }
+  syncListeners.forEach(listener => listener(currentSyncStatus));
+};
 
 const getDefaultPermissions = (role: 'admin' | 'visitor'): UserPermissions => {
   if (role === 'admin') {
@@ -111,24 +135,104 @@ const initializeData = () => {
 
 initializeData();
 
-const syncDataToGist = async () => {
+let isSyncing = false;
+let pendingSync = false;
+let syncTimeout: NodeJS.Timeout | null = null;
+
+export const syncDataToGist = async (): Promise<boolean> => {
     const settings = getSettings();
-    if (!settings.gistUrl || !settings.githubToken) return;
+    if (!settings.gistUrl || !settings.githubToken) {
+        updateSyncStatus({ state: 'error', error: 'إعدادات Gist غير مكتملة (الرابط أو التوكن مفقود).' });
+        return false;
+    }
+    
     const match = settings.gistUrl.match(/gist\.github(?:usercontent)?\.com\/[^\/]+\/([a-f0-9]+)/);
-    if (!match) return;
+    if (!match) {
+        updateSyncStatus({ state: 'error', error: 'رابط Gist غير صالح.' });
+        return false;
+    }
     const gistId = match[1];
+    
+    if (isSyncing) {
+        pendingSync = true;
+        return false;
+    }
+    
+    isSyncing = true;
+    updateSyncStatus({ state: 'syncing', error: undefined });
+    
     const allData = exportAllData();
-    const filename = settings.gistUrl.split('/').pop() || 'warehouse-data.json';
+    
     try {
+        // 1. Get Gist info to find the correct filename
+        const getResponse = await fetch(`https://api.github.com/gists/${gistId}`, {
+            headers: { 
+                'Authorization': `token ${settings.githubToken}`, 
+                'Accept': 'application/vnd.github.v3+json' 
+            }
+        });
+        
+        let filename = settings.gistUrl.split('/').pop() || 'warehouse-data.json';
+        if (filename.includes('?')) filename = filename.split('?')[0];
+        
+        if (getResponse.ok) {
+            const gistInfo = await getResponse.json();
+            if (!gistInfo.files[filename]) {
+                const firstFilename = Object.keys(gistInfo.files)[0];
+                if (firstFilename) filename = firstFilename;
+            }
+        } else if (getResponse.status === 404) {
+            throw new Error('لم يتم العثور على Gist. يرجى التأكد من الرابط.');
+        } else if (getResponse.status === 401) {
+            throw new Error('التوكن غير صالح أو منتهي الصلاحية.');
+        }
+
+        // 2. Perform the update
         const response = await fetch(`https://api.github.com/gists/${gistId}`, {
             method: 'PATCH',
-            headers: { 'Authorization': `token ${settings.githubToken}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
-            body: JSON.stringify({ files: { [filename]: { content: JSON.stringify(allData, null, 2) } } }),
+            headers: { 
+                'Authorization': `token ${settings.githubToken}`, 
+                'Accept': 'application/vnd.github.v3+json', 
+                'Content-Type': 'application/json' 
+            },
+            body: JSON.stringify({ 
+                files: { 
+                    [filename]: { 
+                        content: JSON.stringify(allData, null, 2) 
+                    } 
+                } 
+            }),
         });
+        
         if (response.ok) {
             localStorage.setItem(UNSYNCED_CHANGES_KEY, 'false');
+            const now = new Date().toISOString();
+            updateSyncStatus({ state: 'success', lastSync: now, error: undefined });
+            isSyncing = false;
+            
+            if (pendingSync) {
+                pendingSync = false;
+                setTimeout(() => syncDataToGist(), 1000);
+            }
+            return true;
+        } else {
+            const errData = await response.json();
+            const errorMsg = errData.message || 'فشل تحديث Gist.';
+            throw new Error(errorMsg);
         }
-    } catch (error) { console.error("Gist sync error:", error); }
+    } catch (error: any) { 
+        console.error("Gist sync error:", error); 
+        updateSyncStatus({ state: 'error', error: error.message || 'حدث خطأ أثناء المزامنة.' });
+        isSyncing = false;
+        return false;
+    }
+};
+
+const debouncedSync = () => {
+    if (syncTimeout) clearTimeout(syncTimeout);
+    syncTimeout = setTimeout(() => {
+        syncDataToGist();
+    }, 1000); // Sync 1 second after the last change
 };
 
 export const initializeDataSource = async (overrideUrl?: string): Promise<{ success: boolean; message?: string }> => {
@@ -145,8 +249,13 @@ export const initializeDataSource = async (overrideUrl?: string): Promise<{ succ
 
     try {
         if (hasUnsyncedChanges() && settings.githubToken) {
-            await syncDataToGist();
-            return { success: true, message: 'تم اكتشاف تغييرات محلية ومزامنتها مع Gist.' };
+            const success = await syncDataToGist();
+            if (success) {
+                return { success: true, message: 'تم اكتشاف تغييرات محلية ومزامنتها بنجاح.' };
+            } else {
+                // If sync failed, we still proceed but warn the user
+                return { success: true, message: 'توجد تغييرات محلية لم يتمكن النظام من مزامنتها حالياً.' };
+            }
         }
 
         let dataText = '';
@@ -248,7 +357,7 @@ export const addUser = (userData: Omit<User, 'id'>): User => {
         permissions: userData.permissions || getDefaultPermissions(userData.role)
     };
     saveToStorage(USERS_KEY, [...users, newUser]);
-    syncDataToGist();
+    debouncedSync();
     return newUser;
 };
 
@@ -258,14 +367,14 @@ export const updateUser = (updatedUser: User): User => {
     if (users.some(u => u.username === updatedUser.username && u.id !== updatedUser.id)) throw new Error('Username already exists');
     users = users.map(u => (u.id === updatedUser.id ? updatedUser : u));
     saveToStorage(USERS_KEY, users);
-    syncDataToGist();
+    debouncedSync();
     if (currentUser && currentUser.id === updatedUser.id) sessionStorage.setItem(CURRENT_USER_KEY, JSON.stringify(updatedUser));
     return updatedUser;
 };
 
 export const deleteUser = (userId: string): void => {
     saveToStorage(USERS_KEY, getUsers().filter(u => u.id !== userId));
-    syncDataToGist();
+    debouncedSync();
 };
 
 export const getWarehouses = (): Warehouse[] => getFromStorage<Warehouse[]>(WAREHOUSES_KEY, []);
@@ -275,7 +384,7 @@ export const addWarehouse = (warehouse: Omit<Warehouse, 'id'>): Warehouse => {
   const newWarehouse: Warehouse = { ...warehouse, id: `wh-${Date.now()}` };
   warehouses.push(newWarehouse);
   saveToStorage(WAREHOUSES_KEY, warehouses);
-  syncDataToGist();
+  debouncedSync();
   return newWarehouse;
 };
 
@@ -285,14 +394,14 @@ export const updateWarehouse = (warehouse: Warehouse): void => {
   if (index !== -1) {
     warehouses[index] = warehouse;
     saveToStorage(WAREHOUSES_KEY, warehouses);
-    syncDataToGist();
+    debouncedSync();
   }
 };
 
 export const deleteWarehouse = (id: string): void => {
   const warehouses = getWarehouses();
   saveToStorage(WAREHOUSES_KEY, warehouses.filter(w => w.id !== id));
-  syncDataToGist();
+  debouncedSync();
 };
 
 export const getMaterials = (): Material[] => {
@@ -322,7 +431,7 @@ export const addMaterial = (materialData: Omit<Material, 'id' | 'isNew'>): Mater
     }
 
     saveToStorage(MATERIALS_KEY, [...materials, newMaterial]);
-    syncDataToGist();
+    debouncedSync();
     return newMaterial;
 };
 
@@ -333,7 +442,7 @@ export const updateMaterial = (updatedMaterial: Material): Material => {
 
     const materials = getMaterials().map(m => m.id === materialToSave.id ? materialToSave : m);
     saveToStorage(MATERIALS_KEY, materials);
-    syncDataToGist();
+    debouncedSync();
     return materialToSave;
 };
 
@@ -344,7 +453,7 @@ export const acknowledgeNewMaterial = (materialId: string): void => {
 
 export const deleteMaterial = (materialId: string): void => {
     saveToStorage(MATERIALS_KEY, getMaterials().filter(m => m.id !== materialId));
-    syncDataToGist();
+    debouncedSync();
 };
 
 export const getTransactions = (): Transaction[] => getFromStorage<Transaction[]>(TRANSACTIONS_KEY, []);
@@ -406,7 +515,7 @@ export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'materi
     
     saveToStorage(MATERIALS_KEY, materials);
     saveToStorage(TRANSACTIONS_KEY, [...transactions, newTransaction]);
-    syncDataToGist();
+    debouncedSync();
 
     return newTransaction;
 };
@@ -439,7 +548,7 @@ export const deleteTransaction = (transactionId: string): void => {
     }
 
     saveToStorage(TRANSACTIONS_KEY, transactions.filter(t => t.id !== transactionId));
-    syncDataToGist();
+    debouncedSync();
 };
 
 export const updateTransaction = (updatedTransaction: Transaction): Transaction => {
@@ -488,7 +597,7 @@ export const updateTransaction = (updatedTransaction: Transaction): Transaction 
 
     const updatedTransactions = transactions.map(t => t.id === updatedTransaction.id ? updatedTransaction : t);
     saveToStorage(TRANSACTIONS_KEY, updatedTransactions);
-    syncDataToGist();
+    debouncedSync();
 
     return updatedTransaction;
 };
@@ -513,7 +622,7 @@ export const getSettings = (): SettingsData => {
 };
 export const saveSettings = (settings: SettingsData): void => { 
     saveToStorage(SETTINGS_KEY, settings); 
-    syncDataToGist(); // Sync immediately when settings are saved
+    debouncedSync(); // Sync immediately when settings are saved
 };
 
 export const getCostCalculations = (): CostCalculation[] => getFromStorage<CostCalculation[]>(COST_CALCULATIONS_KEY, []);
@@ -526,13 +635,13 @@ export const addCostCalculation = (calc: Omit<CostCalculation, 'id' | 'date'>): 
         date: new Date().toISOString()
     };
     saveToStorage(COST_CALCULATIONS_KEY, [...calcs, newCalc]);
-    syncDataToGist();
+    debouncedSync();
     return newCalc;
 };
 
 export const deleteCostCalculation = (id: string): void => {
     saveToStorage(COST_CALCULATIONS_KEY, getCostCalculations().filter(c => c.id !== id));
-    syncDataToGist();
+    debouncedSync();
 };
 
 export const getWeightCalculations = (): WeightCalculation[] => getFromStorage<WeightCalculation[]>(WEIGHT_CALCULATIONS_KEY, []);
@@ -545,13 +654,13 @@ export const addWeightCalculation = (calc: Omit<WeightCalculation, 'id' | 'date'
         date: new Date().toISOString()
     };
     saveToStorage(WEIGHT_CALCULATIONS_KEY, [...calcs, newCalc]);
-    syncDataToGist();
+    debouncedSync();
     return newCalc;
 };
 
 export const deleteWeightCalculation = (id: string): void => {
     saveToStorage(WEIGHT_CALCULATIONS_KEY, getWeightCalculations().filter(c => c.id !== id));
-    syncDataToGist();
+    debouncedSync();
 };
 
 export const getCostTemplates = (): CostTemplate[] => getFromStorage<CostTemplate[]>(COST_TEMPLATES_KEY, []);
@@ -564,13 +673,13 @@ export const addCostTemplate = (template: Omit<CostTemplate, 'id' | 'date'>): Co
         date: new Date().toISOString()
     };
     saveToStorage(COST_TEMPLATES_KEY, [...templates, newTemplate]);
-    syncDataToGist();
+    debouncedSync();
     return newTemplate;
 };
 
 export const deleteCostTemplate = (id: string): void => {
     saveToStorage(COST_TEMPLATES_KEY, getCostTemplates().filter(c => c.id !== id));
-    syncDataToGist();
+    debouncedSync();
 };
 
 export const exportAllData = (): AllData => {
@@ -605,7 +714,7 @@ export const resetAllData = (): void => {
     ]);
     saveToStorage(COST_TEMPLATES_KEY, []);
     
-    syncDataToGist();
+    debouncedSync();
 };
 
 export const importAllData = (data: any): void => {

@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { getSettings, saveSettings, exportAllData, importAllData, updateUser, getCurrentUser, resetAllData } from '@/services/mockApi';
+import { getSettings, saveSettings, exportAllData, importAllData, updateUser, getCurrentUser, resetAllData, syncDataToGist } from '@/services/mockApi';
 import { SettingsData, AllData, User } from '@/types';
-import { Save, Upload, Download, Image, User as UserIcon, RefreshCcw } from 'lucide-react';
+import { Save, Upload, Download, Image, User as UserIcon, RefreshCcw, RefreshCw } from 'lucide-react';
 
 interface SettingsProps {
     onDataChange: () => void;
@@ -18,6 +18,7 @@ const Settings: React.FC<SettingsProps> = ({ onDataChange, user }) => {
     const [message, setMessage] = useState('');
     const [profileMessage, setProfileMessage] = useState('');
     const [profileError, setProfileError] = useState('');
+    const [isSyncing, setIsSyncing] = useState(false);
 
     useEffect(() => {
         setSettings(getSettings());
@@ -56,6 +57,18 @@ const Settings: React.FC<SettingsProps> = ({ onDataChange, user }) => {
             setMessage('تم حفظ الإعدادات بنجاح!');
             setTimeout(() => setMessage(''), 3000);
         }
+    };
+
+    const handleSyncNow = async () => {
+        setIsSyncing(true);
+        const success = await syncDataToGist();
+        setIsSyncing(false);
+        if (success) {
+            setMessage('تمت المزامنة مع Gist بنجاح!');
+        } else {
+            setMessage('فشل المزامنة. يرجى التحقق من الإعدادات.');
+        }
+        setTimeout(() => setMessage(''), 3000);
     };
     
     const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -219,6 +232,16 @@ const Settings: React.FC<SettingsProps> = ({ onDataChange, user }) => {
                                 onChange={handleSettingsChange} 
                                 placeholder="••••••••••••••••••••••••••••••••••••••••"
                             />
+                            <div className="flex gap-2">
+                                <button 
+                                    onClick={handleSyncNow} 
+                                    disabled={isSyncing}
+                                    className={`flex items-center px-4 py-2 rounded-lg shadow transition-colors ${isSyncing ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-500 hover:bg-indigo-600 text-white'}`}
+                                >
+                                    <RefreshCw className={`ml-2 ${isSyncing ? 'animate-spin' : ''}`} size={18} />
+                                    {isSyncing ? 'جاري المزامنة...' : 'مزامنة الآن'}
+                                </button>
+                            </div>
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                             <span className="font-bold">ملاحظة:</span> بعد حفظ إعدادات المزامنة، يرجى إعادة تحميل الصفحة لتطبيق التغييرات وسحب البيانات من الرابط.
