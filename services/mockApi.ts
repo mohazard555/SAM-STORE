@@ -168,7 +168,7 @@ export const syncDataToGist = async (): Promise<boolean> => {
         // 1. Get Gist info to find the correct filename
         const getResponse = await fetch(`https://api.github.com/gists/${gistId}`, {
             headers: { 
-                'Authorization': `token ${token}`, 
+                'Authorization': `Bearer ${token}`, 
                 'Accept': 'application/vnd.github.v3+json' 
             }
         });
@@ -192,7 +192,7 @@ export const syncDataToGist = async (): Promise<boolean> => {
         const response = await fetch(`https://api.github.com/gists/${gistId}`, {
             method: 'PATCH',
             headers: { 
-                'Authorization': `token ${token}`, 
+                'Authorization': `Bearer ${token}`, 
                 'Accept': 'application/vnd.github.v3+json', 
                 'Content-Type': 'application/json' 
             },
@@ -223,7 +223,11 @@ export const syncDataToGist = async (): Promise<boolean> => {
         }
     } catch (error: any) { 
         console.error("Gist sync error:", error); 
-        updateSyncStatus({ state: 'error', error: error.message || 'حدث خطأ أثناء المزامنة.' });
+        let errorMsg = error.message || 'حدث خطأ أثناء المزامنة.';
+        if (errorMsg.includes('NetworkError') || errorMsg.includes('Failed to fetch')) {
+            errorMsg = 'فشل الاتصال بخوادم GitHub. يرجى التأكد من اتصالك بالإنترنت أو التحقق من صحة التوكن (قد يسبب التوكن الخاطئ مشكلة CORS).';
+        }
+        updateSyncStatus({ state: 'error', error: errorMsg });
         isSyncing = false;
         return false;
     }
