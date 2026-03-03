@@ -1,5 +1,5 @@
 
-import { User, Material, Transaction, SettingsData, AllData, UserPermissions, Page, CostCalculation, WeightCalculation } from '@/types';
+import { User, Material, Transaction, SettingsData, AllData, UserPermissions, Page, CostCalculation, WeightCalculation, Warehouse, CostTemplate } from '@/types';
 
 // --- INITIAL DATA & HELPERS ---
 
@@ -10,6 +10,9 @@ const SETTINGS_KEY = 'warehouse_settings';
 const CURRENT_USER_KEY = 'currentUser';
 const COST_CALCULATIONS_KEY = 'warehouse_cost_calculations';
 const WEIGHT_CALCULATIONS_KEY = 'warehouse_weight_calculations';
+const WAREHOUSES_KEY = 'warehouse_warehouses';
+const COST_TEMPLATES_KEY = 'warehouse_cost_templates';
+const UNSYNCED_CHANGES_KEY = 'warehouse_unsynced_changes';
 
 const getDefaultPermissions = (role: 'admin' | 'visitor'): UserPermissions => {
   if (role === 'admin') {
@@ -26,14 +29,16 @@ const getDefaultPermissions = (role: 'admin' | 'visitor'): UserPermissions => {
         'users',
         'supplier-returns',
         'cost-meter',
-        'cost-weight'
+        'cost-weight',
+        'quick-look',
+        'warehouses'
       ]
     };
   }
   return {
     canPrint: false,
     canExport: false,
-    allowedPages: ['dashboard', 'materials', 'transactions', 'supplier-returns', 'cost-meter', 'cost-weight']
+    allowedPages: ['dashboard', 'materials', 'transactions', 'supplier-returns', 'cost-meter', 'cost-weight', 'quick-look', 'warehouses']
   };
 };
 
@@ -49,14 +54,19 @@ const getFromStorage = <T>(key: string, defaultValue: T): T => {
   }
 };
 
-const saveToStorage = <T>(key: string, value: T) => {
+const saveToStorage = <T>(key: string, value: T, markUnsynced = true) => {
   try {
     const item = JSON.stringify(value);
     localStorage.setItem(key, item);
+    if (markUnsynced) {
+      localStorage.setItem(UNSYNCED_CHANGES_KEY, 'true');
+    }
   } catch (error) {
     console.error(`Error writing to localStorage key “${key}”:`, error);
   }
 };
+
+const hasUnsyncedChanges = () => localStorage.getItem(UNSYNCED_CHANGES_KEY) === 'true';
 
 const initializeData = () => {
     if (!localStorage.getItem(USERS_KEY)) {
@@ -64,19 +74,26 @@ const initializeData = () => {
             { id: '1', username: 'admin', password: 'admin123', role: 'admin', permissions: getDefaultPermissions('admin') },
             { id: '2', username: 'user', password: 'user123', role: 'visitor', permissions: getDefaultPermissions('visitor') },
         ];
-        saveToStorage(USERS_KEY, initialUsers);
+        saveToStorage(USERS_KEY, initialUsers, false);
+    }
+
+    if (!localStorage.getItem(WAREHOUSES_KEY)) {
+        const initialWarehouses: Warehouse[] = [
+            { id: 'w1', name: 'المستودع الرئيسي', location: 'المبنى أ', description: 'المستودع الأساسي للمواد' }
+        ];
+        saveToStorage(WAREHOUSES_KEY, initialWarehouses, false);
     }
 
     if (!localStorage.getItem(MATERIALS_KEY)) {
         const initialMaterials: Material[] = [
-            { id: 'm1', name: 'لابتوب ديل', materialType: 'DELL-LT-001', unit: 'حبة', category: 'أجهزة إلكترونية', specifications: 'Core i7, 16GB RAM, 512GB SSD', supplier: 'شركة التكنولوجيا الحديثة', barcode: '1234567890123', minStock: 5, currentStock: 15, isNew: false, color: 'فضي' },
-            { id: 'm2', name: 'شاشة سامسونج 24 بوصة', materialType: 'SAM-SC-024', unit: 'حبة', category: 'أجهزة إلكترونية', specifications: '24" Full HD, 75Hz', supplier: 'سامسونج العالمية', barcode: '1234567890124', minStock: 10, currentStock: 8, isNew: false, color: 'أسود' },
+            { id: 'm1', name: 'لابتوب ديل', materialType: 'DELL-LT-001', unit: 'حبة', category: 'أجهزة إلكترونية', specifications: 'Core i7, 16GB RAM, 512GB SSD', supplier: 'شركة التكنولوجيا الحديثة', barcode: '1234567890123', minStock: 5, currentStock: 15, isNew: false, color: 'فضي', stocks: { 'w1': 15 } },
+            { id: 'm2', name: 'شاشة سامسونج 24 بوصة', materialType: 'SAM-SC-024', unit: 'حبة', category: 'أجهزة إلكترونية', specifications: '24" Full HD, 75Hz', supplier: 'سامسونج العالمية', barcode: '1234567890124', minStock: 10, currentStock: 8, isNew: false, color: 'أسود', stocks: { 'w1': 8 } },
         ];
-        saveToStorage(MATERIALS_KEY, initialMaterials);
+        saveToStorage(MATERIALS_KEY, initialMaterials, false);
     }
     
     if (!localStorage.getItem(TRANSACTIONS_KEY)) {
-        saveToStorage(TRANSACTIONS_KEY, []);
+        saveToStorage(TRANSACTIONS_KEY, [], false);
     }
 
     if (!localStorage.getItem(SETTINGS_KEY)) {
@@ -88,7 +105,7 @@ const initializeData = () => {
             gistUrl: 'https://gist.githubusercontent.com/mohazard555/6da370385392ac7cd27e034efe4b7d7c/raw/amenstor.json',
             githubToken: '',
         };
-        saveToStorage(SETTINGS_KEY, initialSettings);
+        saveToStorage(SETTINGS_KEY, initialSettings, false);
     }
 };
 
@@ -103,11 +120,14 @@ const syncDataToGist = async () => {
     const allData = exportAllData();
     const filename = settings.gistUrl.split('/').pop() || 'warehouse-data.json';
     try {
-        await fetch(`https://api.github.com/gists/${gistId}`, {
+        const response = await fetch(`https://api.github.com/gists/${gistId}`, {
             method: 'PATCH',
             headers: { 'Authorization': `token ${settings.githubToken}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
             body: JSON.stringify({ files: { [filename]: { content: JSON.stringify(allData, null, 2) } } }),
         });
+        if (response.ok) {
+            localStorage.setItem(UNSYNCED_CHANGES_KEY, 'false');
+        }
     } catch (error) { console.error("Gist sync error:", error); }
 };
 
@@ -124,6 +144,11 @@ export const initializeDataSource = async (overrideUrl?: string): Promise<{ succ
     const timeoutId = setTimeout(() => controller.abort(), 20000); // Increased to 20 seconds timeout
 
     try {
+        if (hasUnsyncedChanges() && settings.githubToken) {
+            await syncDataToGist();
+            return { success: true, message: 'تم اكتشاف تغييرات محلية ومزامنتها مع Gist.' };
+        }
+
         let dataText = '';
         
         if (gistId) {
@@ -243,20 +268,73 @@ export const deleteUser = (userId: string): void => {
     syncDataToGist();
 };
 
-export const getMaterials = (): Material[] => getFromStorage<Material[]>(MATERIALS_KEY, []);
+export const getWarehouses = (): Warehouse[] => getFromStorage<Warehouse[]>(WAREHOUSES_KEY, []);
+
+export const addWarehouse = (warehouse: Omit<Warehouse, 'id'>): Warehouse => {
+  const warehouses = getWarehouses();
+  const newWarehouse: Warehouse = { ...warehouse, id: `wh-${Date.now()}` };
+  warehouses.push(newWarehouse);
+  saveToStorage(WAREHOUSES_KEY, warehouses);
+  syncDataToGist();
+  return newWarehouse;
+};
+
+export const updateWarehouse = (warehouse: Warehouse): void => {
+  const warehouses = getWarehouses();
+  const index = warehouses.findIndex(w => w.id === warehouse.id);
+  if (index !== -1) {
+    warehouses[index] = warehouse;
+    saveToStorage(WAREHOUSES_KEY, warehouses);
+    syncDataToGist();
+  }
+};
+
+export const deleteWarehouse = (id: string): void => {
+  const warehouses = getWarehouses();
+  saveToStorage(WAREHOUSES_KEY, warehouses.filter(w => w.id !== id));
+  syncDataToGist();
+};
+
+export const getMaterials = (): Material[] => {
+  const materials = getFromStorage<Material[]>(MATERIALS_KEY, []);
+  const warehouses = getWarehouses();
+  const defaultWarehouseId = warehouses.length > 0 ? warehouses[0].id : 'wh-default';
+  
+  // Ensure all materials have stocks object
+  return materials.map(m => {
+    if (!m.stocks) {
+      return { ...m, stocks: { [defaultWarehouseId]: m.currentStock } };
+    }
+    return m;
+  });
+};
 export const addMaterial = (materialData: Omit<Material, 'id' | 'isNew'>): Material => {
     const materials = getMaterials();
-    const newMaterial: Material = { ...materialData, id: `m${Date.now()}`, isNew: true };
+    const newMaterial: Material = { 
+        ...materialData, 
+        id: `m${Date.now()}`, 
+        isNew: true,
+        stocks: materialData.stocks || {}
+    };
+    
+    if (Object.keys(newMaterial.stocks).length > 0) {
+        newMaterial.currentStock = Object.values(newMaterial.stocks).reduce((sum, val) => sum + val, 0);
+    }
+
     saveToStorage(MATERIALS_KEY, [...materials, newMaterial]);
     syncDataToGist();
     return newMaterial;
 };
 
 export const updateMaterial = (updatedMaterial: Material): Material => {
-    const materials = getMaterials().map(m => m.id === updatedMaterial.id ? updatedMaterial : m);
+    // Recalculate total stock
+    const totalStock = Object.values(updatedMaterial.stocks || {}).reduce((sum, val) => sum + val, 0);
+    const materialToSave = { ...updatedMaterial, currentStock: totalStock };
+
+    const materials = getMaterials().map(m => m.id === materialToSave.id ? materialToSave : m);
     saveToStorage(MATERIALS_KEY, materials);
     syncDataToGist();
-    return updatedMaterial;
+    return materialToSave;
 };
 
 export const acknowledgeNewMaterial = (materialId: string): void => {
@@ -278,12 +356,22 @@ export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'materi
 
     if (!material) throw new Error('Material not found');
 
-    if (transactionData.type === 'out' && material.currentStock < transactionData.quantity) {
-        throw new Error('Not enough stock available');
+    const warehouseId = transactionData.warehouseId;
+    const currentWarehouseStock = material.stocks[warehouseId] || 0;
+
+    if (transactionData.type === 'out' && currentWarehouseStock < transactionData.quantity) {
+        throw new Error(`الكمية المطلوبة غير متوفرة في المستودع المحدد. المتوفر: ${currentWarehouseStock}`);
     }
 
-    if (transactionData.type === 'return' && material.currentStock < transactionData.quantity) {
-        throw new Error('لا يوجد رصيد كافي لإتمام عملية المرتجع للمورد.');
+    if (transactionData.type === 'return' && currentWarehouseStock < transactionData.quantity) {
+        throw new Error(`لا يوجد رصيد كافي لإتمام عملية المرتجع للمورد من هذا المستودع. المتوفر: ${currentWarehouseStock}`);
+    }
+
+    if (transactionData.type === 'transfer') {
+        if (!transactionData.toWarehouseId) throw new Error('يجب تحديد المستودع المحول إليه');
+        if (currentWarehouseStock < transactionData.quantity) {
+            throw new Error(`الكمية المطلوبة غير متوفرة في المستودع المحدد. المتوفر: ${currentWarehouseStock}`);
+        }
     }
 
     const newTransaction: Transaction = {
@@ -301,11 +389,19 @@ export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'materi
     };
     
     // Calculate new stock based on type
-    // in -> +
-    // out -> -
-    // return -> -
-    const stockChange = transactionData.type === 'in' ? transactionData.quantity : -transactionData.quantity;
-    const updatedMaterial = { ...material, currentStock: material.currentStock + stockChange };
+    const updatedMaterial = { ...material, stocks: { ...material.stocks } };
+
+    if (transactionData.type === 'in') {
+        updatedMaterial.stocks[warehouseId] = currentWarehouseStock + transactionData.quantity;
+    } else if (transactionData.type === 'out' || transactionData.type === 'return') {
+        updatedMaterial.stocks[warehouseId] = currentWarehouseStock - transactionData.quantity;
+    } else if (transactionData.type === 'transfer' && transactionData.toWarehouseId) {
+        updatedMaterial.stocks[warehouseId] = currentWarehouseStock - transactionData.quantity;
+        updatedMaterial.stocks[transactionData.toWarehouseId] = (updatedMaterial.stocks[transactionData.toWarehouseId] || 0) + transactionData.quantity;
+    }
+
+    updatedMaterial.currentStock = Object.values(updatedMaterial.stocks).reduce((sum, val) => sum + val, 0);
+
     materials = materials.map(m => m.id === updatedMaterial.id ? updatedMaterial : m);
     
     saveToStorage(MATERIALS_KEY, materials);
@@ -324,9 +420,20 @@ export const deleteTransaction = (transactionId: string): void => {
     const material = materials.find(m => m.id === transaction.materialId);
 
     if (material) {
-        // Reverse the stock change: if it was "in", subtract. If it was "out", add back.
-        const reverseStockChange = transaction.type === 'in' ? -transaction.quantity : transaction.quantity;
-        const updatedMaterial = { ...material, currentStock: material.currentStock + reverseStockChange };
+        const warehouseId = transaction.warehouseId;
+        const currentWarehouseStock = material.stocks[warehouseId] || 0;
+        const updatedMaterial = { ...material, stocks: { ...material.stocks } };
+
+        if (transaction.type === 'in') {
+            updatedMaterial.stocks[warehouseId] = currentWarehouseStock - transaction.quantity;
+        } else if (transaction.type === 'out' || transaction.type === 'return') {
+            updatedMaterial.stocks[warehouseId] = currentWarehouseStock + transaction.quantity;
+        } else if (transaction.type === 'transfer' && transaction.toWarehouseId) {
+            updatedMaterial.stocks[warehouseId] = currentWarehouseStock + transaction.quantity;
+            updatedMaterial.stocks[transaction.toWarehouseId] = (updatedMaterial.stocks[transaction.toWarehouseId] || 0) - transaction.quantity;
+        }
+
+        updatedMaterial.currentStock = Object.values(updatedMaterial.stocks).reduce((sum, val) => sum + val, 0);
         materials = materials.map(m => m.id === updatedMaterial.id ? updatedMaterial : m);
         saveToStorage(MATERIALS_KEY, materials);
     }
@@ -344,17 +451,37 @@ export const updateTransaction = (updatedTransaction: Transaction): Transaction 
     const material = materials.find(m => m.id === updatedTransaction.materialId);
 
     if (material) {
+        const updatedMaterial = { ...material, stocks: { ...material.stocks } };
+        
         // 1. Reverse old stock change
-        const reverseOldChange = oldTransaction.type === 'in' ? -oldTransaction.quantity : oldTransaction.quantity;
-        let tempStock = material.currentStock + reverseOldChange;
+        const oldWarehouseId = oldTransaction.warehouseId;
+        if (oldTransaction.type === 'in') {
+            updatedMaterial.stocks[oldWarehouseId] = (updatedMaterial.stocks[oldWarehouseId] || 0) - oldTransaction.quantity;
+        } else if (oldTransaction.type === 'out' || oldTransaction.type === 'return') {
+            updatedMaterial.stocks[oldWarehouseId] = (updatedMaterial.stocks[oldWarehouseId] || 0) + oldTransaction.quantity;
+        } else if (oldTransaction.type === 'transfer' && oldTransaction.toWarehouseId) {
+            updatedMaterial.stocks[oldWarehouseId] = (updatedMaterial.stocks[oldWarehouseId] || 0) + oldTransaction.quantity;
+            updatedMaterial.stocks[oldTransaction.toWarehouseId] = (updatedMaterial.stocks[oldTransaction.toWarehouseId] || 0) - oldTransaction.quantity;
+        }
 
         // 2. Apply new stock change
-        const newStockChange = updatedTransaction.type === 'in' ? updatedTransaction.quantity : -updatedTransaction.quantity;
-        const finalStock = tempStock + newStockChange;
+        const newWarehouseId = updatedTransaction.warehouseId;
+        if (updatedTransaction.type === 'in') {
+            updatedMaterial.stocks[newWarehouseId] = (updatedMaterial.stocks[newWarehouseId] || 0) + updatedTransaction.quantity;
+        } else if (updatedTransaction.type === 'out' || updatedTransaction.type === 'return') {
+            updatedMaterial.stocks[newWarehouseId] = (updatedMaterial.stocks[newWarehouseId] || 0) - updatedTransaction.quantity;
+        } else if (updatedTransaction.type === 'transfer' && updatedTransaction.toWarehouseId) {
+            updatedMaterial.stocks[newWarehouseId] = (updatedMaterial.stocks[newWarehouseId] || 0) - updatedTransaction.quantity;
+            updatedMaterial.stocks[updatedTransaction.toWarehouseId] = (updatedMaterial.stocks[updatedTransaction.toWarehouseId] || 0) + updatedTransaction.quantity;
+        }
 
-        if (finalStock < 0) throw new Error('تعديل الحركة سيؤدي لنتائج سالبة في المخزون.');
+        // Check for negative stocks
+        if (Object.values(updatedMaterial.stocks).some(stock => stock < 0)) {
+            throw new Error('تعديل الحركة سيؤدي لنتائج سالبة في المخزون.');
+        }
 
-        const updatedMaterial = { ...material, currentStock: finalStock };
+        updatedMaterial.currentStock = Object.values(updatedMaterial.stocks).reduce((sum, val) => sum + val, 0);
+
         materials = materials.map(m => m.id === updatedMaterial.id ? updatedMaterial : m);
         saveToStorage(MATERIALS_KEY, materials);
     }
@@ -427,6 +554,25 @@ export const deleteWeightCalculation = (id: string): void => {
     syncDataToGist();
 };
 
+export const getCostTemplates = (): CostTemplate[] => getFromStorage<CostTemplate[]>(COST_TEMPLATES_KEY, []);
+
+export const addCostTemplate = (template: Omit<CostTemplate, 'id' | 'date'>): CostTemplate => {
+    const templates = getCostTemplates();
+    const newTemplate: CostTemplate = {
+        ...template,
+        id: `ctemp${Date.now()}`,
+        date: new Date().toISOString()
+    };
+    saveToStorage(COST_TEMPLATES_KEY, [...templates, newTemplate]);
+    syncDataToGist();
+    return newTemplate;
+};
+
+export const deleteCostTemplate = (id: string): void => {
+    saveToStorage(COST_TEMPLATES_KEY, getCostTemplates().filter(c => c.id !== id));
+    syncDataToGist();
+};
+
 export const exportAllData = (): AllData => {
     return { 
         settings: getSettings(), 
@@ -434,7 +580,9 @@ export const exportAllData = (): AllData => {
         transactions: getTransactions(), 
         users: getUsers(), // Include passwords for full sync across devices
         costCalculations: getCostCalculations(),
-        weightCalculations: getWeightCalculations()
+        weightCalculations: getWeightCalculations(),
+        warehouses: getWarehouses(),
+        costTemplates: getCostTemplates()
     };
 };
 
@@ -452,6 +600,10 @@ export const resetAllData = (): void => {
     saveToStorage(TRANSACTIONS_KEY, []);
     saveToStorage(COST_CALCULATIONS_KEY, []);
     saveToStorage(WEIGHT_CALCULATIONS_KEY, []);
+    saveToStorage(WAREHOUSES_KEY, [
+        { id: 'w1', name: 'المستودع الرئيسي', location: 'المبنى أ', description: 'المستودع الأساسي للمواد' }
+    ]);
+    saveToStorage(COST_TEMPLATES_KEY, []);
     
     syncDataToGist();
 };
@@ -480,11 +632,13 @@ export const importAllData = (data: any): void => {
         return;
     }
     
-    if (actualData.settings) saveToStorage(SETTINGS_KEY, actualData.settings);
-    if (actualData.materials) saveToStorage(MATERIALS_KEY, actualData.materials);
-    if (actualData.transactions) saveToStorage(TRANSACTIONS_KEY, actualData.transactions);
-    if (actualData.costCalculations) saveToStorage(COST_CALCULATIONS_KEY, actualData.costCalculations);
-    if (actualData.weightCalculations) saveToStorage(WEIGHT_CALCULATIONS_KEY, actualData.weightCalculations);
+    if (actualData.settings) saveToStorage(SETTINGS_KEY, actualData.settings, false);
+    if (actualData.materials) saveToStorage(MATERIALS_KEY, actualData.materials, false);
+    if (actualData.transactions) saveToStorage(TRANSACTIONS_KEY, actualData.transactions, false);
+    if (actualData.costCalculations) saveToStorage(COST_CALCULATIONS_KEY, actualData.costCalculations, false);
+    if (actualData.weightCalculations) saveToStorage(WEIGHT_CALCULATIONS_KEY, actualData.weightCalculations, false);
+    if (actualData.warehouses) saveToStorage(WAREHOUSES_KEY, actualData.warehouses, false);
+    if (actualData.costTemplates) saveToStorage(COST_TEMPLATES_KEY, actualData.costTemplates, false);
     
     // Handle users - overwrite with Gist data but preserve passwords if missing
     if (actualData.users && Array.isArray(actualData.users)) {
@@ -499,6 +653,6 @@ export const importAllData = (data: any): void => {
             };
         });
         
-        saveToStorage(USERS_KEY, mergedUsers);
+        saveToStorage(USERS_KEY, mergedUsers, false);
     }
 };

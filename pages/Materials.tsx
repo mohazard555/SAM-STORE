@@ -1,12 +1,14 @@
 
 import React, { useState } from 'react';
-import { Material, SettingsData, Transaction, User } from '@/types';
+import { Material, SettingsData, Transaction, User, Warehouse } from '@/types';
 import { addMaterial, updateMaterial, deleteMaterial, acknowledgeNewMaterial, addTransaction } from '@/services/mockApi';
 import { Plus, Edit, Trash2, AlertTriangle, Printer, Download, CheckCircle, PlusCircle, RotateCcw, Upload } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { exportToExcel } from '@/utils/excelExport';
 
 interface MaterialsProps {
   materials: Material[];
+  warehouses: Warehouse[];
   onDataChange: () => void;
   user: User;
   settings: SettingsData | null;
@@ -15,11 +17,13 @@ interface MaterialsProps {
 // Modal for Adding/Returning Stock (Incremental)
 const StockInModal: React.FC<{ 
     material: Material; 
+    warehouses: Warehouse[];
     actionType: 'supply' | 'return' | 'supplier-return';
     onClose: () => void; 
-    onSave: (amount: number, reason: string, note: string) => void; 
-}> = ({ material, actionType, onClose, onSave }) => {
+    onSave: (amount: number, reason: string, note: string, warehouseId: string) => void; 
+}> = ({ material, warehouses, actionType, onClose, onSave }) => {
     const [amount, setAmount] = useState(1);
+    const [warehouseId, setWarehouseId] = useState(warehouses.length > 0 ? warehouses[0].id : '');
     const [reason, setReason] = useState(
         actionType === 'supply' ? 'توريد جديد' : 
         actionType === 'return' ? 'مرتجع من مستلم' : 'مرتجع للمورد'
@@ -28,7 +32,7 @@ const StockInModal: React.FC<{
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSave(amount, reason, note);
+        onSave(amount, reason, note, warehouseId);
     };
 
     return (
@@ -48,6 +52,14 @@ const StockInModal: React.FC<{
                     <div>
                         <label className="block mb-1 text-sm font-medium dark:text-gray-300">الكمية</label>
                         <input type="number" min="1" value={amount} onChange={(e) => setAmount(Number(e.target.value))} required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                    </div>
+                    <div>
+                        <label className="block mb-1 text-sm font-medium dark:text-gray-300">المستودع</label>
+                        <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                            {warehouses.map(w => (
+                                <option key={w.id} value={w.id}>{w.name}</option>
+                            ))}
+                        </select>
                     </div>
                     <div>
                         <label className="block mb-1 text-sm font-medium dark:text-gray-300">السبب / المصدر</label>
@@ -91,7 +103,12 @@ const StockInModal: React.FC<{
     );
 };
 
-const MaterialModal: React.FC<{ material: Partial<Material> | null; onClose: () => void; onSave: (material: Omit<Material, 'id' | 'isNew'> | Material) => void; }> = ({ material, onClose, onSave }) => {
+const MaterialModal: React.FC<{ 
+    material: Partial<Material> | null; 
+    warehouses: Warehouse[];
+    onClose: () => void; 
+    onSave: (material: Omit<Material, 'id' | 'isNew'> | Material) => void; 
+}> = ({ material, warehouses, onClose, onSave }) => {
     const [formData, setFormData] = useState({
         name: material?.name || '',
         materialType: material?.materialType || '',
@@ -102,20 +119,32 @@ const MaterialModal: React.FC<{ material: Partial<Material> | null; onClose: () 
         color: material?.color || '',
         unit: material?.unit || '',
         minStock: material?.minStock || 0,
-        currentStock: material?.currentStock || 0,
         weightFormula: material?.weightFormula || { pieces: 100, weight: 5 },
+        stocks: material?.stocks || (warehouses.length > 0 ? { [warehouses[0].id]: 0 } : {}),
     });
     
     const isEditing = !!material?.id;
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: (name === 'minStock' || name === 'currentStock') ? Number(value) : value }));
+        setFormData(prev => ({ ...prev, [name]: (name === 'minStock') ? Number(value) : value }));
+    };
+
+    const handleStockChange = (warehouseId: string, value: string) => {
+        setFormData(prev => ({
+            ...prev,
+            stocks: {
+                ...prev.stocks,
+                [warehouseId]: Number(value)
+            }
+        }));
     };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSave(isEditing ? { ...formData, id: material.id!, isNew: material.isNew! } : formData);
+        const totalStock = Object.values(formData.stocks).reduce((sum, val) => sum + val, 0);
+        const dataToSave = { ...formData, currentStock: totalStock };
+        onSave(isEditing ? { ...dataToSave, id: material.id!, isNew: material.isNew! } : dataToSave);
     };
 
     return (
@@ -134,12 +163,32 @@ const MaterialModal: React.FC<{ material: Partial<Material> | null; onClose: () 
                 </div>
                 <input type="text" name="color" value={formData.color} onChange={handleChange} placeholder="اللون (اختياري)" className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                 <textarea name="specifications" value={formData.specifications} onChange={handleChange} placeholder="المواصفات" required rows={3} className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 gap-4">
                     <input type="text" name="unit" value={formData.unit} onChange={handleChange} placeholder="الوحدة" required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                     <input type="number" name="minStock" value={formData.minStock} onChange={handleChange} placeholder="الحد الأدنى" required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-                    <input type="number" name="currentStock" value={formData.currentStock} onChange={handleChange} placeholder="الكمية" required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                 </div>
                 
+                <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
+                    <label className="block text-sm font-bold mb-2 text-gray-700 dark:text-gray-300">الأرصدة الافتتاحية في المستودعات</label>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {warehouses.map(w => (
+                            <div key={w.id} className="flex items-center gap-2">
+                                <span className="text-sm w-1/2 truncate dark:text-gray-300" title={w.name}>{w.name}</span>
+                                <input 
+                                    type="number" 
+                                    min="0"
+                                    value={formData.stocks[w.id] || 0} 
+                                    onChange={(e) => handleStockChange(w.id, e.target.value)}
+                                    className="w-1/2 p-1 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm"
+                                    disabled={isEditing} // Prevent editing stock directly if editing material
+                                    title={isEditing ? "لا يمكن تعديل الرصيد من هنا. استخدم الحركات اليومية." : ""}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                    {isEditing && <p className="text-[10px] text-amber-500 mt-1">تعديل الأرصدة يتم عبر الحركات اليومية فقط.</p>}
+                </div>
+
                 <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-dashed border-gray-300 dark:border-gray-600">
                     <label className="block text-xs font-bold mb-2 text-gray-500 dark:text-gray-400">معادلة الوزن (لحاسبة الوزن)</label>
                     <div className="grid grid-cols-2 gap-4">
@@ -174,7 +223,7 @@ const MaterialModal: React.FC<{ material: Partial<Material> | null; onClose: () 
     );
 };
 
-const Materials: React.FC<MaterialsProps> = ({ materials, onDataChange, user, settings }) => {
+const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChange, user, settings }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isStockInModalOpen, setIsStockInModalOpen] = useState(false);
   const [stockActionType, setStockActionType] = useState<'supply' | 'return' | 'supplier-return'>('supply');
@@ -191,12 +240,13 @@ const Materials: React.FC<MaterialsProps> = ({ materials, onDataChange, user, se
   };
   
   // Added date property to transaction to fix TypeScript error
-  const handleStockIn = (amount: number, reason: string, note: string) => {
+  const handleStockIn = (amount: number, reason: string, note: string, warehouseId: string) => {
     if (!selectedMaterial) return;
     addTransaction({
         type: stockActionType === 'supplier-return' ? 'return' : 'in',
         materialId: selectedMaterial.id,
         quantity: amount,
+        warehouseId: warehouseId,
         recipient: reason,
         notes: note,
         color: selectedMaterial.color,
@@ -217,11 +267,19 @@ const Materials: React.FC<MaterialsProps> = ({ materials, onDataChange, user, se
   const handleAcknowledge = (id: string) => { acknowledgeNewMaterial(id); onDataChange(); };
 
   const handleExport = () => {
-    const dataToExport = materials.map(m => ({ "اسم المادة": m.name, "اللون": m.color || '-', "نوع المادة": m.materialType, "الفئة": m.category, "المورد": m.supplier, "الباركود": m.barcode, "الوحدة": m.unit, "الكمية الحالية": m.currentStock, "الحد الأدنى": m.minStock, "المواصفات": m.specifications, }));
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "المواد");
-    XLSX.writeFile(workbook, "materials_report.xlsx");
+    const dataToExport = materials.map(m => ({ 
+      "اسم المادة": m.name, 
+      "اللون": m.color || '-', 
+      "نوع المادة": m.materialType, 
+      "الفئة": m.category, 
+      "المورد": m.supplier, 
+      "الباركود": m.barcode, 
+      "الوحدة": m.unit, 
+      "الكمية الحالية": m.currentStock, 
+      "الحد الأدنى": m.minStock, 
+      "المواصفات": m.specifications, 
+    }));
+    exportToExcel(dataToExport, "materials_report", "المواد");
   };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -257,6 +315,7 @@ const Materials: React.FC<MaterialsProps> = ({ materials, onDataChange, user, se
             minStock: Number(row["الحد الأدنى"] || row["minStock"] || 0),
             currentStock: Number(row["الكمية الحالية"] || row["الكمية"] || row["currentStock"] || 0),
             color: String(row["اللون"] || row["color"] || ""),
+            stocks: warehouses.length > 0 ? { [warehouses[0].id]: Number(row["الكمية الحالية"] || row["الكمية"] || row["currentStock"] || 0) } : {}
           };
           addMaterial(materialData);
         });
@@ -378,10 +437,11 @@ const Materials: React.FC<MaterialsProps> = ({ materials, onDataChange, user, se
         </table>
       </div>
 
-      {isModalOpen && <MaterialModal material={selectedMaterial} onClose={() => setIsModalOpen(false)} onSave={handleSave} />}
+      {isModalOpen && <MaterialModal material={selectedMaterial} warehouses={warehouses} onClose={() => setIsModalOpen(false)} onSave={handleSave} />}
       {isStockInModalOpen && selectedMaterial && (
           <StockInModal 
             material={selectedMaterial} 
+            warehouses={warehouses}
             actionType={stockActionType}
             onClose={() => setIsStockInModalOpen(false)} 
             onSave={handleStockIn} 

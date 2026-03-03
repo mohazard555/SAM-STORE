@@ -1,19 +1,41 @@
 
 import React, { useState, useMemo } from 'react';
-import { Transaction, Material, SettingsData, User } from '@/types';
-import { Download, Printer, Search } from 'lucide-react';
+import { Transaction, Material, SettingsData, User, Warehouse } from '@/types';
+import { 
+  Download, 
+  Printer, 
+  Search, 
+  History, 
+  CalendarDays, 
+  CalendarRange, 
+  Calendar, 
+  Package, 
+  Layers, 
+  Truck, 
+  Barcode, 
+  QrCode, 
+  ClipboardList, 
+  TrendingUp, 
+  Clock, 
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight
+} from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { motion, AnimatePresence } from 'motion/react';
+import { exportToExcel } from '@/utils/excelExport';
 
 interface ReportsProps {
   transactions: Transaction[];
   materials: Material[];
+  warehouses: Warehouse[];
   settings: SettingsData | null;
   user: User;
 }
 
 type ReportType = 'daily' | 'weekly' | 'monthly' | 'byMaterial' | 'byCategory' | 'byBarcode' | 'byItemBarcode' | 'totalCount' | 'all' | 'bySupplier' | 'mostUsed' | 'inactive' | 'lowStock';
 
-const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings, user }) => {
+const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, settings, user }) => {
   const [filterType, setFilterType] = useState<ReportType>('all');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
@@ -148,7 +170,8 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings, us
   
   const exportToXLSX = () => {
     let dataToExport: any[] = [];
-    let fileName = 'report.xlsx';
+    let fileName = 'report';
+    let sheetName = 'تقرير';
 
     switch(filterType) {
         case 'totalCount':
@@ -159,14 +182,16 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings, us
                 "المورد": m.supplier, "الباركود": m.barcode, "الكمية الحالية": m.currentStock,
                 "الحد الأدنى": m.minStock, "وحدة القياس": m.unit,
             }));
-            fileName = `${filterType}_report.xlsx`;
+            fileName = `${filterType}_report`;
+            sheetName = filterType === 'totalCount' ? 'جرد إجمالي' : filterType === 'lowStock' ? 'نقص المخزون' : 'المواد الراكدة';
             break;
         case 'mostUsed':
             dataToExport = (reportData as (Material & {totalQuantity: number})[]).map(m => ({
                 "اسم المادة": m.name, "نوع المادة": m.materialType, "الفئة": m.category,
                 "المورد": m.supplier, "الباركود": m.barcode, "إجمالي الكمية المسحوبة": m.totalQuantity,
             }));
-            fileName = 'most_used_materials.xlsx';
+            fileName = 'most_used_materials';
+            sheetName = 'الأكثر استخداماً';
             break;
         default: // Transaction reports
             dataToExport = (reportData as Transaction[]).map(t => ({
@@ -176,13 +201,11 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings, us
                 'المورد': t.supplier, 'الكمية المسحوبة': `${t.quantity} ${t.unit}`, 'المستلم': t.recipient,
                 'ملاحظات': t.notes || '',
             }));
-            fileName = 'transactions_report.xlsx';
+            fileName = 'transactions_report';
+            sheetName = 'حركات المخزن';
     }
     
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Report");
-    XLSX.writeFile(workbook, fileName);
+    exportToExcel(dataToExport, fileName, sheetName);
   };
   
   const handlePrint = () => {
@@ -260,141 +283,252 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings, us
 
   // Helper for filtered report options
   const reportOptions = [
-    { value: 'all', label: 'كل الحركات' },
-    { value: 'daily', label: 'تقرير يومي' },
-    { value: 'weekly', label: 'تقرير أسبوعي' },
-    { value: 'monthly', label: 'تقرير شهري' },
-    { value: 'byMaterial', label: 'تقرير حسب المادة' },
-    { value: 'byCategory', label: 'تقرير حسب الفئة' },
-    { value: 'bySupplier', label: 'تقرير حسب المورد' },
-    { value: 'byBarcode', label: 'تقرير حسب باركود المادة' },
-    { value: 'byItemBarcode', label: 'تقرير حسب باركود الصنف/القصة' },
-    { value: 'totalCount', label: 'جرد إجمالي للمخزون' },
-    { value: 'mostUsed', label: 'تقرير بالمواد الأكثر استخداماً' },
-    { value: 'inactive', label: 'تقرير بالمواد الراكدة' },
-    { value: 'lowStock', label: 'تقرير بالمواد منخفضة الكمية' },
-  ].filter(opt => opt.label.includes(searchFilterType));
+    { value: 'all', label: 'كل الحركات', icon: History, color: 'blue', bgColor: 'bg-blue-100', textColor: 'text-blue-600', darkBg: 'dark:bg-blue-900/30', darkText: 'dark:text-blue-400', glow: 'bg-blue-500', description: 'عرض جميع حركات الصادر والوارد' },
+    { value: 'daily', label: 'تقرير يومي', icon: CalendarDays, color: 'indigo', bgColor: 'bg-indigo-100', textColor: 'text-indigo-600', darkBg: 'dark:bg-indigo-900/30', darkText: 'dark:text-indigo-400', glow: 'bg-indigo-500', description: 'حركات المخزن خلال اليوم الحالي' },
+    { value: 'weekly', label: 'تقرير أسبوعي', icon: CalendarRange, color: 'purple', bgColor: 'bg-purple-100', textColor: 'text-purple-600', darkBg: 'dark:bg-purple-900/30', darkText: 'dark:text-purple-400', glow: 'bg-purple-500', description: 'ملخص الحركات خلال الأسبوع الجاري' },
+    { value: 'monthly', label: 'تقرير شهري', icon: Calendar, color: 'violet', bgColor: 'bg-violet-100', textColor: 'text-violet-600', darkBg: 'dark:bg-violet-900/30', darkText: 'dark:text-violet-400', glow: 'bg-violet-500', description: 'جرد وحركات الشهر الحالي' },
+    { value: 'byMaterial', label: 'حسب المادة', icon: Package, color: 'emerald', bgColor: 'bg-emerald-100', textColor: 'text-emerald-600', darkBg: 'dark:bg-emerald-900/30', darkText: 'dark:text-emerald-400', glow: 'bg-emerald-500', description: 'تتبع حركات مادة محددة بالتفصيل' },
+    { value: 'byCategory', label: 'حسب الفئة', icon: Layers, color: 'teal', bgColor: 'bg-teal-100', textColor: 'text-teal-600', darkBg: 'dark:bg-teal-900/30', darkText: 'dark:text-teal-400', glow: 'bg-teal-500', description: 'عرض الحركات لمجموعة مواد معينة' },
+    { value: 'bySupplier', label: 'حسب المورد', icon: Truck, color: 'orange', bgColor: 'bg-orange-100', textColor: 'text-orange-600', darkBg: 'dark:bg-orange-900/30', darkText: 'dark:text-orange-400', glow: 'bg-orange-500', description: 'تقارير المواد المرتبطة بمورد محدد' },
+    { value: 'byBarcode', label: 'حسب الباركود', icon: Barcode, color: 'cyan', bgColor: 'bg-cyan-100', textColor: 'text-cyan-600', darkBg: 'dark:bg-cyan-900/30', darkText: 'dark:text-cyan-400', glow: 'bg-cyan-500', description: 'البحث عن حركات مادة عبر الباركود' },
+    { value: 'byItemBarcode', label: 'باركود الصنف', icon: QrCode, color: 'pink', bgColor: 'bg-pink-100', textColor: 'text-pink-600', darkBg: 'dark:bg-pink-900/30', darkText: 'dark:text-pink-400', glow: 'bg-pink-500', description: 'تتبع صنف محدد عبر باركود القصة' },
+    { value: 'totalCount', label: 'جرد إجمالي', icon: ClipboardList, color: 'slate', bgColor: 'bg-slate-100', textColor: 'text-slate-600', darkBg: 'dark:bg-slate-900/30', darkText: 'dark:text-slate-400', glow: 'bg-slate-500', description: 'حالة المخزون الحالية لجميع المواد' },
+    { value: 'mostUsed', label: 'الأكثر استخداماً', icon: TrendingUp, color: 'rose', bgColor: 'bg-rose-100', textColor: 'text-rose-600', darkBg: 'dark:bg-rose-900/30', darkText: 'dark:text-rose-400', glow: 'bg-rose-500', description: 'المواد ذات معدل السحب الأعلى' },
+    { value: 'inactive', label: 'المواد الراكدة', icon: Clock, color: 'amber', bgColor: 'bg-amber-100', textColor: 'text-amber-600', darkBg: 'dark:bg-amber-900/30', darkText: 'dark:text-amber-400', glow: 'bg-amber-500', description: 'مواد لم يتم تحريكها منذ فترة' },
+    { value: 'lowStock', label: 'نقص المخزون', icon: AlertTriangle, color: 'red', bgColor: 'bg-red-100', textColor: 'text-red-600', darkBg: 'dark:bg-red-900/30', darkText: 'dark:text-red-400', glow: 'bg-red-500', description: 'المواد التي وصلت للحد الأدنى' },
+  ] as const;
+
+  const filteredOptions = reportOptions.filter(opt => 
+    opt.label.includes(searchFilterType) || opt.description.includes(searchFilterType)
+  );
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gray-900 dark:text-white">التقارير والجرد</h1>
-
-      <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md space-y-4 border dark:border-gray-700 transition-colors">
-        <div className="flex flex-wrap items-end gap-4">
-           <div className="space-y-1">
-             <label className="text-xs font-bold text-gray-400">نوع التقرير</label>
-             <div className="flex gap-1">
-                <div className="relative">
-                    <Search className="absolute right-2 top-2.5 text-gray-400" size={14} />
-                    <input type="text" placeholder="بحث..." value={searchFilterType} onChange={e => setSearchFilterType(e.target.value)} className="w-20 p-1.5 pr-7 border rounded text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-                </div>
-                <select 
-                    value={filterType} 
-                    onChange={(e) => handleFilterChange(e.target.value as ReportType)}
-                    className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white w-48 font-bold"
-                >
-                    {reportOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                </select>
-             </div>
-           </div>
-            
-            {showDatePickers && (
-              <div className="flex gap-2 items-end">
-                <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400">من تاريخ</label>
-                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-                </div>
-                {filterType !== 'daily' && (
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400">إلى تاريخ</label>
-                    <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-                  </div>
-                )}
-              </div>
-            )}
-
-            {filterType === 'byMaterial' && (
-                <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400">اختر المادة</label>
-                    <div className="flex gap-1">
-                        <input type="text" placeholder="بحث..." value={searchMaterial} onChange={e => setSearchMaterial(e.target.value)} className="w-20 p-1.5 border rounded text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-                        <select value={selectedMaterialId} onChange={e => setSelectedMaterialId(e.target.value)} className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white w-40" disabled={materials.length === 0}>
-                            {materials.filter(m => m.name.includes(searchMaterial)).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                        </select>
-                    </div>
-                </div>
-            )}
-            
-            {filterType === 'byCategory' && (
-                <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400">اختر الفئة</label>
-                    <div className="flex gap-1">
-                        <input type="text" placeholder="بحث..." value={searchCategory} onChange={e => setSearchCategory(e.target.value)} className="w-20 p-1.5 border rounded text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-                        <select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)} className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white w-40" disabled={uniqueCategories.length === 0}>
-                            <option value="">-- اختر الفئة --</option>
-                            {uniqueCategories.filter(c => c.includes(searchCategory)).map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
-                    </div>
-                </div>
-            )}
-
-            {filterType === 'bySupplier' && (
-                <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400">اختر المورد</label>
-                    <div className="flex gap-1">
-                        <input type="text" placeholder="بحث..." value={searchSupplier} onChange={e => setSearchSupplier(e.target.value)} className="w-20 p-1.5 border rounded text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-                        <select value={selectedSupplier} onChange={e => setSelectedSupplier(e.target.value)} className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white w-40" disabled={uniqueSuppliers.length === 0}>
-                            <option value="">-- اختر المورد --</option>
-                            {uniqueSuppliers.filter(s => s.includes(searchSupplier)).map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                    </div>
-                </div>
-            )}
-
-            {filterType === 'byBarcode' && (
-                <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400">اختر باركود المادة</label>
-                    <div className="flex gap-1">
-                        <input type="text" placeholder="بحث..." value={searchBarcode} onChange={e => setSearchBarcode(e.target.value)} className="w-20 p-1.5 border rounded text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-                        <select value={selectedBarcode} onChange={e => setSelectedBarcode(e.target.value)} className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white w-40" disabled={uniqueBarcodes.length === 0}>
-                            <option value="">-- اختر الباركود --</option>
-                            {uniqueBarcodes.filter(b => b.includes(searchBarcode)).map(b => <option key={b} value={b}>{b}</option>)}
-                        </select>
-                    </div>
-                </div>
-            )}
-
-            {filterType === 'byItemBarcode' && (
-                <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400">اختر باركود الصنف</label>
-                    <div className="flex gap-1">
-                        <input type="text" placeholder="بحث..." value={searchItemBarcode} onChange={e => setSearchItemBarcode(e.target.value)} className="w-20 p-1.5 border rounded text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-                        <select value={selectedItemBarcode} onChange={e => setSelectedItemBarcode(e.target.value)} className="p-1.5 border rounded text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white w-40" disabled={uniqueItemBarcodes.length === 0}>
-                            <option value="">-- اختر الباركود --</option>
-                            {uniqueItemBarcodes.filter(b => b && b.includes(searchItemBarcode)).map(b => <option key={b} value={b}>{b}</option>)}
-                        </select>
-                    </div>
-                </div>
-            )}
-
-            <div className="flex gap-2">
-                {canExport && (
-                    <button onClick={exportToXLSX} className="flex items-center px-4 py-2 bg-emerald-500 text-white rounded-lg shadow hover:bg-emerald-600 disabled:bg-emerald-300 transition-colors" disabled={!canPerformAction}>
-                        <Download className="ml-2" size={18}/>
-                        تصدير XLSX
-                    </button>
-                )}
-                {canPrint && (
-                    <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-sky-500 text-white rounded-lg shadow hover:bg-sky-600 disabled:bg-sky-300 transition-colors" disabled={!canPerformAction}>
-                        <Printer className="ml-2" size={18}/>
-                        طباعة التقرير
-                    </button>
-                )}
-            </div>
+    <div className="space-y-8 pb-10">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">التقارير والجرد</h1>
+        <div className="relative w-64">
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <input 
+            type="text" 
+            placeholder="بحث عن نوع تقرير..." 
+            value={searchFilterType} 
+            onChange={e => setSearchFilterType(e.target.value)} 
+            className="w-full p-2 pr-10 border rounded-xl bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+          />
         </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg overflow-x-auto border dark:border-gray-700 transition-colors">
+      {/* Report Type Cards Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        {filteredOptions.map((opt) => {
+          const Icon = opt.icon;
+          const isActive = filterType === opt.value;
+          
+          return (
+            <motion.button
+              key={opt.value}
+              whileHover={{ 
+                scale: 1.05, 
+                rotateY: 5, 
+                rotateX: -5,
+                z: 50
+              }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => handleFilterChange(opt.value as ReportType)}
+              className={`
+                relative group p-5 rounded-2xl border-2 text-right transition-all duration-300
+                flex flex-col items-start gap-3 overflow-hidden
+                ${isActive 
+                  ? 'bg-blue-50 border-blue-500 dark:bg-blue-900/20 dark:border-blue-400 shadow-lg shadow-blue-500/20' 
+                  : 'bg-white border-transparent hover:border-gray-200 dark:bg-gray-800 dark:hover:border-gray-700 shadow-sm hover:shadow-xl'
+                }
+              `}
+              style={{ perspective: '1000px' }}
+            >
+              {/* Decorative background glow */}
+              <div className={`
+                absolute -right-4 -top-4 w-24 h-24 rounded-full blur-3xl opacity-10 transition-opacity group-hover:opacity-20
+                ${isActive ? 'opacity-30' : ''}
+                ${opt.glow}
+              `} />
+
+              <div className={`
+                p-3 rounded-xl transition-colors
+                ${isActive 
+                  ? 'bg-blue-500 text-white' 
+                  : `${opt.bgColor} ${opt.textColor} ${opt.darkBg} ${opt.darkText}`
+                }
+              `}>
+                <Icon size={24} />
+              </div>
+              
+              <div>
+                <h3 className={`font-bold text-lg ${isActive ? 'text-blue-700 dark:text-blue-300' : 'text-gray-800 dark:text-gray-200'}`}>
+                  {opt.label}
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+                  {opt.description}
+                </p>
+              </div>
+
+              {isActive && (
+                <motion.div 
+                  layoutId="active-indicator"
+                  className="absolute bottom-0 left-0 right-0 h-1 bg-blue-500"
+                />
+              )}
+            </motion.button>
+          );
+        })}
+      </div>
+
+      {/* Filters and Actions Section */}
+      <AnimatePresence mode="wait">
+        <motion.div 
+          key={filterType}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          className="p-6 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border dark:border-gray-700 space-y-6"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-6">
+            <div className="flex flex-wrap items-end gap-4">
+              {showDatePickers && (
+                <div className="flex gap-4 items-end bg-gray-50 dark:bg-gray-900/50 p-3 rounded-xl border dark:border-gray-700">
+                  <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-400 block mr-1">من تاريخ</label>
+                      <input 
+                        type="date" 
+                        value={startDate} 
+                        onChange={e => setStartDate(e.target.value)} 
+                        className="p-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" 
+                      />
+                  </div>
+                  {filterType !== 'daily' && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-400 block mr-1">إلى تاريخ</label>
+                      <input 
+                        type="date" 
+                        value={endDate} 
+                        onChange={e => setEndDate(e.target.value)} 
+                        className="p-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" 
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {filterType === 'byMaterial' && (
+                  <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-400 block mr-1">اختر المادة</label>
+                      <div className="flex gap-2">
+                          <div className="relative">
+                            <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                            <input type="text" placeholder="بحث..." value={searchMaterial} onChange={e => setSearchMaterial(e.target.value)} className="w-24 p-2 pr-7 border rounded-lg text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                          </div>
+                          <select value={selectedMaterialId} onChange={e => setSelectedMaterialId(e.target.value)} className="p-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white w-48 focus:ring-2 focus:ring-blue-500 outline-none" disabled={materials.length === 0}>
+                              {materials.filter(m => m.name.includes(searchMaterial)).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                          </select>
+                      </div>
+                  </div>
+              )}
+              
+              {filterType === 'byCategory' && (
+                  <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-400 block mr-1">اختر الفئة</label>
+                      <div className="flex gap-2">
+                          <div className="relative">
+                            <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                            <input type="text" placeholder="بحث..." value={searchCategory} onChange={e => setSearchCategory(e.target.value)} className="w-24 p-2 pr-7 border rounded-lg text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                          </div>
+                          <select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)} className="p-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white w-48 focus:ring-2 focus:ring-blue-500 outline-none" disabled={uniqueCategories.length === 0}>
+                              <option value="">-- اختر الفئة --</option>
+                              {uniqueCategories.filter(c => c.includes(searchCategory)).map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                      </div>
+                  </div>
+              )}
+
+              {filterType === 'bySupplier' && (
+                  <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-400 block mr-1">اختر المورد</label>
+                      <div className="flex gap-2">
+                          <div className="relative">
+                            <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                            <input type="text" placeholder="بحث..." value={searchSupplier} onChange={e => setSearchSupplier(e.target.value)} className="w-24 p-2 pr-7 border rounded-lg text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                          </div>
+                          <select value={selectedSupplier} onChange={e => setSelectedSupplier(e.target.value)} className="p-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white w-48 focus:ring-2 focus:ring-blue-500 outline-none" disabled={uniqueSuppliers.length === 0}>
+                              <option value="">-- اختر المورد --</option>
+                              {uniqueSuppliers.filter(s => s.includes(searchSupplier)).map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                      </div>
+                  </div>
+              )}
+
+              {filterType === 'byBarcode' && (
+                  <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-400 block mr-1">اختر باركود المادة</label>
+                      <div className="flex gap-2">
+                          <div className="relative">
+                            <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                            <input type="text" placeholder="بحث..." value={searchBarcode} onChange={e => setSearchBarcode(e.target.value)} className="w-24 p-2 pr-7 border rounded-lg text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                          </div>
+                          <select value={selectedBarcode} onChange={e => setSelectedBarcode(e.target.value)} className="p-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white w-48 focus:ring-2 focus:ring-blue-500 outline-none" disabled={uniqueBarcodes.length === 0}>
+                              <option value="">-- اختر الباركود --</option>
+                              {uniqueBarcodes.filter(b => b.includes(searchBarcode)).map(b => <option key={b} value={b}>{b}</option>)}
+                          </select>
+                      </div>
+                  </div>
+              )}
+
+              {filterType === 'byItemBarcode' && (
+                  <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-400 block mr-1">اختر باركود الصنف</label>
+                      <div className="flex gap-2">
+                          <div className="relative">
+                            <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                            <input type="text" placeholder="بحث..." value={searchItemBarcode} onChange={e => setSearchItemBarcode(e.target.value)} className="w-24 p-2 pr-7 border rounded-lg text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                          </div>
+                          <select value={selectedItemBarcode} onChange={e => setSelectedItemBarcode(e.target.value)} className="p-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white w-48 focus:ring-2 focus:ring-blue-500 outline-none" disabled={uniqueItemBarcodes.length === 0}>
+                              <option value="">-- اختر الباركود --</option>
+                              {uniqueItemBarcodes.filter(b => b && b.includes(searchItemBarcode)).map(b => <option key={b} value={b}>{b}</option>)}
+                          </select>
+                      </div>
+                  </div>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+                {canExport && (
+                    <motion.button 
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={exportToXLSX} 
+                      className="flex items-center px-6 py-3 bg-emerald-500 text-white rounded-xl shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 disabled:bg-emerald-300 disabled:shadow-none transition-all font-bold" 
+                      disabled={!canPerformAction}
+                    >
+                        <Download className="ml-2" size={20}/>
+                        تصدير Excel
+                    </motion.button>
+                )}
+                {canPrint && (
+                    <motion.button 
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={handlePrint} 
+                      className="flex items-center px-6 py-3 bg-sky-500 text-white rounded-xl shadow-lg shadow-sky-500/20 hover:bg-sky-600 disabled:bg-sky-300 disabled:shadow-none transition-all font-bold" 
+                      disabled={!canPerformAction}
+                    >
+                        <Printer className="ml-2" size={20}/>
+                        طباعة التقرير
+                    </motion.button>
+                )}
+            </div>
+          </div>
+        </motion.div>
+      </AnimatePresence>
+
+      <div className="bg-white dark:bg-gray-800 shadow-2xl rounded-2xl overflow-hidden border dark:border-gray-700 transition-all">
         { (filterType === 'totalCount' || filterType === 'lowStock' || filterType === 'inactive') ? (
              <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
                 <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
@@ -415,9 +549,9 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings, us
                             <td className="px-6 py-4">{material.category}</td>
                             <td className="px-6 py-4">{material.supplier}</td>
                             <td className={`px-6 py-4 font-black ${material.currentStock < material.minStock ? 'text-red-500' : 'text-emerald-500'}`}>
-                                {material.currentStock} {material.unit}
+                                {material.currentStock.toLocaleString('ar-EG')} {material.unit}
                             </td>
-                            <td className="px-6 py-4 text-gray-400">{material.minStock} {material.unit}</td>
+                            <td className="px-6 py-4 text-gray-400">{material.minStock.toLocaleString('ar-EG')} {material.unit}</td>
                         </tr>
                     ))}
                 </tbody>
@@ -440,7 +574,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings, us
                           <td className="px-6 py-4 font-mono text-xs">{material.barcode}</td>
                           <td className="px-6 py-4">{material.category}</td>
                           <td className="px-6 py-4">{material.supplier}</td>
-                          <td className="px-6 py-4 font-black text-blue-500">{material.totalQuantity} {material.unit}</td>
+                          <td className="px-6 py-4 font-black text-blue-500">{material.totalQuantity.toLocaleString('ar-EG')} {material.unit}</td>
                       </tr>
                   ))}
               </tbody>
@@ -472,7 +606,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, settings, us
                         <td className="px-6 py-4 text-xs">{transaction.category}</td>
                         <td className="px-6 py-4 text-xs">{transaction.supplier}</td>
                         <td className={`px-6 py-4 font-black ${transaction.type === 'in' ? 'text-emerald-500' : 'text-red-500'}`}>
-                            {transaction.type === 'in' ? '+' : '-'}{transaction.quantity} {transaction.unit}
+                            {transaction.type === 'in' ? '+' : '-'}{transaction.quantity.toLocaleString('ar-EG')} {transaction.unit}
                         </td>
                         <td className="px-6 py-4 text-sm font-medium">{transaction.recipient}</td>
                     </tr>

@@ -1,13 +1,14 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Material, CostCalculation, CostPart, User } from '@/types';
+import { Material, CostCalculation, CostPart, User, CostTemplate, CostTemplatePart } from '@/types';
 import { 
   Calculator, History, Plus, Trash2, Save, Search, 
   Printer, Download, ChevronUp, ChevronDown, CheckCircle2,
-  FileText, Calendar, Filter, Package
+  FileText, Calendar, Filter, Package, LayoutTemplate, Copy, X
 } from 'lucide-react';
-import { getCostCalculations, addCostCalculation, deleteCostCalculation } from '@/services/mockApi';
+import { getCostCalculations, addCostCalculation, deleteCostCalculation, getCostTemplates, addCostTemplate, deleteCostTemplate } from '@/services/mockApi';
 import * as XLSX from 'xlsx';
+import { exportToExcel } from '@/utils/excelExport';
 
 interface CostMeterProps {
   materials: Material[];
@@ -24,15 +25,22 @@ const CostMeter: React.FC<CostMeterProps> = ({ materials, user }) => {
   const [baseCost, setBaseCost] = useState(0);
   const [costParts, setCostParts] = useState<(Omit<CostPart, 'id'> & { materialId?: string })[]>([]);
   const [savedCalculations, setSavedCalculations] = useState<CostCalculation[]>([]);
+  const [costTemplates, setCostTemplates] = useState<CostTemplate[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
 
   // --- Archive Filters ---
   const [archiveSearch, setArchiveSearch] = useState('');
   const [archiveStartDate, setArchiveStartDate] = useState('');
   const [archiveEndDate, setArchiveEndDate] = useState('');
 
+  // --- Template Form State ---
+  const [templateModel, setTemplateModel] = useState('');
+  const [templateSize, setTemplateSize] = useState('');
+
   useEffect(() => {
     setSavedCalculations(getCostCalculations());
+    setCostTemplates(getCostTemplates());
   }, []);
 
   const selectedMaterial = materials.find(m => m.id === selectedMaterialId);
@@ -84,6 +92,46 @@ const CostMeter: React.FC<CostMeterProps> = ({ materials, user }) => {
     alert('تم حفظ عملية الحساب بنجاح');
   };
 
+  const handleSaveAsTemplate = () => {
+    if (!calcTitle) {
+      alert('يرجى إدخال عنوان للنموذج');
+      return;
+    }
+    const newTemplate = addCostTemplate({
+      title: calcTitle,
+      model: templateModel,
+      size: templateSize || calcMeasurement,
+      parts: costParts.map((p, i) => ({
+        id: `tp${i}`,
+        name: p.name,
+        cost: p.valuePerPiece
+      })),
+      totalCost: totalCostPerPiece
+    });
+    setCostTemplates([newTemplate, ...costTemplates]);
+    alert('تم حفظ النموذج بنجاح');
+  };
+
+  const handleLoadTemplate = (template: CostTemplate) => {
+    setCalcTitle(template.title);
+    setTemplateModel(template.model);
+    setCalcMeasurement(template.size);
+    setCostParts(template.parts.map(p => ({
+      name: p.name,
+      valuePerPiece: p.cost,
+      materialId: ''
+    })));
+    setBaseCost(0);
+    setShowTemplates(false);
+  };
+
+  const handleDeleteTemplate = (id: string) => {
+    if (confirm('هل أنت متأكد من حذف هذا النموذج؟')) {
+      deleteCostTemplate(id);
+      setCostTemplates(costTemplates.filter(t => t.id !== id));
+    }
+  };
+
   const handleDeleteCalculation = (id: string) => {
     if (confirm('هل أنت متأكد من حذف هذا السجل؟')) {
       deleteCostCalculation(id);
@@ -112,10 +160,7 @@ const CostMeter: React.FC<CostMeterProps> = ({ materials, user }) => {
       'التكلفة الإجمالية': c.totalCost,
       'الوصف': c.description || ''
     }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "أرشيف حاسبة الكلف");
-    XLSX.writeFile(wb, "cost_meter_archive.xlsx");
+    exportToExcel(data, "cost_meter_archive", "أرشيف حاسبة الكلف");
   };
 
   const handlePrintArchive = () => {
@@ -129,16 +174,75 @@ const CostMeter: React.FC<CostMeterProps> = ({ materials, user }) => {
           <Calculator className="text-violet-500" size={32} />
           حاسبة الكلف بالمتر
         </h1>
-        <button 
-          onClick={() => setShowHistory(!showHistory)}
-          className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sky-500 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm no-print"
-        >
-          <History size={18} />
-          {showHistory ? 'العودة للحاسبة' : 'أرشيف العمليات'}
-        </button>
+        <div className="flex gap-2 no-print">
+          <button 
+            onClick={() => { setShowTemplates(!showTemplates); setShowHistory(false); }}
+            className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors shadow-sm ${
+              showTemplates 
+                ? 'bg-violet-500 text-white border-violet-500' 
+                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-violet-500 hover:bg-gray-50 dark:hover:bg-gray-700'
+            }`}
+          >
+            <LayoutTemplate size={18} />
+            نماذج جاهزة
+          </button>
+          <button 
+            onClick={() => { setShowHistory(!showHistory); setShowTemplates(false); }}
+            className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors shadow-sm ${
+              showHistory 
+                ? 'bg-sky-500 text-white border-sky-500' 
+                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-sky-500 hover:bg-gray-50 dark:hover:bg-gray-700'
+            }`}
+          >
+            <History size={18} />
+            {showHistory ? 'العودة للحاسبة' : 'أرشيف العمليات'}
+          </button>
+        </div>
       </div>
 
-      {showHistory ? (
+      {showTemplates ? (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {costTemplates.length > 0 ? costTemplates.map(template => (
+              <div key={template.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col">
+                <div className="p-5 border-b dark:border-gray-700 bg-violet-50/50 dark:bg-violet-900/10 flex justify-between items-start">
+                  <div>
+                    <h3 className="font-bold text-lg text-gray-900 dark:text-white">{template.title}</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{template.model} | {template.size}</p>
+                  </div>
+                  <button onClick={() => handleDeleteTemplate(template.id)} className="text-red-400 hover:text-red-600 p-1 transition-colors">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+                <div className="p-5 flex-1 space-y-3">
+                  <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">الأجزاء والتكلفة:</div>
+                  {template.parts.map((p, idx) => (
+                    <div key={idx} className="flex justify-between text-sm">
+                      <span className="text-gray-600 dark:text-gray-400">{p.name}</span>
+                      <span className="font-bold text-gray-900 dark:text-white">{p.cost.toFixed(3)}</span>
+                    </div>
+                  ))}
+                  <div className="pt-3 border-t dark:border-gray-700 flex justify-between items-center mt-auto">
+                    <span className="text-xs font-bold text-violet-500">إجمالي التكلفة:</span>
+                    <span className="text-lg font-black text-violet-600 dark:text-violet-400">{template.totalCost.toFixed(3)}</span>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => handleLoadTemplate(template)}
+                  className="w-full py-3 bg-violet-500 text-white font-bold hover:bg-violet-600 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Copy size={18} /> استخدام هذا النموذج
+                </button>
+              </div>
+            )) : (
+              <div className="col-span-full text-center py-20 bg-white dark:bg-gray-800 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700">
+                <LayoutTemplate size={48} className="mx-auto text-gray-300 mb-4" />
+                <p className="text-gray-500 dark:text-gray-400">لا توجد نماذج محفوظة حالياً</p>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : showHistory ? (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
           {/* Archive Filters */}
           <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 no-print">
@@ -243,25 +347,35 @@ const CostMeter: React.FC<CostMeterProps> = ({ materials, user }) => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">الموديل</label>
+                  <input 
+                    type="text" 
+                    placeholder="مثال: محير / توب 160" 
+                    className="w-full p-3 border rounded-xl dark:bg-gray-700 dark:border-gray-600 dark:text-white outline-none focus:ring-2 focus:ring-violet-500 shadow-sm"
+                    value={templateModel}
+                    onChange={(e) => setTemplateModel(e.target.value)}
+                  />
+                </div>
+                <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">القياس</label>
                   <input 
                     type="text" 
-                    placeholder="مثال: 200×150" 
+                    placeholder="مثال: 10/12/14" 
                     className="w-full p-3 border rounded-xl dark:bg-gray-700 dark:border-gray-600 dark:text-white outline-none focus:ring-2 focus:ring-violet-500 shadow-sm"
                     value={calcMeasurement}
                     onChange={(e) => setCalcMeasurement(e.target.value)}
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">وصف إضافي</label>
-                  <input 
-                    type="text" 
-                    placeholder="ملاحظات..." 
-                    className="w-full p-3 border rounded-xl dark:bg-gray-700 dark:border-gray-600 dark:text-white outline-none focus:ring-2 focus:ring-violet-500 shadow-sm"
-                    value={calcDescription}
-                    onChange={(e) => setCalcDescription(e.target.value)}
-                  />
-                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">وصف إضافي</label>
+                <input 
+                  type="text" 
+                  placeholder="ملاحظات..." 
+                  className="w-full p-3 border rounded-xl dark:bg-gray-700 dark:border-gray-600 dark:text-white outline-none focus:ring-2 focus:ring-violet-500 shadow-sm"
+                  value={calcDescription}
+                  onChange={(e) => setCalcDescription(e.target.value)}
+                />
               </div>
             </div>
 
@@ -362,14 +476,24 @@ const CostMeter: React.FC<CostMeterProps> = ({ materials, user }) => {
               </div>
             </div>
 
-            <button 
-              disabled={!selectedMaterialId && !calcTitle}
-              onClick={handleSaveCalculation}
-              className="w-full flex items-center justify-center gap-2 bg-emerald-500 text-white py-4 rounded-2xl font-bold hover:bg-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/20"
-            >
-              <Save size={20} />
-              حفظ العملية في الأرشيف
-            </button>
+            <div className="flex gap-3">
+              <button 
+                disabled={!selectedMaterialId && !calcTitle}
+                onClick={handleSaveCalculation}
+                className="flex-1 flex items-center justify-center gap-2 bg-emerald-500 text-white py-4 rounded-2xl font-bold hover:bg-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/20"
+              >
+                <Save size={20} />
+                حفظ في الأرشيف
+              </button>
+              <button 
+                disabled={!calcTitle || costParts.length === 0}
+                onClick={handleSaveAsTemplate}
+                className="flex-1 flex items-center justify-center gap-2 bg-violet-500 text-white py-4 rounded-2xl font-bold hover:bg-violet-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-violet-500/20"
+              >
+                <LayoutTemplate size={20} />
+                حفظ كنموذج
+              </button>
+            </div>
           </div>
 
           {/* Results Display */}

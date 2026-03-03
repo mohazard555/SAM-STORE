@@ -13,8 +13,10 @@ import Users from '@/pages/Users';
 import SupplierReturns from '@/pages/SupplierReturns';
 import CostMeter from '@/pages/CostMeter';
 import CostWeight from '@/pages/CostWeight';
-import { User, Page, Material, Transaction, SettingsData } from '@/types';
-import { getMaterials, getTransactions, getSettings } from '@/services/mockApi';
+import Warehouses from '@/pages/Warehouses';
+import QuickLook from '@/pages/QuickLook';
+import { User, Page, Material, Transaction, SettingsData, Warehouse } from '@/types';
+import { getMaterials, getTransactions, getSettings, getWarehouses } from '@/services/mockApi';
 import { Archive } from 'lucide-react';
 
 interface MainLayoutProps {
@@ -32,12 +34,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, onLogout, darkMode, setDa
   const [materials, setMaterials] = useState<Material[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [settings, setSettings] = useState<SettingsData | null>(null);
-
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
 
   const refreshData = useCallback(() => {
     setMaterials(getMaterials());
     setTransactions(getTransactions());
     setSettings(getSettings());
+    setWarehouses(getWarehouses());
   }, []);
 
   useEffect(() => {
@@ -83,13 +86,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, onLogout, darkMode, setDa
 
     switch (currentPage) {
       case 'dashboard':
-        return <Dashboard materials={materials} transactions={transactions} />;
+        return <Dashboard materials={materials} transactions={transactions} warehouses={warehouses} />;
       case 'materials':
-        return <Materials materials={filteredMaterials} onDataChange={refreshData} user={user} settings={settings} />;
+        return <Materials materials={filteredMaterials} warehouses={warehouses} onDataChange={refreshData} user={user} settings={settings} />;
       case 'transactions':
-        return <Transactions transactions={filteredTransactions} materials={materials} onDataChange={refreshData} user={user} />;
+        return <Transactions transactions={filteredTransactions} materials={materials} warehouses={warehouses} onDataChange={refreshData} user={user} />;
       case 'reports':
-        return <Reports transactions={transactions} materials={materials} settings={settings} user={user} />;
+        return <Reports transactions={transactions} materials={materials} warehouses={warehouses} settings={settings} user={user} />;
       case 'settings':
         return <Settings onDataChange={refreshData} user={user} />;
       case 'new-entries':
@@ -97,13 +100,17 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, onLogout, darkMode, setDa
       case 'users':
         return <Users />;
       case 'supplier-returns':
-        return <SupplierReturns materials={materials} transactions={transactions} user={user} />;
+        return <SupplierReturns materials={materials} transactions={transactions} warehouses={warehouses} user={user} />;
       case 'cost-meter':
         return <CostMeter materials={materials} user={user} />;
       case 'cost-weight':
         return <CostWeight materials={materials} user={user} onMaterialUpdate={refreshData} />;
+      case 'warehouses':
+        return <Warehouses warehouses={warehouses} materials={materials} user={user} onDataChange={refreshData} />;
+      case 'quick-look':
+        return <QuickLook materials={materials} transactions={transactions} user={user} settings={settings} />;
       default:
-        return <Dashboard materials={materials} transactions={transactions} />;
+        return <Dashboard materials={materials} transactions={transactions} warehouses={warehouses} />;
     }
   };
 

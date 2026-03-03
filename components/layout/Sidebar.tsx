@@ -1,6 +1,6 @@
 import React from 'react';
 import { Page, User } from '@/types';
-import { BarChart2, Package, Truck, FileText, X, Settings, Archive, Users, RotateCcw, Calculator, Weight } from 'lucide-react';
+import { BarChart2, Package, Truck, FileText, X, Settings, Archive, Users, RotateCcw, Calculator, Weight, Building2, Table } from 'lucide-react';
 
 interface SidebarProps {
   user: User;
@@ -62,7 +62,13 @@ const Sidebar: React.FC<SidebarProps> = ({ user, currentPage, onNavigate, isOpen
             {(user.role === 'admin' || user.permissions?.allowedPages.includes('dashboard')) && (
               <NavItem icon={<BarChart2 />} label="الرئيسية" isActive={currentPage === 'dashboard'} onClick={() => handleNavigation('dashboard')} />
             )}
-            {(user.role === 'admin' || user.permissions?.allowedPages.includes('materials')) && (
+            {(user.role === 'admin' || user.permissions?.allowedPages.includes('quick-look')) && (
+              <NavItem icon={<Table />} label="نظرة سريعة" isActive={currentPage === 'quick-look'} onClick={() => handleNavigation('quick-look')} />
+            )}
+            {(user.role === 'admin' || user.permissions?.allowedPages.includes('warehouses')) && (
+              <NavItem icon={<Building2 />} label="المستودعات" isActive={currentPage === 'warehouses'} onClick={() => handleNavigation('warehouses')} />
+            )}
+        {(user.role === 'admin' || user.permissions?.allowedPages.includes('materials')) && (
               <NavItem icon={<Package />} label="إدارة المواد" isActive={currentPage === 'materials'} onClick={() => handleNavigation('materials')} />
             )}
             {(user.role === 'admin' || user.permissions?.allowedPages.includes('new-entries')) && (

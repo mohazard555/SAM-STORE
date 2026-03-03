@@ -1,22 +1,24 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Transaction, Material, SettingsData, User } from '@/types';
+import { Transaction, Material, SettingsData, User, Warehouse } from '@/types';
 import { addTransaction, deleteTransaction, updateTransaction, getSettings } from '@/services/mockApi';
 import { Plus, ArrowDownLeft, ArrowUpRight, Calendar, Info, Search, Edit, Trash2, Printer } from 'lucide-react';
 
 interface TransactionsProps {
   transactions: Transaction[];
   materials: Material[];
+  warehouses: Warehouse[];
   onDataChange: () => void;
   user: User;
 }
 
 const TransactionModal: React.FC<{ 
     materials: Material[], 
+    warehouses: Warehouse[],
     editTransaction?: Transaction | null,
     onClose: () => void; 
     onSave: (transaction: any) => void; 
-}> = ({ materials, editTransaction, onClose, onSave }) => {
+}> = ({ materials, warehouses, editTransaction, onClose, onSave }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const filteredMaterials = materials.filter(m => 
         m.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -24,6 +26,9 @@ const TransactionModal: React.FC<{
     );
     
     const [materialId, setMaterialId] = useState(editTransaction?.materialId || filteredMaterials[0]?.id || '');
+    const [type, setType] = useState<'out' | 'transfer'>(editTransaction?.type === 'transfer' ? 'transfer' : 'out');
+    const [warehouseId, setWarehouseId] = useState(editTransaction?.warehouseId || (warehouses.length > 0 ? warehouses[0].id : ''));
+    const [toWarehouseId, setToWarehouseId] = useState(editTransaction?.toWarehouseId || '');
     const [quantity, setQuantity] = useState(editTransaction?.quantity || 1);
     const [recipient, setRecipient] = useState(editTransaction?.recipient || '');
     const [itemBarcode, setItemBarcode] = useState(editTransaction?.itemBarcode || '');
@@ -43,15 +48,21 @@ const TransactionModal: React.FC<{
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedMaterial) { setError('الرجاء اختيار مادة.'); return; }
+        if (!warehouseId) { setError('الرجاء اختيار المستودع.'); return; }
+        if (type === 'transfer' && !toWarehouseId) { setError('الرجاء اختيار المستودع المحول إليه.'); return; }
+        if (type === 'transfer' && warehouseId === toWarehouseId) { setError('لا يمكن التحويل لنفس المستودع.'); return; }
         
-        // Stock check only for new "out" or if quantity increased significantly on "out"
-        if (!editTransaction && selectedMaterial.currentStock < quantity) {
-             setError('الكمية المسحوبة أكبر من المتاح.'); return; 
+        const currentStock = selectedMaterial.stocks?.[warehouseId] || 0;
+
+        if (!editTransaction && currentStock < quantity) {
+             setError(`الكمية المسحوبة أكبر من المتاح في المستودع المحدد (${currentStock}).`); return; 
         }
         
         const payload = { 
-            type: editTransaction?.type || 'out', 
+            type: editTransaction ? editTransaction.type : type, 
             materialId, 
+            warehouseId,
+            toWarehouseId: type === 'transfer' ? toWarehouseId : undefined,
             quantity, 
             recipient, 
             itemBarcode,
@@ -72,10 +83,26 @@ const TransactionModal: React.FC<{
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-lg border dark:border-gray-700">
             <h2 className="text-xl font-bold mb-4 flex items-center text-gray-900 dark:text-white">
                 {editTransaction ? <Edit className="ml-2 text-blue-500" /> : <ArrowDownLeft className="ml-2 text-red-500" />}
-                {editTransaction ? 'تعديل الحركة' : 'إضافة حركة صرف (صادر)'}
+                {editTransaction ? 'تعديل الحركة' : 'إضافة حركة جديدة'}
             </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {!editTransaction && (
+                        <div className="md:col-span-2">
+                            <label className="block mb-1 text-sm font-medium dark:text-gray-200">نوع الحركة</label>
+                            <div className="flex gap-4">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="type" value="out" checked={type === 'out'} onChange={() => setType('out')} className="text-sky-500 focus:ring-sky-500" />
+                                    <span className="dark:text-gray-300">صرف (صادر)</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="type" value="transfer" checked={type === 'transfer'} onChange={() => setType('transfer')} className="text-sky-500 focus:ring-sky-500" />
+                                    <span className="dark:text-gray-300">تحويل بين المستودعات</span>
+                                </label>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="md:col-span-2 space-y-2">
                         <label className="block mb-1 text-sm font-medium dark:text-gray-200">اختر المادة</label>
                         <div className="flex gap-2">
@@ -98,13 +125,48 @@ const TransactionModal: React.FC<{
                                 className="flex-[1.5] p-2 border rounded bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 text-sm"
                             >
                                 {filteredMaterials.length > 0 ? (
-                                    filteredMaterials.map(m => <option key={m.id} value={m.id}>{m.name} (المتاح: {m.currentStock} {m.unit})</option>)
+                                    filteredMaterials.map(m => <option key={m.id} value={m.id}>{m.name} (الإجمالي: {m.currentStock} {m.unit})</option>)
                                 ) : (
                                     <option value="">لا توجد نتائج</option>
                                 )}
                             </select>
                         </div>
                     </div>
+
+                    <div>
+                        <label className="block mb-1 text-sm font-medium dark:text-gray-200">
+                            {type === 'transfer' ? 'من مستودع' : 'المستودع'}
+                        </label>
+                        <select 
+                            value={warehouseId} 
+                            onChange={(e) => setWarehouseId(e.target.value)} 
+                            required 
+                            disabled={!!editTransaction}
+                            className="w-full p-2 border rounded bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 text-sm"
+                        >
+                            {warehouses.map(w => (
+                                <option key={w.id} value={w.id}>{w.name} (المتاح: {selectedMaterial?.stocks?.[w.id] || 0})</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {type === 'transfer' && (
+                        <div>
+                            <label className="block mb-1 text-sm font-medium dark:text-gray-200">إلى مستودع</label>
+                            <select 
+                                value={toWarehouseId} 
+                                onChange={(e) => setToWarehouseId(e.target.value)} 
+                                required 
+                                disabled={!!editTransaction}
+                                className="w-full p-2 border rounded bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 text-sm"
+                            >
+                                <option value="">اختر المستودع...</option>
+                                {warehouses.filter(w => w.id !== warehouseId).map(w => (
+                                    <option key={w.id} value={w.id}>{w.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
 
                     <div className="md:col-span-2 bg-sky-50 dark:bg-sky-900/40 p-3 rounded-lg flex flex-wrap gap-4 text-[10px] md:text-xs text-sky-800 dark:text-sky-200 border dark:border-sky-800">
                         <div className="flex items-center"><Info size={14} className="ml-1"/> <strong>المورد:</strong> {selectedMaterial?.supplier || '-'}</div>
@@ -123,8 +185,8 @@ const TransactionModal: React.FC<{
                     </div>
 
                     <div>
-                        <label className="block mb-1 text-sm font-medium dark:text-gray-200">اسم المستلم</label>
-                        <input type="text" value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder="الجهة أو الشخص" required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                        <label className="block mb-1 text-sm font-medium dark:text-gray-200">اسم المستلم / الجهة</label>
+                        <input type="text" value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder={type === 'transfer' ? 'سبب التحويل' : 'الجهة أو الشخص'} required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                     </div>
 
                     <div>
@@ -160,7 +222,7 @@ const TransactionModal: React.FC<{
     );
 };
 
-const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, onDataChange, user }) => {
+const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, warehouses, onDataChange, user }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
@@ -296,6 +358,7 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, on
               <th scope="col" className="px-6 py-3">التاريخ</th>
               <th scope="col" className="px-6 py-3">النوع</th>
               <th scope="col" className="px-6 py-3">المادة / اللون</th>
+              <th scope="col" className="px-6 py-3">المستودع</th>
               <th scope="col" className="px-6 py-3">باركود المادة</th>
               <th scope="col" className="px-6 py-3">باركود الصنف</th>
               <th scope="col" className="px-6 py-3">الكمية</th>
@@ -312,6 +375,14 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, on
                         <span className="flex items-center text-emerald-600 dark:text-emerald-400 font-bold text-xs bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded">
                             <ArrowUpRight size={14} className="ml-1"/> وارد
                         </span>
+                    ) : transaction.type === 'transfer' ? (
+                        <span className="flex items-center text-blue-600 dark:text-blue-400 font-bold text-xs bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">
+                            <ArrowDownLeft size={14} className="ml-1"/> تحويل
+                        </span>
+                    ) : transaction.type === 'return' ? (
+                        <span className="flex items-center text-amber-600 dark:text-amber-400 font-bold text-xs bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded">
+                            <ArrowUpRight size={14} className="ml-1"/> مرتجع
+                        </span>
                     ) : (
                         <span className="flex items-center text-red-600 dark:text-red-400 font-bold text-xs bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded">
                             <ArrowDownLeft size={14} className="ml-1"/> صادر
@@ -322,10 +393,18 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, on
                     <div className="font-bold text-gray-900 dark:text-white">{transaction.materialName}</div>
                     {transaction.color && <div className="text-[10px] text-gray-400">اللون: {transaction.color}</div>}
                 </td>
+                <td className="px-6 py-4 text-xs">
+                    <div className="font-bold text-gray-900 dark:text-white">{warehouses.find(w => w.id === transaction.warehouseId)?.name || '-'}</div>
+                    {transaction.type === 'transfer' && transaction.toWarehouseId && (
+                        <div className="text-[10px] text-blue-500 mt-1">
+                            إلى: {warehouses.find(w => w.id === transaction.toWarehouseId)?.name || '-'}
+                        </div>
+                    )}
+                </td>
                 <td className="px-6 py-4 font-mono text-xs">{transaction.barcode}</td>
                 <td className="px-6 py-4 font-mono text-xs text-blue-500 font-bold">{transaction.itemBarcode || '-'}</td>
-                <td className={`px-6 py-4 font-black ${transaction.type === 'in' ? 'text-emerald-500' : 'text-red-500'}`}>
-                    {transaction.type === 'in' ? '+' : '-'}{transaction.quantity} {transaction.unit}
+                <td className={`px-6 py-4 font-black ${transaction.type === 'in' || transaction.type === 'return' ? 'text-emerald-500' : transaction.type === 'transfer' ? 'text-blue-500' : 'text-red-500'}`}>
+                    {transaction.type === 'in' || transaction.type === 'return' ? '+' : transaction.type === 'transfer' ? '' : '-'}{transaction.quantity} {transaction.unit}
                 </td>
                 <td className="px-6 py-4">
                     <div className="font-medium text-gray-700 dark:text-gray-300">{transaction.recipient}</div>
@@ -346,7 +425,7 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, on
         {filteredTransactions.length === 0 && <div className="p-12 text-center text-gray-500 dark:text-gray-400">لا توجد حركات مسجلة للفترة المحددة.</div>}
       </div>
 
-      {isModalOpen && <TransactionModal materials={materials} editTransaction={editingTransaction} onClose={() => { setIsModalOpen(false); setEditingTransaction(null); }} onSave={handleSave} />}
+      {isModalOpen && <TransactionModal materials={materials} warehouses={warehouses} editTransaction={editingTransaction} onClose={() => { setIsModalOpen(false); setEditingTransaction(null); }} onSave={handleSave} />}
       
       {deleteConfirm && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex justify-center items-center p-4">

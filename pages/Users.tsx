@@ -11,6 +11,11 @@ const PAGES: { id: Page; label: string }[] = [
     { id: 'settings', label: 'الإعدادات' },
     { id: 'new-entries', label: 'المدخلات الجديدة' },
     { id: 'users', label: 'المستخدمين' },
+    { id: 'warehouses', label: 'المستودعات' },
+    { id: 'supplier-returns', label: 'مرتجعات الموردين' },
+    { id: 'cost-meter', label: 'حاسبة الكلف بالمتر' },
+    { id: 'cost-weight', label: 'حاسبة الكلف بالوزن' },
+    { id: 'quick-look', label: 'نظرة سريعة' },
 ];
 
 const UserModal: React.FC<{ user: Partial<User> | null; onClose: () => void; onSave: (user: Omit<User, 'id'> | User) => void; }> = ({ user, onClose, onSave }) => {

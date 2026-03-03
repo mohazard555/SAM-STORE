@@ -1,4 +1,11 @@
 
+export interface Warehouse {
+  id: string;
+  name: string;
+  location?: string;
+  description?: string;
+}
+
 export interface Material {
   id: string;
   name: string;
@@ -10,7 +17,8 @@ export interface Material {
   color?: string;
   unit: string;
   minStock: number;
-  currentStock: number;
+  currentStock: number; // Total stock across all warehouses
+  stocks: Record<string, number>; // warehouseId -> quantity
   isNew: boolean;
   // Weight formula: X pieces = Y kg
   weightFormula?: {
@@ -21,7 +29,7 @@ export interface Material {
 
 export interface Transaction {
   id: string;
-  type: 'in' | 'out' | 'return'; // Added 'return' for supplier returns
+  type: 'in' | 'out' | 'return' | 'transfer'; // Added 'transfer'
   materialId: string;
   materialName: string;
   materialType: string;
@@ -32,6 +40,8 @@ export interface Transaction {
   color?: string;
   quantity: number;
   unit: string;
+  warehouseId: string; // Source warehouse (or destination for 'in')
+  toWarehouseId?: string; // Destination warehouse for 'transfer'
   recipient: string;
   notes?: string;
   date: string;
@@ -61,7 +71,9 @@ export type Page =
   | 'users'
   | 'supplier-returns'
   | 'cost-meter'
-  | 'cost-weight';
+  | 'cost-weight'
+  | 'warehouses'
+  | 'quick-look';
 
 export interface SettingsData {
   companyName: string;
@@ -111,11 +123,29 @@ export interface WeightCalculation {
   notes?: string;
 }
 
+export interface CostTemplatePart {
+  id: string;
+  name: string;
+  cost: number;
+}
+
+export interface CostTemplate {
+  id: string;
+  title: string;
+  model: string;
+  size: string;
+  parts: CostTemplatePart[];
+  totalCost: number;
+  date: string;
+}
+
 export interface AllData {
   settings: SettingsData;
+  warehouses: Warehouse[];
   materials: Material[];
   transactions: Transaction[];
   users: Omit<User, 'password'>[];
   costCalculations?: CostCalculation[];
   weightCalculations?: WeightCalculation[];
+  costTemplates?: CostTemplate[];
 }

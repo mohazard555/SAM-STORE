@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { getWeightCalculations, addWeightCalculation, deleteWeightCalculation, updateMaterial } from '@/services/mockApi';
 import * as XLSX from 'xlsx';
+import { exportToExcel } from '@/utils/excelExport';
 
 interface CostWeightProps {
   materials: Material[];
@@ -114,10 +115,7 @@ const CostWeight: React.FC<CostWeightProps> = ({ materials, user, onMaterialUpda
       'الوزن الإجمالي': c.totalWeight,
       'ملاحظات': c.notes || ''
     }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "أرشيف حاسبة الوزن");
-    XLSX.writeFile(wb, "weight_calculator_archive.xlsx");
+    exportToExcel(data, "weight_calculator_archive", "أرشيف حاسبة الوزن");
   };
 
   return (

@@ -1,19 +1,21 @@
 
 import React, { useState, useMemo } from 'react';
-import { Transaction, Material, User } from '@/types';
+import { Transaction, Material, User, Warehouse } from '@/types';
 import { 
   RotateCcw, Search, Filter, Calendar, Printer, Download, 
   ArrowLeftRight, Package, User as UserIcon, FileText
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { exportToExcel } from '@/utils/excelExport';
 
 interface SupplierReturnsProps {
   transactions: Transaction[];
   materials: Material[];
+  warehouses: Warehouse[];
   user: User;
 }
 
-const SupplierReturns: React.FC<SupplierReturnsProps> = ({ transactions, materials, user }) => {
+const SupplierReturns: React.FC<SupplierReturnsProps> = ({ transactions, materials, warehouses, user }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSupplier, setFilterSupplier] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -49,10 +51,7 @@ const SupplierReturns: React.FC<SupplierReturnsProps> = ({ transactions, materia
       'الملاحظات': t.notes || ''
     }));
 
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "مرتجعات الموردين");
-    XLSX.writeFile(wb, "supplier_returns.xlsx");
+    exportToExcel(data, "supplier_returns", "مرتجعات الموردين");
   };
 
   const handlePrint = () => {
