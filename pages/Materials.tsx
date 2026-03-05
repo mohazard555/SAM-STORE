@@ -5,6 +5,7 @@ import { addMaterial, updateMaterial, deleteMaterial, acknowledgeNewMaterial, ad
 import { Plus, Edit, Trash2, AlertTriangle, Printer, Download, CheckCircle, PlusCircle, RotateCcw, Upload } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { exportToExcel } from '@/utils/excelExport';
+import { usePrint } from '@/services/PrintContext';
 
 interface MaterialsProps {
   materials: Material[];
@@ -224,6 +225,7 @@ const MaterialModal: React.FC<{
 };
 
 const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChange, user, settings }) => {
+  const { triggerPrint } = usePrint();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isStockInModalOpen, setIsStockInModalOpen] = useState(false);
   const [stockActionType, setStockActionType] = useState<'supply' | 'return' | 'supplier-return'>('supply');
@@ -334,19 +336,50 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
 
   const handlePrint = () => {
     const reportTitle = `تقرير جرد المواد`;
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-    printWindow.document.write(`
-      <html><head><title>${reportTitle}</title><style>
-            @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
-            body { font-family: 'Cairo', sans-serif; direction: rtl; margin: 20px; }
-            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ccc; padding-bottom: 10px; margin-bottom: 20px; }
-            table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
-            th { background-color: #f2f2f2; }
-          </style></head><body><div class="header">${settings?.companyLogo ? `<img src="${settings.companyLogo}" style="max-width:80px">` : ''}<div><h2>${settings?.companyName || ''}</h2><p>${settings?.companyAddress || ''}</p></div></div><h2 style="text-align:center">${reportTitle}</h2><table><thead><tr><th>اسم المادة</th><th>اللون</th><th>الباركود</th><th>الكمية الحالية</th><th>الحد الأدنى</th></tr></thead><tbody>${materials.map(m => `<tr><td>${m.name}</td><td>${m.color || '-'}</td><td>${m.barcode}</td><td>${m.currentStock} ${m.unit}</td><td>${m.minStock} ${m.unit}</td></tr>`).join('')}</tbody></table><script>setTimeout(() => { window.print(); window.close(); }, 500);</script></body></html>
-    `);
-    printWindow.document.close();
+    const html = `
+      <div class="print-container">
+        <style>
+          .print-container { font-family: 'Cairo', sans-serif; direction: rtl; padding: 20px; background: white; color: black; }
+          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ccc; padding-bottom: 10px; margin-bottom: 20px; }
+          .header-info { text-align: right; }
+          table { width: 100%; border-collapse: collapse; font-size: 0.9em; margin-top: 20px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
+          th { background-color: #f2f2f2; }
+          h2 { text-align: center; margin-top: 0; }
+        </style>
+        <div class="header">
+          ${settings?.companyLogo ? `<img src="${settings.companyLogo}" style="max-width:80px">` : '<div></div>'}
+          <div class="header-info">
+            <h2>${settings?.companyName || ''}</h2>
+            <p>${settings?.companyAddress || ''}</p>
+          </div>
+        </div>
+        <h2>${reportTitle}</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>اسم المادة</th>
+              <th>اللون</th>
+              <th>الباركود</th>
+              <th>الكمية الحالية</th>
+              <th>الحد الأدنى</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${materials.map(m => `
+              <tr>
+                <td>${m.name}</td>
+                <td>${m.color || '-'}</td>
+                <td>${m.barcode}</td>
+                <td>${m.currentStock} ${m.unit}</td>
+                <td>${m.minStock} ${m.unit}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+    triggerPrint(html);
   };
 
   return (

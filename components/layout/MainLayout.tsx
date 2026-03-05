@@ -17,6 +17,7 @@ import Warehouses from '@/pages/Warehouses';
 import QuickLook from '@/pages/QuickLook';
 import { User, Page, Material, Transaction, SettingsData, Warehouse } from '@/types';
 import { getMaterials, getTransactions, getSettings, getWarehouses } from '@/services/mockApi';
+import { usePrint } from '@/services/PrintContext';
 import { Archive } from 'lucide-react';
 
 interface MainLayoutProps {
@@ -100,13 +101,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, onLogout, darkMode, setDa
       case 'users':
         return <Users />;
       case 'supplier-returns':
-        return <SupplierReturns materials={materials} transactions={transactions} warehouses={warehouses} user={user} />;
+        return <SupplierReturns materials={materials} transactions={transactions} warehouses={warehouses} user={user} settings={settings || undefined} />;
       case 'cost-meter':
-        return <CostMeter materials={materials} user={user} />;
+        return <CostMeter materials={materials} user={user} settings={settings || undefined} />;
       case 'cost-weight':
-        return <CostWeight materials={materials} user={user} onMaterialUpdate={refreshData} />;
+        return <CostWeight materials={materials} user={user} settings={settings || undefined} onMaterialUpdate={refreshData} />;
       case 'warehouses':
-        return <Warehouses warehouses={warehouses} materials={materials} user={user} onDataChange={refreshData} />;
+        return <Warehouses warehouses={warehouses} materials={materials} user={user} settings={settings || undefined} onDataChange={refreshData} />;
       case 'quick-look':
         return <QuickLook materials={materials} transactions={transactions} user={user} settings={settings} />;
       default:
@@ -114,8 +115,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, onLogout, darkMode, setDa
     }
   };
 
+  const { printContent } = usePrint();
+
   return (
     <div className="flex h-screen bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 overflow-hidden">
+      {/* Print Section - only visible during print */}
+      <div id="print-section" dangerouslySetInnerHTML={{ __html: printContent || '' }} />
+      
       <Sidebar 
         user={user}
         currentPage={currentPage} 

@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Material, WeightCalculation, User } from '@/types';
+import { Material, WeightCalculation, User, SettingsData } from '@/types';
+import { usePrint } from '@/services/PrintContext';
 import { 
   Scale, History, Save, Search, Printer, Download, 
   ChevronUp, ChevronDown, CheckCircle2, FileText, 
@@ -13,10 +14,12 @@ import { exportToExcel } from '@/utils/excelExport';
 interface CostWeightProps {
   materials: Material[];
   user: User;
+  settings?: SettingsData;
   onMaterialUpdate: () => void;
 }
 
-const CostWeight: React.FC<CostWeightProps> = ({ materials, user, onMaterialUpdate }) => {
+const CostWeight: React.FC<CostWeightProps> = ({ materials, user, settings, onMaterialUpdate }) => {
+  const { triggerPrint } = usePrint();
   // --- Calculator State ---
   const [calcTitle, setCalcTitle] = useState('');
   const [selectedMaterialId, setSelectedMaterialId] = useState('');
@@ -104,6 +107,58 @@ const CostWeight: React.FC<CostWeightProps> = ({ materials, user, onMaterialUpda
     });
   }, [savedCalculations, archiveSearch, archiveStartDate, archiveEndDate]);
 
+  const handlePrintArchive = () => {
+    const tableContent = filteredArchive.map(c => `
+      <tr>
+        <td>${c.title}</td>
+        <td>${new Date(c.date).toLocaleString('ar-EG')}</td>
+        <td>${c.materialName}</td>
+        <td>${c.pieceCount}</td>
+        <td>${c.standardPieces} ق = ${c.standardWeight} كغم</td>
+        <td>${c.totalWeight.toFixed(2)} كغم</td>
+      </tr>
+    `).join('');
+
+    const html = `
+      <div class="print-container">
+        <style>
+          .print-container { font-family: 'Cairo', sans-serif; direction: rtl; padding: 20px; background: white; color: black; }
+          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ccc; padding-bottom: 10px; margin-bottom: 20px; }
+          .header img { max-width: 80px; max-height: 80px; }
+          .company-info { text-align: right; }
+          .report-title { text-align: center; margin-bottom: 20px; font-size: 1.5em; }
+          table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
+          th { background-color: #f2f2f2; }
+        </style>
+        <div class="header">
+          ${settings?.companyLogo ? `<img src="${settings.companyLogo}" alt="Logo">` : '<div></div>'}
+          <div class="company-info">
+            <h2>${settings?.companyName || ''}</h2>
+            <p>${settings?.companyAddress || ''}</p>
+          </div>
+        </div>
+        <h2 class="report-title">أرشيف حاسبة الوزن</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>العنوان</th>
+              <th>التاريخ</th>
+              <th>المادة</th>
+              <th>عدد القطع</th>
+              <th>المعيار</th>
+              <th>الوزن الإجمالي</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableContent}
+          </tbody>
+        </table>
+      </div>
+    `;
+    triggerPrint(html);
+  };
+
   const handleExportArchive = () => {
     const data = filteredArchive.map(c => ({
       'العنوان': c.title,
@@ -168,7 +223,7 @@ const CostWeight: React.FC<CostWeightProps> = ({ materials, user, onMaterialUpda
                 />
               </div>
               <div className="flex gap-2">
-                <button onClick={() => window.print()} className="flex-1 flex items-center justify-center gap-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 transition-colors">
+                <button onClick={handlePrintArchive} className="flex-1 flex items-center justify-center gap-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 transition-colors">
                   <Printer size={18} /> طباعة
                 </button>
                 <button onClick={handleExportArchive} className="flex-1 flex items-center justify-center gap-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors">

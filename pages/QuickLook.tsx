@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Material, Transaction, User, SettingsData } from '@/types';
+import { usePrint } from '@/services/PrintContext';
 import { 
   Table, Filter, Search, ChevronUp, ChevronDown, Printer, Download 
 } from 'lucide-react';
@@ -14,6 +15,7 @@ interface QuickLookProps {
 }
 
 const QuickLook: React.FC<QuickLookProps> = ({ materials, transactions, user, settings }) => {
+  const { triggerPrint } = usePrint();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSupplier, setFilterSupplier] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
@@ -85,65 +87,57 @@ const QuickLook: React.FC<QuickLookProps> = ({ materials, transactions, user, se
 
   const handlePrint = () => {
     const reportTitle = `تقرير نظرة سريعة للمواد`;
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>${reportTitle}</title>
-          <style>
-            @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
-            body { font-family: 'Cairo', sans-serif; direction: rtl; margin: 20px; }
-            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ccc; padding-bottom: 10px; margin-bottom: 20px; }
-            table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
-            th { background-color: #f2f2f2; }
-            .footer { margin-top: 20px; font-weight: bold; text-align: left; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            ${settings?.companyLogo ? `<img src="${settings.companyLogo}" style="max-width:80px">` : ''}
-            <div>
-              <h2>${settings?.companyName || ''}</h2>
-              <p>${settings?.companyAddress || ''}</p>
-            </div>
+    const html = `
+      <div class="print-container">
+        <style>
+          .print-container { font-family: 'Cairo', sans-serif; direction: rtl; padding: 20px; background: white; color: black; }
+          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ccc; padding-bottom: 10px; margin-bottom: 20px; }
+          table { width: 100%; border-collapse: collapse; font-size: 0.9em; margin-top: 20px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
+          th { background-color: #f2f2f2; }
+          .footer { margin-top: 20px; font-weight: bold; text-align: left; }
+          h2 { text-align: center; margin-top: 0; }
+        </style>
+        <div class="header">
+          ${settings?.companyLogo ? `<img src="${settings.companyLogo}" style="max-width:80px">` : '<div></div>'}
+          <div>
+            <h2>${settings?.companyName || ''}</h2>
+            <p>${settings?.companyAddress || ''}</p>
           </div>
-          <h2 style="text-align:center">${reportTitle}</h2>
-          <table>
-            <thead>
+        </div>
+        <h2>${reportTitle}</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>اسم المادة</th>
+              <th>الفئة</th>
+              <th>الوحدة</th>
+              <th>الرصيد الكامل</th>
+              <th>الكمية المستخدمة</th>
+              <th>الكمية المتبقية</th>
+              <th>المورد</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filteredData.map(m => `
               <tr>
-                <th>اسم المادة</th>
-                <th>الفئة</th>
-                <th>الوحدة</th>
-                <th>الرصيد الكامل</th>
-                <th>الكمية المستخدمة</th>
-                <th>الكمية المتبقية</th>
-                <th>المورد</th>
+                <td>${m.name}</td>
+                <td>${m.category}</td>
+                <td>${m.unit}</td>
+                <td>${m.fullBalance}</td>
+                <td>${m.usedQuantity}</td>
+                <td>${m.remainingQuantity}</td>
+                <td>${m.supplier}</td>
               </tr>
-            </thead>
-            <tbody>
-              ${filteredData.map(m => `
-                <tr>
-                  <td>${m.name}</td>
-                  <td>${m.category}</td>
-                  <td>${m.unit}</td>
-                  <td>${m.fullBalance}</td>
-                  <td>${m.usedQuantity}</td>
-                  <td>${m.remainingQuantity}</td>
-                  <td>${m.supplier}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-          <div class="footer">
-            إجمالي الكمية المتبقية: ${totalFilteredRemaining}
-          </div>
-          <script>setTimeout(() => { window.print(); window.close(); }, 500);</script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+            `).join('')}
+          </tbody>
+        </table>
+        <div class="footer">
+          إجمالي الكمية المتبقية: ${totalFilteredRemaining}
+        </div>
+      </div>
+    `;
+    triggerPrint(html);
   };
 
   const canExport = user?.role === 'admin' || user?.permissions?.canExport;

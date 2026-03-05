@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Transaction, Material, SettingsData, User, Warehouse } from '@/types';
+import { usePrint } from '@/services/PrintContext';
 import { 
   Download, 
   Printer, 
@@ -36,6 +37,7 @@ interface ReportsProps {
 type ReportType = 'daily' | 'weekly' | 'monthly' | 'byMaterial' | 'byCategory' | 'byBarcode' | 'byItemBarcode' | 'totalCount' | 'all' | 'bySupplier' | 'mostUsed' | 'inactive' | 'lowStock';
 
 const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, settings, user }) => {
+  const { triggerPrint } = usePrint();
   const [filterType, setFilterType] = useState<ReportType>('all');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
@@ -210,9 +212,6 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
   
   const handlePrint = () => {
     let reportTitle = `تقرير`;
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
     let tableContent;
     let tableHeaders;
 
@@ -235,47 +234,39 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
             tableContent = (reportData as Transaction[]).map(t => `<tr><td>${new Date(t.date).toLocaleString('ar-EG')}</td><td>${t.materialName}</td><td>${t.barcode}</td><td>${t.itemBarcode || '-'}</td><td>${t.supplier}</td><td>${t.quantity} ${t.unit}</td><td>${t.recipient}</td><td>${t.notes || ''}</td></tr>`).join('');
     }
 
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>${reportTitle}</title>
-          <style>
-            @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
-            body { font-family: 'Cairo', sans-serif; direction: rtl; margin: 20px; }
-            @media print { body { -webkit-print-color-adjust: exact; } .no-print { display: none; } }
-            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ccc; padding-bottom: 10px; margin-bottom: 20px; }
-            .header img { max-width: 80px; max-height: 80px; }
-            .company-info { text-align: right; }
-            .report-title { text-align: center; margin-bottom: 20px; font-size: 1.5em; }
-            table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
-            th { background-color: #f2f2f2; }
-            .signatures { margin-top: 50px; display: flex; justify-content: space-around; text-align: center; }
-            .signature-box { padding-top: 10px; }
-            .signature-box p { margin: 0; padding: 0; }
-            .signature-box .line { border-bottom: 1px solid #000; margin-top: 40px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            ${settings?.companyLogo ? `<img src="${settings.companyLogo}" alt="Logo">` : ''}
-            <div class="company-info">
-              <h2>${settings?.companyName || ''}</h2>
-              <p>${settings?.companyAddress || ''}</p>
-            </div>
+    const html = `
+      <div class="print-container">
+        <style>
+          .print-container { font-family: 'Cairo', sans-serif; direction: rtl; padding: 20px; background: white; color: black; }
+          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ccc; padding-bottom: 10px; margin-bottom: 20px; }
+          .header img { max-width: 80px; max-height: 80px; }
+          .company-info { text-align: right; }
+          .report-title { text-align: center; margin-bottom: 20px; font-size: 1.5em; }
+          table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
+          th { background-color: #f2f2f2; }
+          .signatures { margin-top: 50px; display: flex; justify-content: space-around; text-align: center; }
+          .signature-box { padding-top: 10px; }
+          .signature-box p { margin: 0; padding: 0; }
+          .signature-box .line { border-bottom: 1px solid #000; margin-top: 40px; }
+        </style>
+        <div class="header">
+          ${settings?.companyLogo ? `<img src="${settings.companyLogo}" alt="Logo">` : '<div></div>'}
+          <div class="company-info">
+            <h2>${settings?.companyName || ''}</h2>
+            <p>${settings?.companyAddress || ''}</p>
           </div>
-          <h2 class="report-title">${reportTitle}</h2>
-          <table><thead><tr>${tableHeaders}</tr></thead><tbody>${tableContent}</tbody></table>
-          <div class="signatures">
-            <div class="signature-box"><p>${settings?.signatureNames?.keeper}</p><div class="line"></div></div>
-            <div class="signature-box"><p>${settings?.signatureNames?.accountant}</p><div class="line"></div></div>
-            <div class="signature-box"><p>${settings?.signatureNames?.manager}</p><div class="line"></div></div>
-          </div>
-          <script>setTimeout(() => { window.print(); window.close(); }, 500);</script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+        </div>
+        <h2 class="report-title">${reportTitle}</h2>
+        <table><thead><tr>${tableHeaders}</tr></thead><tbody>${tableContent}</tbody></table>
+        <div class="signatures">
+          <div class="signature-box"><p>${settings?.signatureNames?.keeper}</p><div class="line"></div></div>
+          <div class="signature-box"><p>${settings?.signatureNames?.accountant}</p><div class="line"></div></div>
+          <div class="signature-box"><p>${settings?.signatureNames?.manager}</p><div class="line"></div></div>
+        </div>
+      </div>
+    `;
+    triggerPrint(html);
   };
   
   const canPerformAction = reportData && reportData.length > 0;

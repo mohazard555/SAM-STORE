@@ -31,3 +31,31 @@
 .slide-in-from-right-2 {
   animation-name: slide-in-from-right;
 }
+
+/* Print Styles */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #print-section, #print-section * {
+    visibility: visible;
+  }
+  #print-section {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background: white !important;
+    color: black !important;
+  }
+  /* Hide UI elements during print */
+  .no-print {
+    display: none !important;
+  }
+}
+
+#print-section {
+  display: none;
+}

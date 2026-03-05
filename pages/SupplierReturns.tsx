@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
-import { Transaction, Material, User, Warehouse } from '@/types';
+import { Transaction, Material, User, Warehouse, SettingsData } from '@/types';
+import { usePrint } from '@/services/PrintContext';
 import { 
   RotateCcw, Search, Filter, Calendar, Printer, Download, 
   ArrowLeftRight, Package, User as UserIcon, FileText
@@ -13,9 +14,11 @@ interface SupplierReturnsProps {
   materials: Material[];
   warehouses: Warehouse[];
   user: User;
+  settings?: SettingsData;
 }
 
-const SupplierReturns: React.FC<SupplierReturnsProps> = ({ transactions, materials, warehouses, user }) => {
+const SupplierReturns: React.FC<SupplierReturnsProps> = ({ transactions, materials, warehouses, user, settings }) => {
+  const { triggerPrint } = usePrint();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSupplier, setFilterSupplier] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -55,7 +58,59 @@ const SupplierReturns: React.FC<SupplierReturnsProps> = ({ transactions, materia
   };
 
   const handlePrint = () => {
-    window.print();
+    const tableContent = filteredReturns.map(t => `
+      <tr>
+        <td>${t.id}</td>
+        <td>${new Date(t.date).toLocaleDateString('ar-EG')}</td>
+        <td>${t.supplier}</td>
+        <td>${t.materialName}</td>
+        <td>${t.quantity}</td>
+        <td>${t.unit}</td>
+        <td>${t.notes || ''}</td>
+      </tr>
+    `).join('');
+
+    const html = `
+      <div class="print-container">
+        <style>
+          .print-container { font-family: 'Cairo', sans-serif; direction: rtl; padding: 20px; background: white; color: black; }
+          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ccc; padding-bottom: 10px; margin-bottom: 20px; }
+          .header img { max-width: 80px; max-height: 80px; }
+          .company-info { text-align: right; }
+          .report-title { text-align: center; margin-bottom: 20px; font-size: 1.5em; }
+          table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
+          th { background-color: #f2f2f2; }
+          .total-row { margin-top: 20px; text-align: left; font-weight: bold; font-size: 1.1em; }
+        </style>
+        <div class="header">
+          ${settings?.companyLogo ? `<img src="${settings.companyLogo}" alt="Logo">` : '<div></div>'}
+          <div class="company-info">
+            <h2>${settings?.companyName || ''}</h2>
+            <p>${settings?.companyAddress || ''}</p>
+          </div>
+        </div>
+        <h2 class="report-title">تقرير مرتجعات الموردين</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>رقم العملية</th>
+              <th>التاريخ</th>
+              <th>المورد</th>
+              <th>المادة</th>
+              <th>الكمية</th>
+              <th>الوحدة</th>
+              <th>الملاحظات</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableContent}
+          </tbody>
+        </table>
+        <div class="total-row">إجمالي الكمية: ${totalQuantity}</div>
+      </div>
+    `;
+    triggerPrint(html);
   };
 
   return (

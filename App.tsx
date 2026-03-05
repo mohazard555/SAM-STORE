@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import Login from '@/pages/Login';
 import MainLayout from '@/components/layout/MainLayout';
 import { getCurrentUser, initializeDataSource } from '@/services/mockApi';
+import { PrintProvider } from '@/services/PrintContext';
 import { User } from '@/types';
 
 const GIST_URL = 'https://gist.githubusercontent.com/mohazard555/6da370385392ac7cd27e034efe4b7d7c/raw/amenstor.json';
@@ -70,20 +71,22 @@ function App() {
   }
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-900 min-h-screen font-sans transition-colors duration-300">
-      {error && <div className="bg-red-100 dark:bg-red-900/30 border-l-4 border-red-500 text-red-700 dark:text-red-300 p-4 text-center" role="alert"><p>{error}</p></div>}
-      {successMessage && <div className="bg-green-100 dark:bg-green-900/30 border-l-4 border-green-500 text-green-700 dark:text-green-300 p-2 text-center text-sm" role="alert"><p>{successMessage}</p></div>}
-      {user ? (
-        <MainLayout 
-          user={user} 
-          onLogout={handleLogout} 
-          darkMode={darkMode} 
-          setDarkMode={setDarkMode} 
-        />
-      ) : (
-        <Login onLogin={handleLogin} />
-      )}
-    </div>
+    <PrintProvider>
+      <div className="bg-gray-50 dark:bg-gray-900 min-h-screen font-sans transition-colors duration-300">
+        {error && <div className="bg-red-100 dark:bg-red-900/30 border-l-4 border-red-500 text-red-700 dark:text-red-300 p-4 text-center" role="alert"><p>{error}</p></div>}
+        {successMessage && <div className="bg-green-100 dark:bg-green-900/30 border-l-4 border-green-500 text-green-700 dark:text-green-300 p-2 text-center text-sm" role="alert"><p>{successMessage}</p></div>}
+        {user ? (
+          <MainLayout 
+            user={user} 
+            onLogout={handleLogout} 
+            darkMode={darkMode} 
+            setDarkMode={setDarkMode} 
+          />
+        ) : (
+          <Login onLogin={handleLogin} />
+        )}
+      </div>
+    </PrintProvider>
   );
 }
 

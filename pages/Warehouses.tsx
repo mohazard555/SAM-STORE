@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Warehouse, Material, User } from '@/types';
+import { Warehouse, Material, User, SettingsData } from '@/types';
+import { usePrint } from '@/services/PrintContext';
 import { Building2, Search, Filter, Printer, Download, Package, Plus, Edit, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { exportToExcel } from '@/utils/excelExport';
@@ -9,10 +10,12 @@ interface WarehousesProps {
   warehouses: Warehouse[];
   materials: Material[];
   user: User;
+  settings?: SettingsData;
   onDataChange: () => void;
 }
 
-const Warehouses: React.FC<WarehousesProps> = ({ warehouses, materials, user, onDataChange }) => {
+const Warehouses: React.FC<WarehousesProps> = ({ warehouses, materials, user, settings, onDataChange }) => {
+  const { triggerPrint } = usePrint();
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
@@ -59,7 +62,59 @@ const Warehouses: React.FC<WarehousesProps> = ({ warehouses, materials, user, on
   };
 
   const handlePrint = () => {
-    window.print();
+    if (!selectedWarehouse) return;
+
+    const tableContent = filteredMaterials.map(m => `
+      <tr>
+        <td>${m.barcode}</td>
+        <td>${m.name}</td>
+        <td>${m.category}</td>
+        <td>${m.supplier || '---'}</td>
+        <td>${m.stocks?.[selectedWarehouse.id] || 0}</td>
+        <td>${m.unit}</td>
+      </tr>
+    `).join('');
+
+    const html = `
+      <div class="print-container">
+        <style>
+          .print-container { font-family: 'Cairo', sans-serif; direction: rtl; padding: 20px; background: white; color: black; }
+          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ccc; padding-bottom: 10px; margin-bottom: 20px; }
+          .header img { max-width: 80px; max-height: 80px; }
+          .company-info { text-align: right; }
+          .report-title { text-align: center; margin-bottom: 20px; font-size: 1.5em; }
+          table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
+          th { background-color: #f2f2f2; }
+          .total-row { margin-top: 20px; text-align: left; font-weight: bold; font-size: 1.1em; }
+        </style>
+        <div class="header">
+          ${settings?.companyLogo ? `<img src="${settings.companyLogo}" alt="Logo">` : '<div></div>'}
+          <div class="company-info">
+            <h2>${settings?.companyName || ''}</h2>
+            <p>${settings?.companyAddress || ''}</p>
+          </div>
+        </div>
+        <h2 class="report-title">تقرير جرد مستودع: ${selectedWarehouse.name}</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>الباركود</th>
+              <th>اسم المادة</th>
+              <th>الفئة</th>
+              <th>المورد</th>
+              <th>الرصيد</th>
+              <th>الوحدة</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableContent}
+          </tbody>
+        </table>
+        <div class="total-row">إجمالي الكميات: ${totalQuantity}</div>
+      </div>
+    `;
+    triggerPrint(html);
   };
 
   const openModal = (warehouse?: Warehouse) => {

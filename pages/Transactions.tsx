@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Transaction, Material, SettingsData, User, Warehouse } from '@/types';
 import { addTransaction, deleteTransaction, updateTransaction, getSettings } from '@/services/mockApi';
+import { usePrint } from '@/services/PrintContext';
 import { Plus, ArrowDownLeft, ArrowUpRight, Calendar, Info, Search, Edit, Trash2, Printer } from 'lucide-react';
 
 interface TransactionsProps {
@@ -223,6 +224,7 @@ const TransactionModal: React.FC<{
 };
 
 const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, warehouses, onDataChange, user }) => {
+  const { triggerPrint } = usePrint();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
@@ -270,59 +272,46 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, wa
 
   const handlePrintVoucher = (t: Transaction) => {
     const settings = getSettings();
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>سند حركة مخزنية</title>
-          <style>
-            @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
-            body { font-family: 'Cairo', sans-serif; direction: rtl; margin: 40px; color: #333; }
-            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px double #333; padding-bottom: 20px; margin-bottom: 30px; }
-            .logo { max-width: 100px; }
-            .voucher-title { text-align: center; font-size: 24px; font-weight: bold; border: 2px solid #333; padding: 10px; width: fit-content; margin: 0 auto 30px; }
-            .details-grid { display: grid; grid-template-cols: 1fr 1fr; gap: 20px; margin-bottom: 40px; }
-            .detail-item { border-bottom: 1px dashed #ccc; padding: 5px 0; }
-            .detail-label { font-weight: bold; color: #666; width: 120px; display: inline-block; }
-            .signatures { display: grid; grid-template-cols: 1fr 1fr 1fr; gap: 40px; margin-top: 80px; text-align: center; }
-            .sig-line { border-top: 1px solid #000; margin-top: 50px; }
-            .type-badge { padding: 5px 15px; border-radius: 5px; font-weight: bold; }
-            .type-in { background: #d1fae5; color: #065f46; }
-            .type-out { background: #fee2e2; color: #991b1b; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            ${settings.companyLogo ? `<img src="${settings.companyLogo}" class="logo" />` : '<div></div>'}
-            <div style="text-align:left">
-              <h2 style="margin:0">${settings.companyName}</h2>
-              <p style="margin:5px 0">${settings.companyAddress}</p>
-            </div>
+    const html = `
+      <div class="print-container">
+        <style>
+          .print-container { font-family: 'Cairo', sans-serif; direction: rtl; padding: 40px; color: #333; background: white; }
+          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px double #333; padding-bottom: 20px; margin-bottom: 30px; }
+          .logo { max-width: 100px; }
+          .voucher-title { text-align: center; font-size: 24px; font-weight: bold; border: 2px solid #333; padding: 10px; width: fit-content; margin: 0 auto 30px; }
+          .details-grid { display: grid; grid-template-cols: 1fr 1fr; gap: 20px; margin-bottom: 40px; }
+          .detail-item { border-bottom: 1px dashed #ccc; padding: 5px 0; display: flex; align-items: center; }
+          .detail-label { font-weight: bold; color: #666; width: 150px; flex-shrink: 0; }
+          .signatures { display: grid; grid-template-cols: 1fr 1fr 1fr; gap: 40px; margin-top: 80px; text-align: center; }
+          .sig-line { border-top: 1px solid #000; margin-top: 50px; }
+        </style>
+        <div class="header">
+          ${settings.companyLogo ? `<img src="${settings.companyLogo}" class="logo" />` : '<div></div>'}
+          <div style="text-align:left">
+            <h2 style="margin:0">${settings.companyName}</h2>
+            <p style="margin:5px 0">${settings.companyAddress}</p>
           </div>
-          <div class="voucher-title">سند ${t.type === 'in' ? 'توريد' : 'صرف'} مخزني</div>
-          <div class="details-grid">
-            <div class="detail-item"><span class="detail-label">رقم الحركة:</span> <span>${t.id.slice(-6).toUpperCase()}</span></div>
-            <div class="detail-item"><span class="detail-label">تاريخ الحركة:</span> <span>${new Date(t.date).toLocaleDateString('ar-EG')}</span></div>
-            <div class="detail-item"><span class="detail-label">اسم المادة:</span> <span>${t.materialName}</span></div>
-            <div class="detail-item"><span class="detail-label">الباركود:</span> <span>${t.barcode}</span></div>
-            <div class="detail-item"><span class="detail-label">باركود الصنف/القصة:</span> <span>${t.itemBarcode || '-'}</span></div>
-            <div class="detail-item"><span class="detail-label">اللون:</span> <span>${t.color || '-'}</span></div>
-            <div class="detail-item"><span class="detail-label">الكمية:</span> <strong>${t.quantity} ${t.unit}</strong></div>
-            <div class="detail-item"><span class="detail-label">${t.type === 'in' ? 'المورد:' : 'المستلم:'}</span> <span>${t.recipient}</span></div>
-            <div class="detail-item"><span class="detail-label">ملاحظات:</span> <span>${t.notes || '-'}</span></div>
-          </div>
-          <div class="signatures">
-            <div><p>${settings.signatureNames.keeper}</p><div class="sig-line"></div></div>
-            <div><p>${settings.signatureNames.accountant}</p><div class="sig-line"></div></div>
-            <div><p>${settings.signatureNames.manager}</p><div class="sig-line"></div></div>
-          </div>
-          <script>setTimeout(() => { window.print(); window.close(); }, 500);</script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+        </div>
+        <div class="voucher-title">سند ${t.type === 'in' ? 'توريد' : t.type === 'transfer' ? 'تحويل' : t.type === 'return' ? 'مرتجع' : 'صرف'} مخزني</div>
+        <div class="details-grid">
+          <div class="detail-item"><span class="detail-label">رقم الحركة:</span> <span>${t.id.slice(-6).toUpperCase()}</span></div>
+          <div class="detail-item"><span class="detail-label">تاريخ الحركة:</span> <span>${new Date(t.date).toLocaleDateString('ar-EG')}</span></div>
+          <div class="detail-item"><span class="detail-label">اسم المادة:</span> <span>${t.materialName}</span></div>
+          <div class="detail-item"><span class="detail-label">الباركود:</span> <span>${t.barcode}</span></div>
+          <div class="detail-item"><span class="detail-label">باركود الصنف/القصة:</span> <span>${t.itemBarcode || '-'}</span></div>
+          <div class="detail-item"><span class="detail-label">اللون:</span> <span>${t.color || '-'}</span></div>
+          <div class="detail-item"><span class="detail-label">الكمية:</span> <strong>${t.quantity} ${t.unit}</strong></div>
+          <div class="detail-item"><span class="detail-label">${t.type === 'in' ? 'المورد:' : 'المستلم:'}</span> <span>${t.recipient}</span></div>
+          <div class="detail-item"><span class="detail-label">ملاحظات:</span> <span>${t.notes || '-'}</span></div>
+        </div>
+        <div class="signatures">
+          <div><p>${settings.signatureNames.keeper}</p><div class="sig-line"></div></div>
+          <div><p>${settings.signatureNames.accountant}</p><div class="sig-line"></div></div>
+          <div><p>${settings.signatureNames.manager}</p><div class="sig-line"></div></div>
+        </div>
+      </div>
+    `;
+    triggerPrint(html);
   };
   
   return (

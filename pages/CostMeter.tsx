@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Material, CostCalculation, CostPart, User, CostTemplate, CostTemplatePart } from '@/types';
+import { Material, CostCalculation, CostPart, User, CostTemplate, CostTemplatePart, SettingsData } from '@/types';
+import { usePrint } from '@/services/PrintContext';
 import { 
   Calculator, History, Plus, Trash2, Save, Search, 
   Printer, Download, ChevronUp, ChevronDown, CheckCircle2,
@@ -13,9 +14,11 @@ import { exportToExcel } from '@/utils/excelExport';
 interface CostMeterProps {
   materials: Material[];
   user: User;
+  settings?: SettingsData;
 }
 
-const CostMeter: React.FC<CostMeterProps> = ({ materials, user }) => {
+const CostMeter: React.FC<CostMeterProps> = ({ materials, user, settings }) => {
+  const { triggerPrint } = usePrint();
   // --- Calculator State ---
   const [calcTitle, setCalcTitle] = useState('');
   const [calcDescription, setCalcDescription] = useState('');
@@ -164,7 +167,55 @@ const CostMeter: React.FC<CostMeterProps> = ({ materials, user }) => {
   };
 
   const handlePrintArchive = () => {
-    window.print();
+    const tableContent = filteredArchive.map(c => `
+      <tr>
+        <td>${c.title}</td>
+        <td>${new Date(c.date).toLocaleString('ar-EG')}</td>
+        <td>${c.materialName}</td>
+        <td>${c.measurement || ''}</td>
+        <td>${c.pieceCount}</td>
+        <td>${c.totalCost.toFixed(2)}</td>
+      </tr>
+    `).join('');
+
+    const html = `
+      <div class="print-container">
+        <style>
+          .print-container { font-family: 'Cairo', sans-serif; direction: rtl; padding: 20px; background: white; color: black; }
+          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ccc; padding-bottom: 10px; margin-bottom: 20px; }
+          .header img { max-width: 80px; max-height: 80px; }
+          .company-info { text-align: right; }
+          .report-title { text-align: center; margin-bottom: 20px; font-size: 1.5em; }
+          table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
+          th { background-color: #f2f2f2; }
+        </style>
+        <div class="header">
+          ${settings?.companyLogo ? `<img src="${settings.companyLogo}" alt="Logo">` : '<div></div>'}
+          <div class="company-info">
+            <h2>${settings?.companyName || ''}</h2>
+            <p>${settings?.companyAddress || ''}</p>
+          </div>
+        </div>
+        <h2 class="report-title">أرشيف حاسبة الكلف بالمتر</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>العنوان</th>
+              <th>التاريخ</th>
+              <th>المادة</th>
+              <th>القياس</th>
+              <th>العدد</th>
+              <th>التكلفة الإجمالية</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableContent}
+          </tbody>
+        </table>
+      </div>
+    `;
+    triggerPrint(html);
   };
 
   return (
