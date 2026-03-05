@@ -753,7 +753,14 @@ export const importAllData = (data: any): void => {
         return;
     }
     
-    if (actualData.settings) saveToStorage(SETTINGS_KEY, actualData.settings, false);
+    if (actualData.settings) {
+        const currentSettings = getSettings();
+        const mergedSettings = {
+            ...actualData.settings,
+            githubToken: currentSettings.githubToken // Always preserve local token as it's never exported to Gist
+        };
+        saveToStorage(SETTINGS_KEY, mergedSettings, false);
+    }
     if (actualData.materials) saveToStorage(MATERIALS_KEY, actualData.materials, false);
     if (actualData.transactions) saveToStorage(TRANSACTIONS_KEY, actualData.transactions, false);
     if (actualData.costCalculations) saveToStorage(COST_CALCULATIONS_KEY, actualData.costCalculations, false);
