@@ -34,13 +34,18 @@
 
 /* Print Styles */
 @media print {
+  html, body {
+    height: auto !important;
+    overflow: visible !important;
+  }
+  
   body * {
     visibility: hidden;
   }
-  #print-section, #print-section * {
-    visibility: visible;
-  }
+  
   #print-section {
+    visibility: visible;
+    display: block !important;
     position: absolute;
     left: 0;
     top: 0;
@@ -49,7 +54,13 @@
     padding: 0;
     background: white !important;
     color: black !important;
+    z-index: 9999;
   }
+  
+  #print-section * {
+    visibility: visible;
+  }
+  
   /* Hide UI elements during print */
   .no-print {
     display: none !important;

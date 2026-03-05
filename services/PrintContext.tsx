@@ -17,8 +17,9 @@ export const PrintProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     // Give it a moment to render then print
     setTimeout(() => {
       window.print();
-      setPrintContent(null);
-    }, 300);
+      // Clear content after a longer delay to ensure print dialog is handled
+      setTimeout(() => setPrintContent(null), 1000);
+    }, 500);
   };
 
   return (
