@@ -596,8 +596,8 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
                         <td className="px-6 py-4 font-mono text-xs text-blue-500 font-bold">{transaction.itemBarcode || '-'}</td>
                         <td className="px-6 py-4 text-xs">{transaction.category}</td>
                         <td className="px-6 py-4 text-xs">{transaction.supplier}</td>
-                        <td className={`px-6 py-4 font-black ${transaction.type === 'in' ? 'text-emerald-500' : 'text-red-500'}`}>
-                            {transaction.type === 'in' ? '+' : '-'}{transaction.quantity.toLocaleString('ar-EG')} {transaction.unit}
+                        <td className={`px-6 py-4 font-black ${(transaction.type === 'in' || transaction.type === 'return_in') ? 'text-emerald-500' : 'text-red-500'}`}>
+                            {(transaction.type === 'in' || transaction.type === 'return_in') ? '+' : '-'}{transaction.quantity.toLocaleString('ar-EG')} {transaction.unit}
                         </td>
                         <td className="px-6 py-4 text-sm font-medium">{transaction.recipient}</td>
                     </tr>

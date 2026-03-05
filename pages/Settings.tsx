@@ -205,9 +205,26 @@ const Settings: React.FC<SettingsProps> = ({ onDataChange, user }) => {
                 <>
                     {/* Company Info */}
                     <div className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-                        <h2 className="text-xl font-semibold mb-4">معلومات الشركة</h2>
-                        <div className="space-y-4">
-                            <InputField label="اسم الشركة" name="companyName" value={settings.companyName} onChange={handleSettingsChange} />
+                        <h2 className="text-xl font-semibold mb-4">معلومات الشركة والمظهر</h2>
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <InputField label="اسم الشركة" name="companyName" value={settings.companyName} onChange={handleSettingsChange} />
+                                <div>
+                                    <label className="block mb-1 font-medium">ثيم الموقع (الألوان)</label>
+                                    <select 
+                                        name="theme" 
+                                        value={settings.theme || 'default'} 
+                                        onChange={(e) => setSettings(prev => prev ? { ...prev, theme: e.target.value as any } : null)}
+                                        className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                    >
+                                        <option value="default">الافتراضي (سماوي)</option>
+                                        <option value="emerald">الزمردي (أخضر)</option>
+                                        <option value="rose">الياقوتي (أحمر)</option>
+                                        <option value="amber">الكهرماني (برتقالي)</option>
+                                        <option value="violet">البنفسجي</option>
+                                    </select>
+                                </div>
+                            </div>
                             <div>
                                 <label className="block mb-1 font-medium">عنوان الشركة</label>
                                 <textarea name="companyAddress" value={settings.companyAddress} onChange={handleSettingsChange} rows={3} className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" />

@@ -516,7 +516,7 @@ export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'materi
     // Calculate new stock based on type
     const updatedMaterial = { ...material, stocks: { ...material.stocks } };
 
-    if (transactionData.type === 'in') {
+    if (transactionData.type === 'in' || transactionData.type === 'return_in') {
         updatedMaterial.stocks[warehouseId] = currentWarehouseStock + transactionData.quantity;
     } else if (transactionData.type === 'out' || transactionData.type === 'return') {
         updatedMaterial.stocks[warehouseId] = currentWarehouseStock - transactionData.quantity;

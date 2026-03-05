@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Transaction, Material, SettingsData, User, Warehouse } from '@/types';
 import { addTransaction, deleteTransaction, updateTransaction, getSettings } from '@/services/mockApi';
 import { usePrint } from '@/services/PrintContext';
-import { Plus, ArrowDownLeft, ArrowUpRight, Calendar, Info, Search, Edit, Trash2, Printer } from 'lucide-react';
+import { Plus, ArrowDownLeft, ArrowUpRight, Calendar, Info, Search, Edit, Trash2, Printer, RotateCcw } from 'lucide-react';
 
 interface TransactionsProps {
   transactions: Transaction[];
@@ -27,7 +27,11 @@ const TransactionModal: React.FC<{
     );
     
     const [materialId, setMaterialId] = useState(editTransaction?.materialId || filteredMaterials[0]?.id || '');
-    const [type, setType] = useState<'out' | 'transfer'>(editTransaction?.type === 'transfer' ? 'transfer' : 'out');
+    const [type, setType] = useState<'out' | 'transfer' | 'return' | 'return_in'>(
+        editTransaction?.type === 'transfer' ? 'transfer' : 
+        editTransaction?.type === 'return' ? 'return' : 
+        editTransaction?.type === 'return_in' ? 'return_in' : 'out'
+    );
     const [warehouseId, setWarehouseId] = useState(editTransaction?.warehouseId || (warehouses.length > 0 ? warehouses[0].id : ''));
     const [toWarehouseId, setToWarehouseId] = useState(editTransaction?.toWarehouseId || '');
     const [quantity, setQuantity] = useState(editTransaction?.quantity || 1);
@@ -55,12 +59,12 @@ const TransactionModal: React.FC<{
         
         const currentStock = selectedMaterial.stocks?.[warehouseId] || 0;
 
-        if (!editTransaction && currentStock < quantity) {
-             setError(`الكمية المسحوبة أكبر من المتاح في المستودع المحدد (${currentStock}).`); return; 
+        if (!editTransaction && (type === 'out' || type === 'transfer' || type === 'return') && currentStock < quantity) {
+             setError(`الكمية المطلوبة أكبر من المتاح في المستودع المحدد (${currentStock}).`); return; 
         }
         
         const payload = { 
-            type: editTransaction ? editTransaction.type : type, 
+            type: type, 
             materialId, 
             warehouseId,
             toWarehouseId: type === 'transfer' ? toWarehouseId : undefined,
@@ -80,41 +84,51 @@ const TransactionModal: React.FC<{
     };
 
     return (
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-lg border dark:border-gray-700">
-            <h2 className="text-xl font-bold mb-4 flex items-center text-gray-900 dark:text-white">
-                {editTransaction ? <Edit className="ml-2 text-blue-500" /> : <ArrowDownLeft className="ml-2 text-red-500" />}
-                {editTransaction ? 'تعديل الحركة' : 'إضافة حركة جديدة'}
-            </h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {!editTransaction && (
-                        <div className="md:col-span-2">
-                            <label className="block mb-1 text-sm font-medium dark:text-gray-200">نوع الحركة</label>
-                            <div className="flex gap-4">
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input type="radio" name="type" value="out" checked={type === 'out'} onChange={() => setType('out')} className="text-sky-500 focus:ring-sky-500" />
-                                    <span className="dark:text-gray-300">صرف (صادر)</span>
-                                </label>
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input type="radio" name="type" value="transfer" checked={type === 'transfer'} onChange={() => setType('transfer')} className="text-sky-500 focus:ring-sky-500" />
-                                    <span className="dark:text-gray-300">تحويل بين المستودعات</span>
-                                </label>
-                            </div>
-                        </div>
-                    )}
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-center items-center p-4 overflow-y-auto">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-2xl border dark:border-gray-700 my-auto">
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold flex items-center text-gray-900 dark:text-white">
+                    {editTransaction ? <Edit className="ml-2 text-blue-500" /> : <Plus className="ml-2 text-sky-500" />}
+                    {editTransaction ? 'تعديل الحركة' : 'إضافة حركة جديدة'}
+                </h2>
+                <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                    <Trash2 size={20} />
+                </button>
+            </div>
 
+            <form onSubmit={handleSubmit} className="space-y-5">
+                {!editTransaction && (
+                    <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg border dark:border-gray-700">
+                        <label className="block mb-2 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">نوع الحركة</label>
+                        <div className="flex gap-6">
+                            <label className="flex items-center gap-2 cursor-pointer group">
+                                <input type="radio" name="type" value="out" checked={type === 'out'} onChange={() => setType('out')} className="w-4 h-4 text-sky-600 focus:ring-sky-500" />
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-sky-600 transition-colors">صرف (صادر)</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer group">
+                                <input type="radio" name="type" value="return_in" checked={type === 'return_in'} onChange={() => setType('return_in')} className="w-4 h-4 text-amber-600 focus:ring-amber-500" />
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-amber-600 transition-colors">إرجاع من مستلم</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer group">
+                                <input type="radio" name="type" value="transfer" checked={type === 'transfer'} onChange={() => setType('transfer')} className="w-4 h-4 text-blue-600 focus:ring-blue-500" />
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-blue-600 transition-colors">تحويل بين المستودعات</span>
+                            </label>
+                        </div>
+                    </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                     <div className="md:col-span-2 space-y-2">
-                        <label className="block mb-1 text-sm font-medium dark:text-gray-200">اختر المادة</label>
+                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">المادة</label>
                         <div className="flex gap-2">
-                            <div className="relative flex-1">
-                                <Search className="absolute right-2 top-2.5 text-gray-400" size={16} />
+                            <div className="relative flex-[1]">
+                                <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                                 <input 
                                     type="text" 
-                                    placeholder="ابحث..." 
+                                    placeholder="بحث..." 
                                     value={searchTerm} 
                                     onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="w-full p-2 pr-9 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm"
+                                    className="w-full p-2.5 pr-10 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm focus:ring-2 focus:ring-sky-500 outline-none"
                                     disabled={!!editTransaction}
                                 />
                             </div>
@@ -123,10 +137,10 @@ const TransactionModal: React.FC<{
                                 onChange={(e) => setMaterialId(e.target.value)} 
                                 required 
                                 disabled={!!editTransaction}
-                                className="flex-[1.5] p-2 border rounded bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 text-sm"
+                                className="flex-[2] p-2.5 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm"
                             >
                                 {filteredMaterials.length > 0 ? (
-                                    filteredMaterials.map(m => <option key={m.id} value={m.id}>{m.name} (الإجمالي: {m.currentStock} {m.unit})</option>)
+                                    filteredMaterials.map(m => <option key={m.id} value={m.id}>{m.name} (المتاح: {m.currentStock} {m.unit})</option>)
                                 ) : (
                                     <option value="">لا توجد نتائج</option>
                                 )}
@@ -134,87 +148,97 @@ const TransactionModal: React.FC<{
                         </div>
                     </div>
 
-                    <div>
-                        <label className="block mb-1 text-sm font-medium dark:text-gray-200">
-                            {type === 'transfer' ? 'من مستودع' : 'المستودع'}
-                        </label>
-                        <select 
-                            value={warehouseId} 
-                            onChange={(e) => setWarehouseId(e.target.value)} 
-                            required 
-                            disabled={!!editTransaction}
-                            className="w-full p-2 border rounded bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 text-sm"
-                        >
-                            {warehouses.map(w => (
-                                <option key={w.id} value={w.id}>{w.name} (المتاح: {selectedMaterial?.stocks?.[w.id] || 0})</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {type === 'transfer' && (
+                    <div className="md:col-span-2 grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block mb-1 text-sm font-medium dark:text-gray-200">إلى مستودع</label>
+                            <label className="block mb-1.5 text-sm font-bold text-gray-700 dark:text-gray-300">
+                                {type === 'transfer' ? 'من مستودع' : 'المستودع'}
+                            </label>
                             <select 
-                                value={toWarehouseId} 
-                                onChange={(e) => setToWarehouseId(e.target.value)} 
+                                value={warehouseId} 
+                                onChange={(e) => setWarehouseId(e.target.value)} 
                                 required 
                                 disabled={!!editTransaction}
-                                className="w-full p-2 border rounded bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 text-sm"
+                                className="w-full p-2.5 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm"
                             >
-                                <option value="">اختر المستودع...</option>
-                                {warehouses.filter(w => w.id !== warehouseId).map(w => (
-                                    <option key={w.id} value={w.id}>{w.name}</option>
+                                {warehouses.map(w => (
+                                    <option key={w.id} value={w.id}>{w.name} (المتاح: {selectedMaterial?.stocks?.[w.id] || 0})</option>
                                 ))}
                             </select>
                         </div>
-                    )}
 
-                    <div className="md:col-span-2 bg-sky-50 dark:bg-sky-900/40 p-3 rounded-lg flex flex-wrap gap-4 text-[10px] md:text-xs text-sky-800 dark:text-sky-200 border dark:border-sky-800">
-                        <div className="flex items-center"><Info size={14} className="ml-1"/> <strong>المورد:</strong> {selectedMaterial?.supplier || '-'}</div>
-                        <div className="flex items-center"><Info size={14} className="ml-1"/> <strong>الباركود:</strong> {selectedMaterial?.barcode || '-'}</div>
-                        <div className="flex items-center"><Info size={14} className="ml-1"/> <strong>الفئة:</strong> {selectedMaterial?.category || '-'}</div>
+                        {type === 'transfer' ? (
+                            <div>
+                                <label className="block mb-1.5 text-sm font-bold text-gray-700 dark:text-gray-300">إلى مستودع</label>
+                                <select 
+                                    value={toWarehouseId} 
+                                    onChange={(e) => setToWarehouseId(e.target.value)} 
+                                    required 
+                                    disabled={!!editTransaction}
+                                    className="w-full p-2.5 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm"
+                                >
+                                    <option value="">اختر المستودع...</option>
+                                    {warehouses.filter(w => w.id !== warehouseId).map(w => (
+                                        <option key={w.id} value={w.id}>{w.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        ) : (
+                            <div className="flex items-end">
+                                <div className="w-full bg-sky-50 dark:bg-sky-900/30 p-2.5 rounded-lg border border-sky-100 dark:border-sky-800 text-[10px] text-sky-700 dark:text-sky-300 grid grid-cols-2 gap-1">
+                                    <div><strong>المورد:</strong> {selectedMaterial?.supplier || '-'}</div>
+                                    <div><strong>الباركود:</strong> {selectedMaterial?.barcode || '-'}</div>
+                                    <div className="col-span-2"><strong>الفئة:</strong> {selectedMaterial?.category || '-'}</div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
-                    <div>
-                        <label className="block mb-1 text-sm font-medium dark:text-gray-200">الكمية</label>
-                        <input type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} min="1" required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-                    </div>
-
-                    <div>
-                        <label className="block mb-1 text-sm font-medium dark:text-gray-200">اللون</label>
-                        <input type="text" value={color} onChange={(e) => setColor(e.target.value)} placeholder="اللون..." className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-                    </div>
-
-                    <div>
-                        <label className="block mb-1 text-sm font-medium dark:text-gray-200">اسم المستلم / الجهة</label>
-                        <input type="text" value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder={type === 'transfer' ? 'سبب التحويل' : 'الجهة أو الشخص'} required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-                    </div>
-
-                    <div>
-                        <label className="block mb-1 text-sm font-medium dark:text-gray-200">باركود الصنف / القصة</label>
-                        <input type="text" value={itemBarcode} onChange={(e) => setItemBarcode(e.target.value)} placeholder="باركود الصنف المراد تسليمه" className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-                    </div>
-
-                    <div>
-                        <label className="block mb-1 text-sm font-medium dark:text-gray-200">تاريخ الحركة</label>
-                        <div className="relative">
-                            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required className="w-full p-2 pr-10 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-                            <Calendar className="absolute left-3 top-2.5 text-gray-400" size={18} />
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block mb-1.5 text-sm font-bold text-gray-700 dark:text-gray-300">الكمية</label>
+                            <input type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} min="1" required className="w-full p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm" />
+                        </div>
+                        <div>
+                            <label className="block mb-1.5 text-sm font-bold text-gray-700 dark:text-gray-300">اللون</label>
+                            <input type="text" value={color} onChange={(e) => setColor(e.target.value)} placeholder="اللون..." className="w-full p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm" />
                         </div>
                     </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block mb-1.5 text-sm font-bold text-gray-700 dark:text-gray-300">
+                                {type === 'return' ? 'الجهة المرجعة' : type === 'transfer' ? 'سبب التحويل' : 'اسم المستلم / الجهة'}
+                            </label>
+                            <input type="text" value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder="الجهة أو الشخص" required className="w-full p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm" />
+                        </div>
+                        <div>
+                            <label className="block mb-1.5 text-sm font-bold text-gray-700 dark:text-gray-300">باركود الصنف / القصة</label>
+                            <input type="text" value={itemBarcode} onChange={(e) => setItemBarcode(e.target.value)} placeholder="باركود الصنف" className="w-full p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm" />
+                        </div>
+                    </div>
+
+                    <div className="md:col-span-2">
+                        <label className="block mb-1.5 text-sm font-bold text-gray-700 dark:text-gray-300">تاريخ الحركة</label>
+                        <div className="relative">
+                            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required className="w-full p-2.5 pr-10 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm" />
+                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                        </div>
+                    </div>
+
+                    <div className="md:col-span-2">
+                        <label className="block mb-1.5 text-sm font-bold text-gray-700 dark:text-gray-300">ملاحظات</label>
+                        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="تفاصيل إضافية..." className="w-full p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm" rows={2}></textarea>
+                    </div>
                 </div>
 
-                <div>
-                    <label className="block mb-1 text-sm font-medium dark:text-gray-200">ملاحظات</label>
-                    <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="تفاصيل إضافية..." className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" rows={2}></textarea>
-                </div>
+                {error && <div className="p-3 text-sm text-red-600 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-800 flex items-center gap-2">
+                    <Info size={16} /> {error}
+                </div>}
 
-                {error && <div className="p-2 text-sm text-red-600 bg-red-100 dark:bg-red-900/30 rounded border border-red-200 dark:border-red-800">{error}</div>}
-
-                <div className="flex justify-end space-x-2 space-x-reverse pt-2">
-                    <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 dark:bg-gray-600 dark:text-white rounded hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors">إلغاء</button>
-                    <button type="submit" className="px-6 py-2 bg-sky-600 text-white rounded shadow hover:bg-sky-700 transition-colors">
-                        {editTransaction ? 'تحديث' : 'حفظ'}
+                <div className="flex justify-end gap-3 pt-4 border-t dark:border-gray-700">
+                    <button type="button" onClick={onClose} className="px-6 py-2.5 text-sm font-bold text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">إلغاء</button>
+                    <button type="submit" className="px-8 py-2.5 bg-sky-600 text-white text-sm font-bold rounded-lg shadow-lg hover:bg-sky-700 hover:shadow-sky-500/20 transition-all">
+                        {editTransaction ? 'تحديث البيانات' : 'حفظ الحركة'}
                     </button>
                 </div>
             </form>
@@ -233,6 +257,19 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, wa
 
   const canPrint = user.role === 'admin' || user.permissions?.canPrint;
   const isAdmin = user.role === 'admin';
+
+  const handleReturnAction = (t: Transaction) => {
+      // Create a new transaction based on the old one but with 'return_in' type
+      const returnData = {
+          ...t,
+          id: undefined, // New ID will be generated
+          type: 'return_in',
+          date: new Date().toISOString(),
+          notes: `مرتجع من الحركة رقم: ${t.id.slice(-6).toUpperCase()}`
+      };
+      setEditingTransaction(returnData as any);
+      setIsModalOpen(true);
+  };
 
   const filteredTransactions = useMemo(() => {
       let result = [...transactions];
@@ -364,13 +401,17 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, wa
                         <span className="flex items-center text-emerald-600 dark:text-emerald-400 font-bold text-xs bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded">
                             <ArrowUpRight size={14} className="ml-1"/> وارد
                         </span>
+                    ) : transaction.type === 'return_in' ? (
+                        <span className="flex items-center text-emerald-600 dark:text-emerald-400 font-bold text-xs bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded">
+                            <RotateCcw size={14} className="ml-1"/> مرتجع من مستلم
+                        </span>
                     ) : transaction.type === 'transfer' ? (
                         <span className="flex items-center text-blue-600 dark:text-blue-400 font-bold text-xs bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">
                             <ArrowDownLeft size={14} className="ml-1"/> تحويل
                         </span>
                     ) : transaction.type === 'return' ? (
                         <span className="flex items-center text-amber-600 dark:text-amber-400 font-bold text-xs bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded">
-                            <ArrowUpRight size={14} className="ml-1"/> مرتجع
+                            <ArrowDownLeft size={14} className="ml-1"/> مرتجع لمورد
                         </span>
                     ) : (
                         <span className="flex items-center text-red-600 dark:text-red-400 font-bold text-xs bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded">
@@ -402,6 +443,11 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, wa
                     {canPrint && <button onClick={() => handlePrintVoucher(transaction)} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" title="طباعة سند"><Printer size={18}/></button>}
                     {isAdmin && (
                         <>
+                            {transaction.type === 'out' && (
+                                <button onClick={() => handleReturnAction(transaction)} className="text-amber-500 hover:text-amber-700" title="إرجاع للمستودع">
+                                    <RotateCcw size={18}/>
+                                </button>
+                            )}
                             <button onClick={() => { setEditingTransaction(transaction); setIsModalOpen(true); }} className="text-blue-500 hover:text-blue-700" title="تعديل"><Edit size={18}/></button>
                             <button onClick={() => setDeleteConfirm(transaction.id)} className="text-red-500 hover:text-red-700" title="حذف"><Trash2 size={18}/></button>
                         </>

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Login from '@/pages/Login';
 import MainLayout from '@/components/layout/MainLayout';
-import { getCurrentUser, initializeDataSource } from '@/services/mockApi';
+import { getCurrentUser, initializeDataSource, getSettings } from '@/services/mockApi';
 import { usePrint } from '@/services/PrintContext';
 import { User } from '@/types';
 
@@ -41,6 +41,15 @@ function App() {
     };
     initApp();
   }, []);
+
+  useEffect(() => {
+    const settings = getSettings();
+    if (settings?.theme) {
+      document.documentElement.setAttribute('data-theme', settings.theme);
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+  }, [user, successMessage]); // Re-apply when user changes or data is synced
 
   useEffect(() => {
     if (darkMode) {

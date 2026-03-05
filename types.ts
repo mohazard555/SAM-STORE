@@ -29,7 +29,7 @@ export interface Material {
 
 export interface Transaction {
   id: string;
-  type: 'in' | 'out' | 'return' | 'transfer'; // Added 'transfer'
+  type: 'in' | 'out' | 'return' | 'transfer' | 'return_in';
   materialId: string;
   materialName: string;
   materialType: string;
@@ -75,10 +75,13 @@ export type Page =
   | 'warehouses'
   | 'quick-look';
 
+export type ThemeType = 'default' | 'emerald' | 'rose' | 'amber' | 'violet';
+
 export interface SettingsData {
   companyName: string;
   companyAddress: string;
   companyLogo: string;
+  theme?: ThemeType;
   signatureNames: {
     keeper: string;
     accountant: string;
