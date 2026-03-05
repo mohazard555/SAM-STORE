@@ -4,21 +4,26 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "tsx server.ts",
     "build": "vite build",
     "lint": "tsc --noEmit",
     "preview": "vite preview"
   },
   "dependencies": {
+    "express": "^5.2.1",
     "lucide-react": "^0.552.0",
     "motion": "^12.34.4",
+    "node-fetch": "^2.7.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "recharts": "^3.3.0",
+    "tsx": "^4.21.0",
     "xlsx": "latest"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
     "@types/node": "^22.14.0",
+    "@types/node-fetch": "^2.6.13",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.0.0",

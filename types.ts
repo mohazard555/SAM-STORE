@@ -85,7 +85,6 @@ export interface SettingsData {
     manager: string;
   };
   gistUrl?: string;
-  githubToken?: string;
 }
 
 export interface CostPart {

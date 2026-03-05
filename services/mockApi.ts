@@ -127,7 +127,6 @@ const initializeData = () => {
             companyLogo: defaultLogoSvg,
             signatureNames: { keeper: 'أمين المستودع', accountant: 'المحاسب', manager: 'المدير العام' },
             gistUrl: 'https://gist.githubusercontent.com/mohazard555/6da370385392ac7cd27e034efe4b7d7c/raw/amenstor.json',
-            githubToken: '',
         };
         saveToStorage(SETTINGS_KEY, initialSettings, false);
     }
@@ -141,9 +140,8 @@ let syncTimeout: NodeJS.Timeout | null = null;
 
 export const syncDataToGist = async (): Promise<boolean> => {
     const settings = getSettings();
-    const token = settings.githubToken ? settings.githubToken.trim() : '';
-    if (!settings.gistUrl || !token) {
-        updateSyncStatus({ state: 'error', error: 'إعدادات Gist غير مكتملة (الرابط أو التوكن مفقود).' });
+    if (!settings.gistUrl) {
+        updateSyncStatus({ state: 'error', error: 'إعدادات Gist غير مكتملة (الرابط مفقود).' });
         return false;
     }
     
@@ -165,13 +163,8 @@ export const syncDataToGist = async (): Promise<boolean> => {
     const allData = exportAllData();
     
     try {
-        // 1. Get Gist info to find the correct filename
-        const getResponse = await fetch(`https://api.github.com/gists/${gistId}`, {
-            headers: { 
-                'Authorization': `Bearer ${token}`, 
-                'Accept': 'application/vnd.github.v3+json' 
-            }
-        });
+        // 1. Get Gist info to find the correct filename via Proxy
+        const getResponse = await fetch(`/api/sync?gistId=${gistId}`);
         
         let filename = settings.gistUrl.split('/').pop() || 'warehouse-data.json';
         if (filename.includes('?')) filename = filename.split('?')[0];
@@ -184,16 +177,14 @@ export const syncDataToGist = async (): Promise<boolean> => {
             }
         } else {
             const errData = await getResponse.json().catch(() => ({}));
-            const errorMsg = `GitHub Error (${getResponse.status}): ${errData.message || getResponse.statusText}`;
+            const errorMsg = `Proxy Error (${getResponse.status}): ${errData.message || getResponse.statusText}`;
             throw new Error(errorMsg);
         }
 
-        // 2. Perform the update
-        const response = await fetch(`https://api.github.com/gists/${gistId}`, {
-            method: 'PATCH',
+        // 2. Perform the update via Proxy
+        const response = await fetch(`/api/sync?gistId=${gistId}`, {
+            method: 'POST',
             headers: { 
-                'Authorization': `Bearer ${token}`, 
-                'Accept': 'application/vnd.github.v3+json', 
                 'Content-Type': 'application/json' 
             },
             body: JSON.stringify({ 
@@ -218,14 +209,14 @@ export const syncDataToGist = async (): Promise<boolean> => {
             return true;
         } else {
             const errData = await response.json().catch(() => ({}));
-            const errorMsg = `GitHub Error (${response.status}): ${errData.message || response.statusText}`;
+            const errorMsg = `Proxy Error (${response.status}): ${errData.message || response.statusText}`;
             throw new Error(errorMsg);
         }
     } catch (error: any) { 
         console.error("Gist sync error:", error); 
-        let errorMsg = error.message || 'حدث خطأ أثناء المزامنة.';
+        let errorMsg = error.message || 'حدث خطأ أثناء المزامنة عبر البروكسي.';
         if (errorMsg.includes('NetworkError') || errorMsg.includes('Failed to fetch')) {
-            errorMsg = 'فشل الاتصال بخوادم GitHub. يرجى التأكد من اتصالك بالإنترنت أو التحقق من صحة التوكن (قد يسبب التوكن الخاطئ مشكلة CORS).';
+            errorMsg = 'فشل الاتصال بالخادم المحلي. يرجى التأكد من تشغيل الخادم.';
         }
         updateSyncStatus({ state: 'error', error: errorMsg });
         isSyncing = false;
@@ -253,7 +244,7 @@ export const initializeDataSource = async (overrideUrl?: string): Promise<{ succ
     const timeoutId = setTimeout(() => controller.abort(), 20000); // Increased to 20 seconds timeout
 
     try {
-        if (hasUnsyncedChanges() && settings.githubToken) {
+        if (hasUnsyncedChanges()) {
             const success = await syncDataToGist();
             if (success) {
                 return { success: true, message: 'تم اكتشاف تغييرات محلية ومزامنتها بنجاح.' };
@@ -267,10 +258,9 @@ export const initializeDataSource = async (overrideUrl?: string): Promise<{ succ
         
         if (gistId) {
             try {
-                const apiResponse = await fetch(`https://api.github.com/gists/${gistId}`, { 
+                const apiResponse = await fetch(`/api/sync?gistId=${gistId}`, { 
                     cache: 'no-store',
-                    signal: controller.signal,
-                    headers: settings.githubToken ? { 'Authorization': `token ${settings.githubToken}` } : {}
+                    signal: controller.signal
                 });
                 if (apiResponse.ok) {
                     const gistData = await apiResponse.json();
@@ -318,11 +308,8 @@ export const initializeDataSource = async (overrideUrl?: string): Promise<{ succ
             return { success: true, message: 'الاتصال ضعيف، يتم استخدام البيانات المحلية حالياً.' };
         }
         if (!dataText || dataText.trim() === '' || dataText.trim() === '{}' || dataText.trim() === '[]') {
-            if (settings.githubToken) {
-                syncDataToGist();
-                return { success: true, message: 'Gist was empty. Local data has been queued for sync.' };
-            }
-            return { success: true, message: 'Gist is empty. Sync will start on next change.' };
+            syncDataToGist();
+            return { success: true, message: 'Gist was empty. Local data has been queued for sync.' };
         }
         
         try {
@@ -614,8 +601,7 @@ export const getSettings = (): SettingsData => {
         companyAddress: '', 
         companyLogo: '', 
         signatureNames: { keeper: '', accountant: '', manager: '' }, 
-        gistUrl: defaultGistUrl, 
-        githubToken: '' 
+        gistUrl: defaultGistUrl
     });
     
     // If gistUrl is empty in storage, use the default one
@@ -688,13 +674,8 @@ export const deleteCostTemplate = (id: string): void => {
 };
 
 export const exportAllData = (): AllData => {
-    const settings = getSettings();
-    // CRITICAL: Never export the GitHub token to the Gist.
-    // If GitHub sees a valid token in a public Gist, it will immediately revoke it.
-    const safeSettings = { ...settings, githubToken: '' };
-    
     return { 
-        settings: safeSettings, 
+        settings: getSettings(), 
         materials: getMaterials(), 
         transactions: getTransactions(), 
         users: getUsers(), // Include passwords for full sync across devices
