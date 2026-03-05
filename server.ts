@@ -13,19 +13,32 @@ async function startServer() {
     const { gistId } = req.query;
     const token = process.env.GITHUB_TOKEN;
 
-    if (!token) {
-      return res.status(500).json({ message: "GITHUB_TOKEN not configured." });
+    if (!token || token.trim() === "") {
+      return res.status(500).json({ 
+        message: "GITHUB_TOKEN is missing or empty in environment variables. Please add it to the platform settings." 
+      });
     }
 
     try {
       const response = await fetch(`https://api.github.com/gists/${gistId}`, {
         headers: { 
-          'Authorization': `token ${token}`, 
-          'Accept': 'application/vnd.github.v3+json' 
+          'Authorization': `Bearer ${token.trim()}`, 
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'Warehouse-App-Proxy'
         }
       });
+      
       const data = await response.json();
-      res.status(response.status).json(data);
+      
+      if (!response.ok) {
+        return res.status(response.status).json({
+          message: data.message || "GitHub API Error",
+          status: response.status,
+          hint: response.status === 404 ? "Gist not found. Check if Gist ID is correct and token has 'gist' scope." : undefined
+        });
+      }
+      
+      res.status(200).json(data);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -37,9 +50,9 @@ async function startServer() {
     const body = req.body;
     const token = process.env.GITHUB_TOKEN;
 
-    if (!token) {
+    if (!token || token.trim() === "") {
       return res.status(500).json({ 
-        message: "GITHUB_TOKEN is not configured in environment variables." 
+        message: "GITHUB_TOKEN is missing or empty in environment variables." 
       });
     }
 
@@ -53,9 +66,10 @@ async function startServer() {
       const response = await fetch(`https://api.github.com/gists/${gistId}`, {
         method: 'PATCH',
         headers: { 
-          'Authorization': `token ${token}`, 
+          'Authorization': `Bearer ${token.trim()}`, 
           'Accept': 'application/vnd.github.v3+json', 
-          'Content-Type': 'application/json' 
+          'Content-Type': 'application/json',
+          'User-Agent': 'Warehouse-App-Proxy'
         },
         body: JSON.stringify(body),
       });
@@ -67,7 +81,8 @@ async function startServer() {
       } else {
         res.status(response.status).json({
           message: data.message || "GitHub API error",
-          status: response.status
+          status: response.status,
+          hint: response.status === 404 ? "Gist not found or token lacks permissions." : undefined
         });
       }
     } catch (error: any) {
