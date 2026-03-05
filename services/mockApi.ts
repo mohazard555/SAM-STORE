@@ -688,8 +688,13 @@ export const deleteCostTemplate = (id: string): void => {
 };
 
 export const exportAllData = (): AllData => {
+    const settings = getSettings();
+    // CRITICAL: Never export the GitHub token to the Gist.
+    // If GitHub sees a valid token in a public Gist, it will immediately revoke it.
+    const safeSettings = { ...settings, githubToken: '' };
+    
     return { 
-        settings: getSettings(), 
+        settings: safeSettings, 
         materials: getMaterials(), 
         transactions: getTransactions(), 
         users: getUsers(), // Include passwords for full sync across devices
