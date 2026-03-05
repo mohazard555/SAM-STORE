@@ -372,7 +372,16 @@ export const updateUser = (updatedUser: User): User => {
     let users = getUsers();
     const currentUser = getCurrentUser();
     if (users.some(u => u.username === updatedUser.username && u.id !== updatedUser.id)) throw new Error('Username already exists');
-    users = users.map(u => (u.id === updatedUser.id ? updatedUser : u));
+    users = users.map(u => {
+        if (u.id === updatedUser.id) {
+            return {
+                ...u,
+                ...updatedUser,
+                password: updatedUser.password || u.password // Preserve password if not provided
+            };
+        }
+        return u;
+    });
     saveToStorage(USERS_KEY, users);
     debouncedSync();
     if (currentUser && currentUser.id === updatedUser.id) sessionStorage.setItem(CURRENT_USER_KEY, JSON.stringify(updatedUser));
@@ -768,17 +777,26 @@ export const importAllData = (data: any): void => {
     if (actualData.warehouses) saveToStorage(WAREHOUSES_KEY, actualData.warehouses, false);
     if (actualData.costTemplates) saveToStorage(COST_TEMPLATES_KEY, actualData.costTemplates, false);
     
-    // Handle users - overwrite with Gist data but preserve passwords if missing
+    // Handle users - merge Gist data with local data
     if (actualData.users && Array.isArray(actualData.users)) {
-        const existingUsers = getUsers();
-        const mergedUsers = actualData.users.map((importedUser: any) => {
-            const existing = existingUsers.find(u => u.id === importedUser.id || u.username === importedUser.username);
-            
+        const localUsers = getUsers();
+        const importedUsers = actualData.users;
+        
+        // Start with imported users, merging with local data for passwords/permissions
+        const mergedUsers = importedUsers.map((importedUser: any) => {
+            const local = localUsers.find(u => u.id === importedUser.id || u.username === importedUser.username);
             return {
                 ...importedUser,
-                password: importedUser.password || existing?.password,
-                permissions: importedUser.permissions || (existing?.permissions) || getDefaultPermissions(importedUser.role)
+                password: importedUser.password || local?.password,
+                permissions: importedUser.permissions || local?.permissions || getDefaultPermissions(importedUser.role)
             };
+        });
+        
+        // Add local users that aren't in the imported list yet
+        localUsers.forEach(local => {
+            if (!mergedUsers.some((m: any) => m.id === local.id || m.username === local.username)) {
+                mergedUsers.push(local);
+            }
         });
         
         saveToStorage(USERS_KEY, mergedUsers, false);

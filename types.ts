@@ -144,7 +144,7 @@ export interface AllData {
   warehouses: Warehouse[];
   materials: Material[];
   transactions: Transaction[];
-  users: Omit<User, 'password'>[];
+  users: User[];
   costCalculations?: CostCalculation[];
   weightCalculations?: WeightCalculation[];
   costTemplates?: CostTemplate[];
