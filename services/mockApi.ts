@@ -136,7 +136,7 @@ const initializeData = () => {
 initializeData();
 
 let isSyncing = false;
-let pendingSync = false;
+let lastSyncRequestTime = 0;
 let syncTimeout: NodeJS.Timeout | null = null;
 
 export const syncDataToGist = async (): Promise<boolean> => {
@@ -144,6 +144,13 @@ export const syncDataToGist = async (): Promise<boolean> => {
     const token = settings.githubToken ? settings.githubToken.trim() : '';
     if (!settings.gistUrl || !token) {
         updateSyncStatus({ state: 'error', error: 'إعدادات Gist غير مكتملة (الرابط أو التوكن مفقود).' });
+        return false;
+    }
+
+    // Rate limiting: Prevent more than one request every 5 seconds
+    const nowTime = Date.now();
+    if (nowTime - lastSyncRequestTime < 5000) {
+        console.warn("Sync skipped: Rate limit (5s)");
         return false;
     }
     
@@ -155,11 +162,11 @@ export const syncDataToGist = async (): Promise<boolean> => {
     const gistId = match[1];
     
     if (isSyncing) {
-        pendingSync = true;
         return false;
     }
     
     isSyncing = true;
+    lastSyncRequestTime = Date.now();
     updateSyncStatus({ state: 'syncing', error: undefined });
     
     const allData = exportAllData();
@@ -210,11 +217,6 @@ export const syncDataToGist = async (): Promise<boolean> => {
             const now = new Date().toISOString();
             updateSyncStatus({ state: 'success', lastSync: now, error: undefined });
             isSyncing = false;
-            
-            if (pendingSync) {
-                pendingSync = false;
-                setTimeout(() => syncDataToGist(), 1000);
-            }
             return true;
         } else {
             const errData = await response.json().catch(() => ({}));
@@ -237,7 +239,7 @@ const debouncedSync = () => {
     if (syncTimeout) clearTimeout(syncTimeout);
     syncTimeout = setTimeout(() => {
         syncDataToGist();
-    }, 1000); // Sync 1 second after the last change
+    }, 5000); // Sync 5 seconds after the last change
 };
 
 export const initializeDataSource = async (overrideUrl?: string): Promise<{ success: boolean; message?: string }> => {
