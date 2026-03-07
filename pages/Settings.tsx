@@ -207,8 +207,9 @@ const Settings: React.FC<SettingsProps> = ({ onDataChange, user }) => {
                     <div className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
                         <h2 className="text-xl font-semibold mb-4">معلومات الشركة والمظهر</h2>
                         <div className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <InputField label="اسم الشركة" name="companyName" value={settings.companyName} onChange={handleSettingsChange} />
+                                <InputField label="رمز العملة (مثلاً: ج.م أو $)" name="currencySymbol" value={settings.currencySymbol || ''} onChange={handleSettingsChange} />
                                 <div>
                                     <label className="block mb-1 font-medium">ثيم الموقع (الألوان)</label>
                                     <select 

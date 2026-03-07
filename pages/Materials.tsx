@@ -20,9 +20,10 @@ const StockInModal: React.FC<{
     material: Material; 
     warehouses: Warehouse[];
     actionType: 'supply' | 'return' | 'supplier-return';
+    settings: SettingsData | null;
     onClose: () => void; 
     onSave: (amount: number, reason: string, note: string, warehouseId: string, date: string, price: number) => void; 
-}> = ({ material, warehouses, actionType, onClose, onSave }) => {
+}> = ({ material, warehouses, actionType, settings, onClose, onSave }) => {
     const [amount, setAmount] = useState(1);
     const [price, setPrice] = useState(material.price || 0);
     const [warehouseId, setWarehouseId] = useState(warehouses.length > 0 ? warehouses[0].id : '');
@@ -58,13 +59,13 @@ const StockInModal: React.FC<{
                             <input type="number" min="1" value={amount} onChange={(e) => setAmount(Number(e.target.value))} required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                         </div>
                         <div>
-                            <label className="block mb-1 text-sm font-medium dark:text-gray-300">السعر الحالي (ج.م)</label>
+                            <label className="block mb-1 text-sm font-medium dark:text-gray-300">السعر الحالي ({settings?.currencySymbol || 'ج.م'})</label>
                             <input type="number" step="0.01" value={price} onChange={(e) => setPrice(Number(e.target.value))} required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                         </div>
                     </div>
                     <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-100 dark:border-blue-800 flex justify-between items-center text-xs">
                         <span className="text-blue-700 dark:text-blue-300 font-bold">إجمالي القيمة:</span>
-                        <span className="text-blue-800 dark:text-blue-200 font-black">{(amount * price).toLocaleString('ar-EG')} ج.م</span>
+                        <span className="text-blue-800 dark:text-blue-200 font-black">{(amount * price).toLocaleString('ar-EG')} {settings?.currencySymbol || 'ج.م'}</span>
                     </div>
                     <div>
                         <label className="block mb-1 text-sm font-medium dark:text-gray-300">المستودع</label>
@@ -123,9 +124,10 @@ const StockInModal: React.FC<{
 const MaterialModal: React.FC<{ 
     material: Partial<Material> | null; 
     warehouses: Warehouse[];
+    settings: SettingsData | null;
     onClose: () => void; 
     onSave: (material: Omit<Material, 'id' | 'isNew'> | Material) => void; 
-}> = ({ material, warehouses, onClose, onSave }) => {
+}> = ({ material, warehouses, settings, onClose, onSave }) => {
     const [formData, setFormData] = useState<{
         name: string;
         materialType: string;
@@ -224,8 +226,8 @@ const MaterialModal: React.FC<{
                         </div>
                     </div>
                     <div>
-                        <label className="block mb-1 text-xs font-bold text-gray-500 dark:text-gray-400">السعر (ج.م)</label>
-                        <input type="number" name="price" value={formData.price} onChange={handleChange} placeholder="السعر" required step="0.01" className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                        <label className="block mb-1 text-xs font-bold text-gray-500 dark:text-gray-400">السعر ({settings?.currencySymbol || 'ج.م'})</label>
+                        <input type="number" name="price" value={formData.price} onChange={handleChange} placeholder={`السعر (${settings?.currencySymbol || 'ج.م'})`} required step="0.01" className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                     </div>
                 </div>
                 <div>
@@ -510,7 +512,7 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
                     {material.color && <div className="text-[10px] text-gray-400">اللون: {material.color}</div>}
                 </td>
                 <td className="px-6 py-4 text-xs">{material.createdAt ? new Date(material.createdAt).toLocaleDateString('ar-EG') : '-'}</td>
-                <td className="px-6 py-4 text-xs font-bold text-gray-700 dark:text-gray-300">{material.price?.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</td>
+                <td className="px-6 py-4 text-xs font-bold text-gray-700 dark:text-gray-300">{material.price?.toLocaleString('ar-EG')} {settings?.currencySymbol || 'ج.م'}</td>
                 <td className="px-6 py-4 font-mono text-xs">{material.barcode}</td>
                 <td className={`px-6 py-4 font-bold ${material.currentStock < material.minStock ? 'text-red-500' : 'text-emerald-500'}`}>
                     {material.currentStock} {material.unit}
@@ -549,12 +551,13 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
         </table>
       </div>
 
-      {isModalOpen && <MaterialModal material={selectedMaterial} warehouses={warehouses} onClose={() => setIsModalOpen(false)} onSave={handleSave} />}
+      {isModalOpen && <MaterialModal material={selectedMaterial} warehouses={warehouses} settings={settings} onClose={() => setIsModalOpen(false)} onSave={handleSave} />}
       {isStockInModalOpen && selectedMaterial && (
           <StockInModal 
             material={selectedMaterial} 
             warehouses={warehouses}
             actionType={stockActionType}
+            settings={settings}
             onClose={() => setIsStockInModalOpen(false)} 
             onSave={handleStockIn} 
           />

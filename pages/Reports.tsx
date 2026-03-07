@@ -255,7 +255,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
             tableHeaders = `<th>اسم المادة</th><th>الباركود</th><th>الكمية</th><th>السعر</th><th>القيمة الإجمالية</th>`;
             tableContent = (reportData as any[]).map(m => `<tr><td>${m.name}</td><td>${m.barcode}</td><td>${m.displayStock} ${m.unit}</td><td>${(m.price || 0).toLocaleString('ar-EG')}</td><td>${m.totalValue.toLocaleString('ar-EG')}</td></tr>`).join('');
             const totalInventoryValue = (reportData as any[]).reduce((sum, m) => sum + m.totalValue, 0);
-            tableContent += `<tr><td colspan="4" style="text-align:left; font-weight:bold;">إجمالي قيمة المخزون:</td><td style="font-weight:bold;">${totalInventoryValue.toLocaleString('ar-EG')} ج.م</td></tr>`;
+            tableContent += `<tr><td colspan="4" style="text-align:left; font-weight:bold;">إجمالي قيمة المخزون:</td><td style="font-weight:bold;">${totalInventoryValue.toLocaleString('ar-EG')} ${settings?.currencySymbol || 'ج.م'}</td></tr>`;
             break;
         default: // Transaction reports
             reportTitle = `تقرير حركات`;
@@ -619,7 +619,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
                 <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 rounded-xl flex justify-between items-center">
                     <span className="font-bold text-emerald-800 dark:text-emerald-300">إجمالي قيمة المخزون المفلتر:</span>
                     <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
-                        {(reportData as any[]).reduce((sum, m) => sum + m.totalValue, 0).toLocaleString('ar-EG')} ج.م
+                        {(reportData as any[]).reduce((sum, m) => sum + m.totalValue, 0).toLocaleString('ar-EG')} {settings?.currencySymbol || 'ج.م'}
                     </span>
                 </div>
                 <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
@@ -638,8 +638,8 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
                                 <td className="px-6 py-4 font-bold text-gray-900 whitespace-nowrap dark:text-white">{material.name}</td>
                                 <td className="px-6 py-4 font-mono text-xs">{material.barcode}</td>
                                 <td className="px-6 py-4 font-bold">{material.displayStock.toLocaleString('ar-EG')} {material.unit}</td>
-                                <td className="px-6 py-4">{(material.price || 0).toLocaleString('ar-EG')}</td>
-                                <td className="px-6 py-4 font-black text-emerald-500">{material.totalValue.toLocaleString('ar-EG')} ج.م</td>
+                                <td className="px-6 py-4">{(material.price || 0).toLocaleString('ar-EG')} {settings?.currencySymbol || 'ج.م'}</td>
+                                <td className="px-6 py-4 font-black text-emerald-500">{material.totalValue.toLocaleString('ar-EG')} {settings?.currencySymbol || 'ج.م'}</td>
                             </tr>
                         ))}
                     </tbody>

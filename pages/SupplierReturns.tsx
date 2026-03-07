@@ -129,7 +129,7 @@ const SupplierReturns: React.FC<SupplierReturnsProps> = ({ transactions, materia
           </tbody>
         </table>
         <div class="total-row">إجمالي الكمية: ${totalQuantity}</div>
-        <div class="total-row">إجمالي القيمة: ${totalValue.toLocaleString('ar-EG')} ج.م</div>
+        <div class="total-row">إجمالي القيمة: ${totalValue.toLocaleString('ar-EG')} ${settings?.currencySymbol || 'ج.م'}</div>
       </div>
     `;
     triggerPrint(html);
@@ -224,7 +224,7 @@ const SupplierReturns: React.FC<SupplierReturnsProps> = ({ transactions, materia
             </div>
             <span className="font-bold text-gray-700 dark:text-gray-200">إجمالي القيمة المالية:</span>
             </div>
-            <span className="text-2xl font-black text-amber-600 dark:text-amber-400">{totalValue.toLocaleString('ar-EG')} ج.م</span>
+            <span className="text-2xl font-black text-amber-600 dark:text-amber-400">{totalValue.toLocaleString('ar-EG')} {settings?.currencySymbol || 'ج.م'}</span>
         </div>
       </div>
 
@@ -255,10 +255,10 @@ const SupplierReturns: React.FC<SupplierReturnsProps> = ({ transactions, materia
                   <td className="p-4 text-center font-black text-red-600 dark:text-red-400">{t.quantity}</td>
                   <td className="p-4 text-gray-500 dark:text-gray-400">{t.unit}</td>
                   <td className="p-4 text-gray-500 dark:text-gray-400 text-xs">
-                    {materials.find(m => m.id === t.materialId)?.price?.toLocaleString('ar-EG') || '0'}
+                    {materials.find(m => m.id === t.materialId)?.price?.toLocaleString('ar-EG') || '0'} {settings?.currencySymbol || 'ج.م'}
                   </td>
                   <td className="p-4 font-bold text-gray-900 dark:text-white">
-                    {((materials.find(m => m.id === t.materialId)?.price || 0) * t.quantity).toLocaleString('ar-EG')}
+                    {((materials.find(m => m.id === t.materialId)?.price || 0) * t.quantity).toLocaleString('ar-EG')} {settings?.currencySymbol || 'ج.م'}
                   </td>
                   <td className="p-4 text-gray-500 dark:text-gray-400 text-sm max-w-xs truncate" title={t.notes}>
                     {t.notes || '---'}

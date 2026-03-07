@@ -83,6 +83,7 @@ export interface SettingsData {
   companyName: string;
   companyAddress: string;
   companyLogo: string;
+  currencySymbol?: string;
   theme?: ThemeType;
   signatureNames: {
     keeper: string;

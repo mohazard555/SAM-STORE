@@ -344,7 +344,7 @@ const CostMeter: React.FC<CostMeterProps> = ({ materials, user, settings }) => {
                   <div className="flex items-center gap-3 mb-2">
                     <h3 className="font-bold text-lg text-gray-900 dark:text-white">{calc.title}</h3>
                     <span className="text-xs px-2 py-1 bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 rounded-full font-bold">
-                      {calc.totalCost.toFixed(2)} د.أ
+                      {calc.totalCost.toFixed(2)} {settings?.currencySymbol || 'ج.م'}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-500 dark:text-gray-400">
@@ -597,7 +597,7 @@ const CostMeter: React.FC<CostMeterProps> = ({ materials, user, settings }) => {
                   <p className="text-sm text-violet-600 dark:text-violet-400 font-bold uppercase tracking-wider">المجموع الكلي النهائي</p>
                   <p className="text-6xl font-black text-violet-700 dark:text-violet-300 mt-2">
                     {grandTotal.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
-                    <span className="text-xl font-normal mr-3">د.أ</span>
+                    <span className="text-xl font-normal mr-3">{settings?.currencySymbol || 'ج.م'}</span>
                   </p>
                 </div>
                 <div className="bg-violet-500 text-white p-5 rounded-3xl shadow-2xl shadow-violet-500/50 animate-pulse">
