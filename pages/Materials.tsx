@@ -21,10 +21,12 @@ const StockInModal: React.FC<{
     warehouses: Warehouse[];
     actionType: 'supply' | 'return' | 'supplier-return';
     onClose: () => void; 
-    onSave: (amount: number, reason: string, note: string, warehouseId: string) => void; 
+    onSave: (amount: number, reason: string, note: string, warehouseId: string, date: string, price: number) => void; 
 }> = ({ material, warehouses, actionType, onClose, onSave }) => {
     const [amount, setAmount] = useState(1);
+    const [price, setPrice] = useState(material.price || 0);
     const [warehouseId, setWarehouseId] = useState(warehouses.length > 0 ? warehouses[0].id : '');
+    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [reason, setReason] = useState(
         actionType === 'supply' ? 'توريد جديد' : 
         actionType === 'return' ? 'مرتجع من مستلم' : 'مرتجع للمورد'
@@ -33,7 +35,7 @@ const StockInModal: React.FC<{
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSave(amount, reason, note, warehouseId);
+        onSave(amount, reason, note, warehouseId, date, price);
     };
 
     return (
@@ -50,9 +52,19 @@ const StockInModal: React.FC<{
                 </div>
                 <p className="text-sm text-gray-500 mb-4">المادة: <span className="font-bold text-gray-800 dark:text-white">{material.name}</span></p>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label className="block mb-1 text-sm font-medium dark:text-gray-300">الكمية</label>
-                        <input type="number" min="1" value={amount} onChange={(e) => setAmount(Number(e.target.value))} required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block mb-1 text-sm font-medium dark:text-gray-300">الكمية</label>
+                            <input type="number" min="1" value={amount} onChange={(e) => setAmount(Number(e.target.value))} required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                        </div>
+                        <div>
+                            <label className="block mb-1 text-sm font-medium dark:text-gray-300">السعر الحالي (ج.م)</label>
+                            <input type="number" step="0.01" value={price} onChange={(e) => setPrice(Number(e.target.value))} required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                        </div>
+                    </div>
+                    <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-100 dark:border-blue-800 flex justify-between items-center text-xs">
+                        <span className="text-blue-700 dark:text-blue-300 font-bold">إجمالي القيمة:</span>
+                        <span className="text-blue-800 dark:text-blue-200 font-black">{(amount * price).toLocaleString('ar-EG')} ج.م</span>
                     </div>
                     <div>
                         <label className="block mb-1 text-sm font-medium dark:text-gray-300">المستودع</label>
@@ -61,6 +73,10 @@ const StockInModal: React.FC<{
                                 <option key={w.id} value={w.id}>{w.name}</option>
                             ))}
                         </select>
+                    </div>
+                    <div>
+                        <label className="block mb-1 text-sm font-medium dark:text-gray-300">التاريخ</label>
+                        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                     </div>
                     <div>
                         <label className="block mb-1 text-sm font-medium dark:text-gray-300">السبب / المصدر</label>
@@ -110,7 +126,21 @@ const MaterialModal: React.FC<{
     onClose: () => void; 
     onSave: (material: Omit<Material, 'id' | 'isNew'> | Material) => void; 
 }> = ({ material, warehouses, onClose, onSave }) => {
-    const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState<{
+        name: string;
+        materialType: string;
+        category: string;
+        specifications: string;
+        supplier: string;
+        barcode: string;
+        color: string;
+        unit: string;
+        price: number;
+        minStock: number;
+        createdAt: string;
+        weightFormula: { pieces: number; weight: number };
+        stocks: Record<string, number>;
+    }>({
         name: material?.name || '',
         materialType: material?.materialType || '',
         category: material?.category || '',
@@ -119,7 +149,9 @@ const MaterialModal: React.FC<{
         barcode: material?.barcode || '',
         color: material?.color || '',
         unit: material?.unit || '',
+        price: material?.price || 0,
         minStock: material?.minStock || 0,
+        createdAt: material?.createdAt ? new Date(material.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
         weightFormula: material?.weightFormula || { pieces: 100, weight: 5 },
         stocks: material?.stocks || (warehouses.length > 0 ? { [warehouses[0].id]: 0 } : {}),
     });
@@ -128,7 +160,7 @@ const MaterialModal: React.FC<{
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: (name === 'minStock') ? Number(value) : value }));
+        setFormData(prev => ({ ...prev, [name]: (name === 'minStock' || name === 'price') ? Number(value) : value }));
     };
 
     const handleStockChange = (warehouseId: string, value: string) => {
@@ -144,7 +176,7 @@ const MaterialModal: React.FC<{
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const totalStock = Object.values(formData.stocks).reduce((sum, val) => sum + val, 0);
-        const dataToSave = { ...formData, currentStock: totalStock };
+        const dataToSave = { ...formData, currentStock: totalStock, createdAt: new Date(formData.createdAt).toISOString() };
         onSave(isEditing ? { ...dataToSave, id: material.id!, isNew: material.isNew! } : dataToSave);
     };
 
@@ -163,9 +195,41 @@ const MaterialModal: React.FC<{
                     <input type="text" name="barcode" value={formData.barcode} onChange={handleChange} placeholder="الباركود" required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                 </div>
                 <input type="text" name="color" value={formData.color} onChange={handleChange} placeholder="اللون (اختياري)" className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                <div>
+                    <label className="block mb-1 text-xs font-bold text-gray-500 dark:text-gray-400">تاريخ الإضافة</label>
+                    <input type="date" name="createdAt" value={formData.createdAt} onChange={handleChange} required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                </div>
                 <textarea name="specifications" value={formData.specifications} onChange={handleChange} placeholder="المواصفات" required rows={3} className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                 <div className="grid grid-cols-2 gap-4">
-                    <input type="text" name="unit" value={formData.unit} onChange={handleChange} placeholder="الوحدة" required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                    <div>
+                        <label className="block mb-1 text-xs font-bold text-gray-500 dark:text-gray-400">الوحدة (اختر أو اكتب)</label>
+                        <div className="relative">
+                            <input 
+                                list="units-list"
+                                name="unit" 
+                                value={formData.unit} 
+                                onChange={handleChange} 
+                                placeholder="الوحدة" 
+                                required 
+                                className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
+                            />
+                            <datalist id="units-list">
+                                <option value="حبة" />
+                                <option value="متر" />
+                                <option value="كغم" />
+                                <option value="كرتونة" />
+                                <option value="طقم" />
+                                <option value="درزن" />
+                            </datalist>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block mb-1 text-xs font-bold text-gray-500 dark:text-gray-400">السعر (ج.م)</label>
+                        <input type="number" name="price" value={formData.price} onChange={handleChange} placeholder="السعر" required step="0.01" className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                    </div>
+                </div>
+                <div>
+                    <label className="block mb-1 text-xs font-bold text-gray-500 dark:text-gray-400">الحد الأدنى للمخزون</label>
                     <input type="number" name="minStock" value={formData.minStock} onChange={handleChange} placeholder="الحد الأدنى" required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                 </div>
                 
@@ -198,7 +262,7 @@ const MaterialModal: React.FC<{
                             <input 
                                 type="number" 
                                 value={formData.weightFormula.pieces} 
-                                onChange={(e) => setFormData(prev => ({ ...prev, weightFormula: { ...prev.weightFormula, pieces: Number(e.target.value) } }))}
+                                onChange={(e) => setFormData(prev => ({ ...prev, weightFormula: { pieces: Number(e.target.value), weight: prev.weightFormula.weight } }))}
                                 className="w-full p-2 text-sm border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
                             />
                         </div>
@@ -208,7 +272,7 @@ const MaterialModal: React.FC<{
                                 type="number" 
                                 step="0.01"
                                 value={formData.weightFormula.weight} 
-                                onChange={(e) => setFormData(prev => ({ ...prev, weightFormula: { ...prev.weightFormula, weight: Number(e.target.value) } }))}
+                                onChange={(e) => setFormData(prev => ({ ...prev, weightFormula: { weight: Number(e.target.value), pieces: prev.weightFormula.pieces } }))}
                                 className="w-full p-2 text-sm border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
                             />
                         </div>
@@ -242,8 +306,14 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
   };
   
   // Added date property to transaction to fix TypeScript error
-  const handleStockIn = (amount: number, reason: string, note: string, warehouseId: string) => {
+  const handleStockIn = (amount: number, reason: string, note: string, warehouseId: string, date: string, price: number) => {
     if (!selectedMaterial) return;
+    
+    // Update material price if it changed
+    if (price !== selectedMaterial.price) {
+        updateMaterial({ ...selectedMaterial, price });
+    }
+
     addTransaction({
         type: stockActionType === 'supplier-return' ? 'return' : 'in',
         materialId: selectedMaterial.id,
@@ -252,7 +322,7 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
         recipient: reason,
         notes: note,
         color: selectedMaterial.color,
-        date: new Date().toISOString(),
+        date: new Date(date).toISOString(),
     });
     onDataChange();
     setIsStockInModalOpen(false);
@@ -272,6 +342,7 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
     const dataToExport = materials.map(m => ({ 
       "اسم المادة": m.name, 
       "اللون": m.color || '-', 
+      "السعر": m.price || 0,
       "نوع المادة": m.materialType, 
       "الفئة": m.category, 
       "المورد": m.supplier, 
@@ -317,6 +388,8 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
             minStock: Number(row["الحد الأدنى"] || row["minStock"] || 0),
             currentStock: Number(row["الكمية الحالية"] || row["الكمية"] || row["currentStock"] || 0),
             color: String(row["اللون"] || row["color"] || ""),
+            price: Number(row["السعر"] || row["price"] || 0),
+            createdAt: row["تاريخ الإضافة"] || row["التاريخ"] || row["createdAt"] || new Date().toISOString(),
             stocks: warehouses.length > 0 ? { [warehouses[0].id]: Number(row["الكمية الحالية"] || row["الكمية"] || row["currentStock"] || 0) } : {}
           };
           addMaterial(materialData);
@@ -359,6 +432,7 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
           <thead>
             <tr>
               <th>اسم المادة</th>
+              <th>السعر</th>
               <th>اللون</th>
               <th>الباركود</th>
               <th>الكمية الحالية</th>
@@ -369,6 +443,7 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
             ${materials.map(m => `
               <tr>
                 <td>${m.name}</td>
+                <td>${m.price?.toLocaleString('ar-EG')}</td>
                 <td>${m.color || '-'}</td>
                 <td>${m.barcode}</td>
                 <td>${m.currentStock} ${m.unit}</td>
@@ -417,6 +492,8 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
           <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
             <tr>
               <th scope="col" className="px-6 py-3">المادة / اللون</th>
+              <th scope="col" className="px-6 py-3">تاريخ الإضافة</th>
+              <th scope="col" className="px-6 py-3">السعر</th>
               <th scope="col" className="px-6 py-3">الباركود</th>
               <th scope="col" className="px-6 py-3">الكمية الحالية</th>
               <th scope="col" className="px-6 py-3">الحد الأدنى</th>
@@ -432,6 +509,8 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
                     <div className="font-medium text-gray-900 whitespace-nowrap dark:text-white">{material.name}</div>
                     {material.color && <div className="text-[10px] text-gray-400">اللون: {material.color}</div>}
                 </td>
+                <td className="px-6 py-4 text-xs">{material.createdAt ? new Date(material.createdAt).toLocaleDateString('ar-EG') : '-'}</td>
+                <td className="px-6 py-4 text-xs font-bold text-gray-700 dark:text-gray-300">{material.price?.toLocaleString('ar-EG', { style: 'currency', currency: 'EGP' })}</td>
                 <td className="px-6 py-4 font-mono text-xs">{material.barcode}</td>
                 <td className={`px-6 py-4 font-bold ${material.currentStock < material.minStock ? 'text-red-500' : 'text-emerald-500'}`}>
                     {material.currentStock} {material.unit}

@@ -97,7 +97,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, onLogout, darkMode, setDa
       case 'settings':
         return <Settings onDataChange={refreshData} user={user} />;
       case 'new-entries':
-        return <NewEntries materials={materials.filter(m => m.isNew)} />;
+        return <NewEntries materials={materials.filter(m => m.isNew)} user={user} settings={settings || undefined} />;
       case 'users':
         return <Users />;
       case 'supplier-returns':

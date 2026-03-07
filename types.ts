@@ -16,10 +16,12 @@ export interface Material {
   barcode: string;
   color?: string;
   unit: string;
+  price: number;
   minStock: number;
   currentStock: number; // Total stock across all warehouses
   stocks: Record<string, number>; // warehouseId -> quantity
   isNew: boolean;
+  createdAt: string;
   // Weight formula: X pieces = Y kg
   weightFormula?: {
     pieces: number;

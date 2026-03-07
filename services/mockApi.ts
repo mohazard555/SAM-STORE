@@ -110,8 +110,8 @@ const initializeData = () => {
 
     if (!localStorage.getItem(MATERIALS_KEY)) {
         const initialMaterials: Material[] = [
-            { id: 'm1', name: 'لابتوب ديل', materialType: 'DELL-LT-001', unit: 'حبة', category: 'أجهزة إلكترونية', specifications: 'Core i7, 16GB RAM, 512GB SSD', supplier: 'شركة التكنولوجيا الحديثة', barcode: '1234567890123', minStock: 5, currentStock: 15, isNew: false, color: 'فضي', stocks: { 'w1': 15 } },
-            { id: 'm2', name: 'شاشة سامسونج 24 بوصة', materialType: 'SAM-SC-024', unit: 'حبة', category: 'أجهزة إلكترونية', specifications: '24" Full HD, 75Hz', supplier: 'سامسونج العالمية', barcode: '1234567890124', minStock: 10, currentStock: 8, isNew: false, color: 'أسود', stocks: { 'w1': 8 } },
+            { id: 'm1', name: 'لابتوب ديل', materialType: 'DELL-LT-001', unit: 'حبة', category: 'أجهزة إلكترونية', specifications: 'Core i7, 16GB RAM, 512GB SSD', supplier: 'شركة التكنولوجيا الحديثة', barcode: '1234567890123', minStock: 5, currentStock: 15, isNew: false, color: 'فضي', stocks: { 'w1': 15 }, createdAt: new Date().toISOString(), price: 25000 },
+            { id: 'm2', name: 'شاشة سامسونج 24 بوصة', materialType: 'SAM-SC-024', unit: 'حبة', category: 'أجهزة إلكترونية', specifications: '24" Full HD, 75Hz', supplier: 'سامسونج العالمية', barcode: '1234567890124', minStock: 10, currentStock: 8, isNew: false, color: 'أسود', stocks: { 'w1': 8 }, createdAt: new Date().toISOString(), price: 4500 },
         ];
         saveToStorage(MATERIALS_KEY, initialMaterials, false);
     }
@@ -439,6 +439,7 @@ export const addMaterial = (materialData: Omit<Material, 'id' | 'isNew'>): Mater
         ...materialData, 
         id: `m${Date.now()}`, 
         isNew: true,
+        createdAt: (materialData as any).createdAt || new Date().toISOString(),
         stocks: materialData.stocks || {}
     };
     

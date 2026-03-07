@@ -42,33 +42,52 @@ const SupplierReturns: React.FC<SupplierReturnsProps> = ({ transactions, materia
   }, [transactions, searchTerm, filterSupplier, startDate, endDate]);
 
   const totalQuantity = filteredReturns.reduce((sum, t) => sum + t.quantity, 0);
+  const totalValue = useMemo(() => {
+    return filteredReturns.reduce((sum, t) => {
+      const material = materials.find(m => m.id === t.materialId);
+      const price = material?.price || 0;
+      return sum + (t.quantity * price);
+    }, 0);
+  }, [filteredReturns, materials]);
 
   const handleExportExcel = () => {
-    const data = filteredReturns.map(t => ({
-      'رقم العملية': t.id,
-      'التاريخ': new Date(t.date).toLocaleDateString('ar-EG'),
-      'المورد': t.supplier,
-      'اسم المادة': t.materialName,
-      'الكمية': t.quantity,
-      'الوحدة': t.unit,
-      'الملاحظات': t.notes || ''
-    }));
+    const data = filteredReturns.map(t => {
+      const material = materials.find(m => m.id === t.materialId);
+      const price = material?.price || 0;
+      return {
+        'رقم العملية': t.id,
+        'التاريخ': new Date(t.date).toLocaleDateString('ar-EG'),
+        'المورد': t.supplier,
+        'اسم المادة': t.materialName,
+        'الكمية': t.quantity,
+        'الوحدة': t.unit,
+        'السعر': price,
+        'القيمة الإجمالية': t.quantity * price,
+        'الملاحظات': t.notes || ''
+      };
+    });
 
     exportToExcel(data, "supplier_returns", "مرتجعات الموردين");
   };
 
   const handlePrint = () => {
-    const tableContent = filteredReturns.map(t => `
-      <tr>
-        <td>${t.id}</td>
-        <td>${new Date(t.date).toLocaleDateString('ar-EG')}</td>
-        <td>${t.supplier}</td>
-        <td>${t.materialName}</td>
-        <td>${t.quantity}</td>
-        <td>${t.unit}</td>
-        <td>${t.notes || ''}</td>
-      </tr>
-    `).join('');
+    const tableContent = filteredReturns.map(t => {
+      const material = materials.find(m => m.id === t.materialId);
+      const price = material?.price || 0;
+      return `
+        <tr>
+          <td>${t.id}</td>
+          <td>${new Date(t.date).toLocaleDateString('ar-EG')}</td>
+          <td>${t.supplier}</td>
+          <td>${t.materialName}</td>
+          <td>${t.quantity}</td>
+          <td>${t.unit}</td>
+          <td>${price.toLocaleString('ar-EG')}</td>
+          <td>${(t.quantity * price).toLocaleString('ar-EG')}</td>
+          <td>${t.notes || ''}</td>
+        </tr>
+      `;
+    }).join('');
 
     const html = `
       <div class="print-container">
@@ -100,6 +119,8 @@ const SupplierReturns: React.FC<SupplierReturnsProps> = ({ transactions, materia
               <th>المادة</th>
               <th>الكمية</th>
               <th>الوحدة</th>
+              <th>السعر</th>
+              <th>القيمة</th>
               <th>الملاحظات</th>
             </tr>
           </thead>
@@ -108,6 +129,7 @@ const SupplierReturns: React.FC<SupplierReturnsProps> = ({ transactions, materia
           </tbody>
         </table>
         <div class="total-row">إجمالي الكمية: ${totalQuantity}</div>
+        <div class="total-row">إجمالي القيمة: ${totalValue.toLocaleString('ar-EG')} ج.م</div>
       </div>
     `;
     triggerPrint(html);
@@ -185,14 +207,25 @@ const SupplierReturns: React.FC<SupplierReturnsProps> = ({ transactions, materia
       </div>
 
       {/* Summary Stat */}
-      <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-xl border border-red-100 dark:border-red-900/20 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-red-500 rounded-lg text-white">
-            <Package size={20} />
-          </div>
-          <span className="font-bold text-gray-700 dark:text-gray-200">إجمالي كميات المرتجعات المفلترة:</span>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-xl border border-red-100 dark:border-red-900/20 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+            <div className="p-2 bg-red-500 rounded-lg text-white">
+                <Package size={20} />
+            </div>
+            <span className="font-bold text-gray-700 dark:text-gray-200">إجمالي الكميات:</span>
+            </div>
+            <span className="text-2xl font-black text-red-600 dark:text-red-400">{totalQuantity}</span>
         </div>
-        <span className="text-2xl font-black text-red-600 dark:text-red-400">{totalQuantity}</span>
+        <div className="bg-amber-50 dark:bg-amber-900/10 p-4 rounded-xl border border-amber-100 dark:border-amber-900/20 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-500 rounded-lg text-white">
+                <FileText size={20} />
+            </div>
+            <span className="font-bold text-gray-700 dark:text-gray-200">إجمالي القيمة المالية:</span>
+            </div>
+            <span className="text-2xl font-black text-amber-600 dark:text-amber-400">{totalValue.toLocaleString('ar-EG')} ج.م</span>
+        </div>
       </div>
 
       {/* Table */}
@@ -207,6 +240,8 @@ const SupplierReturns: React.FC<SupplierReturnsProps> = ({ transactions, materia
                 <th className="p-4 border-b dark:border-gray-600">اسم المادة</th>
                 <th className="p-4 border-b dark:border-gray-600 text-center">الكمية</th>
                 <th className="p-4 border-b dark:border-gray-600">الوحدة</th>
+                <th className="p-4 border-b dark:border-gray-600">السعر</th>
+                <th className="p-4 border-b dark:border-gray-600">القيمة</th>
                 <th className="p-4 border-b dark:border-gray-600">الملاحظات</th>
               </tr>
             </thead>
@@ -219,6 +254,12 @@ const SupplierReturns: React.FC<SupplierReturnsProps> = ({ transactions, materia
                   <td className="p-4 text-gray-900 dark:text-white">{t.materialName}</td>
                   <td className="p-4 text-center font-black text-red-600 dark:text-red-400">{t.quantity}</td>
                   <td className="p-4 text-gray-500 dark:text-gray-400">{t.unit}</td>
+                  <td className="p-4 text-gray-500 dark:text-gray-400 text-xs">
+                    {materials.find(m => m.id === t.materialId)?.price?.toLocaleString('ar-EG') || '0'}
+                  </td>
+                  <td className="p-4 font-bold text-gray-900 dark:text-white">
+                    {((materials.find(m => m.id === t.materialId)?.price || 0) * t.quantity).toLocaleString('ar-EG')}
+                  </td>
                   <td className="p-4 text-gray-500 dark:text-gray-400 text-sm max-w-xs truncate" title={t.notes}>
                     {t.notes || '---'}
                   </td>

@@ -1,39 +1,168 @@
 
-import React, { useState } from 'react';
-import { Material } from '@/types';
-import { AlertTriangle, Search } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Material, User, SettingsData } from '@/types';
+import { AlertTriangle, Search, Printer, Download, Calendar } from 'lucide-react';
+import { usePrint } from '@/services/PrintContext';
+import { exportToExcel } from '@/utils/excelExport';
 
 interface NewEntriesProps {
   materials: Material[];
+  user: User;
+  settings?: SettingsData;
 }
 
-const NewEntries: React.FC<NewEntriesProps> = ({ materials }) => {
+const NewEntries: React.FC<NewEntriesProps> = ({ materials, user, settings }) => {
+  const { triggerPrint } = usePrint();
   const [searchTerm, setSearchTerm] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
-  const filteredMaterials = materials.filter(m =>
-    m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.materialType.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.supplier.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.barcode.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredMaterials = useMemo(() => {
+    return materials.filter(m => {
+      const matchesSearch = 
+        m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        m.materialType.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        m.supplier.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        m.barcode.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const mDate = m.createdAt ? new Date(m.createdAt) : null;
+      const matchesStartDate = !startDate || (mDate && mDate >= new Date(startDate));
+      const matchesEndDate = !endDate || (mDate && mDate <= new Date(endDate + 'T23:59:59'));
+
+      return matchesSearch && matchesStartDate && matchesEndDate;
+    }).sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+    });
+  }, [materials, searchTerm, startDate, endDate]);
+
+  const handleExportExcel = () => {
+    const data = filteredMaterials.map(m => ({
+      'اسم المادة': m.name,
+      'التاريخ': m.createdAt ? new Date(m.createdAt).toLocaleDateString('ar-EG') : '-',
+      'نوع المادة': m.materialType,
+      'الفئة': m.category,
+      'الباركود': m.barcode,
+      'الكمية': m.currentStock,
+      'الوحدة': m.unit,
+      'المورد': m.supplier,
+      'المواصفات': m.specifications
+    }));
+
+    exportToExcel(data, "new_entries", "إدخالات المواد الجديدة");
+  };
+
+  const handlePrint = () => {
+    const tableContent = filteredMaterials.map(m => `
+      <tr>
+        <td>${m.name}</td>
+        <td>${m.createdAt ? new Date(m.createdAt).toLocaleDateString('ar-EG') : '-'}</td>
+        <td>${m.materialType}</td>
+        <td>${m.category}</td>
+        <td>${m.barcode}</td>
+        <td>${m.currentStock} ${m.unit}</td>
+        <td>${m.supplier}</td>
+      </tr>
+    `).join('');
+
+    const html = `
+      <div class="print-container">
+        <style>
+          .print-container { font-family: 'Cairo', sans-serif; direction: rtl; padding: 20px; background: white; color: black; }
+          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ccc; padding-bottom: 10px; margin-bottom: 20px; }
+          .header img { max-width: 80px; max-height: 80px; }
+          .company-info { text-align: right; }
+          .report-title { text-align: center; margin-bottom: 20px; font-size: 1.5em; }
+          table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
+          th { background-color: #f2f2f2; }
+        </style>
+        <div class="header">
+          ${settings?.companyLogo ? `<img src="${settings.companyLogo}" alt="Logo">` : '<div></div>'}
+          <div class="company-info">
+            <h2>${settings?.companyName || ''}</h2>
+            <p>${settings?.companyAddress || ''}</p>
+          </div>
+        </div>
+        <h2 class="report-title">تقرير إدخالات المواد الجديدة</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>اسم المادة</th>
+              <th>التاريخ</th>
+              <th>النوع</th>
+              <th>الفئة</th>
+              <th>الباركود</th>
+              <th>الكمية</th>
+              <th>المورد</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableContent}
+          </tbody>
+        </table>
+      </div>
+    `;
+    triggerPrint(html);
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">إدخالات المواد الجديدة</h1>
         
-        {/* Search Input */}
-        <div className="relative w-full md:w-80">
-          <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-            <Search className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+        <div className="flex gap-3 no-print">
+          {user.permissions?.canPrint && (
+            <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+              <Printer size={18} />
+              طباعة
+            </button>
+          )}
+          {user.permissions?.canExport && (
+            <button onClick={handleExportExcel} className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors">
+              <Download size={18} />
+              تصدير Excel
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 no-print">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="relative">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input 
+              type="text" 
+              placeholder="بحث سريع (اسم، نوع، مورد، باركود)..." 
+              className="w-full pr-10 pl-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
-          <input
-            type="text"
-            className="block w-full p-2.5 pr-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-white focus:ring-sky-500 focus:border-sky-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-sky-500 dark:focus:border-sky-500 shadow-sm"
-            placeholder="بحث سريع (اسم، نوع، مورد، باركود)..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+
+          <div className="relative">
+            <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input 
+              type="date" 
+              className="w-full pr-10 pl-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white outline-none focus:ring-2 focus:ring-sky-500"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              placeholder="من تاريخ"
+            />
+          </div>
+
+          <div className="relative">
+            <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input 
+              type="date" 
+              className="w-full pr-10 pl-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white outline-none focus:ring-2 focus:ring-sky-500"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              placeholder="إلى تاريخ"
+            />
+          </div>
         </div>
       </div>
       
@@ -47,6 +176,7 @@ const NewEntries: React.FC<NewEntriesProps> = ({ materials }) => {
           <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
             <tr>
               <th scope="col" className="px-6 py-3">اسم المادة</th>
+              <th scope="col" className="px-6 py-3">تاريخ الإضافة</th>
               <th scope="col" className="px-6 py-3">نوع المادة</th>
               <th scope="col" className="px-6 py-3">الفئة</th>
               <th scope="col" className="px-6 py-3">الباركود</th>
@@ -59,6 +189,7 @@ const NewEntries: React.FC<NewEntriesProps> = ({ materials }) => {
             {filteredMaterials.map(material => (
               <tr key={material.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                 <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">{material.name}</td>
+                <td className="px-6 py-4 text-xs">{material.createdAt ? new Date(material.createdAt).toLocaleDateString('ar-EG') : '-'}</td>
                 <td className="px-6 py-4">{material.materialType}</td>
                 <td className="px-6 py-4">{material.category}</td>
                 <td className="px-6 py-4 font-mono">{material.barcode}</td>
@@ -75,7 +206,7 @@ const NewEntries: React.FC<NewEntriesProps> = ({ materials }) => {
         {filteredMaterials.length === 0 && (
           <div className="text-center p-8">
             <p className="text-gray-500 dark:text-gray-400">
-              {searchTerm ? 'لا توجد نتائج تطابق بحثك.' : 'لا توجد إدخالات جديدة حالياً.'}
+              {searchTerm || startDate || endDate ? 'لا توجد نتائج تطابق بحثك.' : 'لا توجد إدخالات جديدة حالياً.'}
             </p>
           </div>
         )}

@@ -34,7 +34,7 @@ interface ReportsProps {
   user: User;
 }
 
-type ReportType = 'daily' | 'weekly' | 'monthly' | 'byMaterial' | 'byCategory' | 'byBarcode' | 'byItemBarcode' | 'totalCount' | 'all' | 'bySupplier' | 'mostUsed' | 'inactive' | 'lowStock';
+type ReportType = 'daily' | 'weekly' | 'monthly' | 'byMaterial' | 'byCategory' | 'byBarcode' | 'byItemBarcode' | 'totalCount' | 'all' | 'bySupplier' | 'mostUsed' | 'inactive' | 'lowStock' | 'inventoryValue';
 
 const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, settings, user }) => {
   const { triggerPrint } = usePrint();
@@ -46,6 +46,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
   const [selectedItemBarcode, setSelectedItemBarcode] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState('');
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState('');
 
   const canPrint = user.role === 'admin' || user.permissions?.canPrint;
   const canExport = user.role === 'admin' || user.permissions?.canExport;
@@ -147,6 +148,19 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
         return materials.filter(m => !activeMaterialIds.has(m.id));
       }
 
+      case 'inventoryValue': {
+        return materials.map(m => {
+            const stock = selectedWarehouseId 
+                ? (m.stocks[selectedWarehouseId] || 0)
+                : m.currentStock;
+            return {
+                ...m,
+                displayStock: stock,
+                totalValue: stock * (m.price || 0)
+            };
+        }).filter(m => m.displayStock > 0);
+      }
+
       default: // Transaction-based reports
         let result = dateFilteredTransactions;
         if (filterType === 'byMaterial' && selectedMaterialId) {
@@ -195,6 +209,14 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
             fileName = 'most_used_materials';
             sheetName = 'الأكثر استخداماً';
             break;
+        case 'inventoryValue':
+            dataToExport = (reportData as any[]).map(m => ({
+                "اسم المادة": m.name, "الباركود": m.barcode, "المستودع": selectedWarehouseId ? warehouses.find(w => w.id === selectedWarehouseId)?.name : "الكل",
+                "الكمية": m.displayStock, "السعر": m.price || 0, "القيمة الإجمالية": m.totalValue
+            }));
+            fileName = 'inventory_value_report';
+            sheetName = 'قيمة المخزون';
+            break;
         default: // Transaction reports
             dataToExport = (reportData as Transaction[]).map(t => ({
                 'التاريخ والوقت': new Date(t.date).toLocaleString('ar-EG'), 'اسم المادة': t.materialName,
@@ -227,6 +249,13 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
             reportTitle = `تقرير المواد الأكثر استخداماً`;
             tableHeaders = `<th>اسم المادة</th><th>الفئة</th><th>الباركود</th><th>المورد</th><th>إجمالي المسحوب</th>`;
             tableContent = (reportData as (Material & {totalQuantity: number})[]).map(m => `<tr><td>${m.name}</td><td>${m.category}</td><td>${m.barcode}</td><td>${m.supplier}</td><td>${m.totalQuantity} ${m.unit}</td></tr>`).join('');
+            break;
+        case 'inventoryValue':
+            reportTitle = `تقرير قيمة المخزون - ${selectedWarehouseId ? warehouses.find(w => w.id === selectedWarehouseId)?.name : 'جميع المستودعات'}`;
+            tableHeaders = `<th>اسم المادة</th><th>الباركود</th><th>الكمية</th><th>السعر</th><th>القيمة الإجمالية</th>`;
+            tableContent = (reportData as any[]).map(m => `<tr><td>${m.name}</td><td>${m.barcode}</td><td>${m.displayStock} ${m.unit}</td><td>${(m.price || 0).toLocaleString('ar-EG')}</td><td>${m.totalValue.toLocaleString('ar-EG')}</td></tr>`).join('');
+            const totalInventoryValue = (reportData as any[]).reduce((sum, m) => sum + m.totalValue, 0);
+            tableContent += `<tr><td colspan="4" style="text-align:left; font-weight:bold;">إجمالي قيمة المخزون:</td><td style="font-weight:bold;">${totalInventoryValue.toLocaleString('ar-EG')} ج.م</td></tr>`;
             break;
         default: // Transaction reports
             reportTitle = `تقرير حركات`;
@@ -287,6 +316,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
     { value: 'mostUsed', label: 'الأكثر استخداماً', icon: TrendingUp, color: 'rose', bgColor: 'bg-rose-100', textColor: 'text-rose-600', darkBg: 'dark:bg-rose-900/30', darkText: 'dark:text-rose-400', glow: 'bg-rose-500', description: 'المواد ذات معدل السحب الأعلى' },
     { value: 'inactive', label: 'المواد الراكدة', icon: Clock, color: 'amber', bgColor: 'bg-amber-100', textColor: 'text-amber-600', darkBg: 'dark:bg-amber-900/30', darkText: 'dark:text-amber-400', glow: 'bg-amber-500', description: 'مواد لم يتم تحريكها منذ فترة' },
     { value: 'lowStock', label: 'نقص المخزون', icon: AlertTriangle, color: 'red', bgColor: 'bg-red-100', textColor: 'text-red-600', darkBg: 'dark:bg-red-900/30', darkText: 'dark:text-red-400', glow: 'bg-red-500', description: 'المواد التي وصلت للحد الأدنى' },
+    { value: 'inventoryValue', label: 'قيمة المخزون', icon: TrendingUp, color: 'emerald', bgColor: 'bg-emerald-100', textColor: 'text-emerald-600', darkBg: 'dark:bg-emerald-900/30', darkText: 'dark:text-emerald-400', glow: 'bg-emerald-500', description: 'حساب القيمة المالية للمخزون الحالي' },
   ] as const;
 
   const filteredOptions = reportOptions.filter(opt => 
@@ -487,6 +517,20 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
                       </div>
                   </div>
               )}
+
+              {filterType === 'inventoryValue' && (
+                  <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-400 block mr-1">اختر المستودع</label>
+                      <select 
+                        value={selectedWarehouseId} 
+                        onChange={e => setSelectedWarehouseId(e.target.value)} 
+                        className="p-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white w-48 focus:ring-2 focus:ring-blue-500 outline-none"
+                      >
+                          <option value="">جميع المستودعات</option>
+                          {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                      </select>
+                  </div>
+              )}
             </div>
 
             <div className="flex gap-3">
@@ -570,6 +614,37 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
                   ))}
               </tbody>
            </table>
+        ) : (filterType === 'inventoryValue') ? (
+            <div className="space-y-4">
+                <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 rounded-xl flex justify-between items-center">
+                    <span className="font-bold text-emerald-800 dark:text-emerald-300">إجمالي قيمة المخزون المفلتر:</span>
+                    <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                        {(reportData as any[]).reduce((sum, m) => sum + m.totalValue, 0).toLocaleString('ar-EG')} ج.م
+                    </span>
+                </div>
+                <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
+                    <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                        <tr>
+                            <th scope="col" className="px-6 py-3">اسم المادة</th>
+                            <th scope="col" className="px-6 py-3">الباركود</th>
+                            <th scope="col" className="px-6 py-3">الكمية</th>
+                            <th scope="col" className="px-6 py-3">السعر</th>
+                            <th scope="col" className="px-6 py-3">القيمة الإجمالية</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {(reportData as any[]).map(material => (
+                            <tr key={material.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                                <td className="px-6 py-4 font-bold text-gray-900 whitespace-nowrap dark:text-white">{material.name}</td>
+                                <td className="px-6 py-4 font-mono text-xs">{material.barcode}</td>
+                                <td className="px-6 py-4 font-bold">{material.displayStock.toLocaleString('ar-EG')} {material.unit}</td>
+                                <td className="px-6 py-4">{(material.price || 0).toLocaleString('ar-EG')}</td>
+                                <td className="px-6 py-4 font-black text-emerald-500">{material.totalValue.toLocaleString('ar-EG')} ج.م</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
         ) : (
             <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
                 <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
