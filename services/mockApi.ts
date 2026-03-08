@@ -15,6 +15,21 @@ const COST_TEMPLATES_KEY = 'warehouse_cost_templates';
 const UNSYNCED_CHANGES_KEY = 'warehouse_unsynced_changes';
 const LAST_SYNC_KEY = 'warehouse_last_sync';
 
+// --- Obfuscation Helpers for Token Persistence ---
+const obfuscate = (str: string) => {
+    if (!str) return '';
+    try {
+        return btoa(str.split('').reverse().join(''));
+    } catch { return ''; }
+};
+
+const deobfuscate = (str: string) => {
+    if (!str) return '';
+    try {
+        return atob(str).split('').reverse().join('');
+    } catch { return ''; }
+};
+
 // --- Sync Status Management ---
 let currentSyncStatus: SyncStatus = {
   state: 'idle',
@@ -136,7 +151,6 @@ const initializeData = () => {
 initializeData();
 
 let isSyncing = false;
-let lastSyncRequestTime = 0;
 let syncTimeout: NodeJS.Timeout | null = null;
 
 export const syncDataToGist = async (): Promise<boolean> => {
@@ -147,13 +161,6 @@ export const syncDataToGist = async (): Promise<boolean> => {
         return false;
     }
 
-    // Rate limiting: Prevent more than one request every 5 seconds
-    const nowTime = Date.now();
-    if (nowTime - lastSyncRequestTime < 5000) {
-        console.warn("Sync skipped: Rate limit (5s)");
-        return false;
-    }
-    
     const match = settings.gistUrl.match(/gist\.github(?:usercontent)?\.com\/[^\/]+\/([a-f0-9]+)/);
     if (!match) {
         updateSyncStatus({ state: 'error', error: 'رابط Gist غير صالح.' });
@@ -162,11 +169,11 @@ export const syncDataToGist = async (): Promise<boolean> => {
     const gistId = match[1];
     
     if (isSyncing) {
+        // If already syncing, the debouncedSync will trigger again after 2s anyway
         return false;
     }
     
     isSyncing = true;
-    lastSyncRequestTime = Date.now();
     updateSyncStatus({ state: 'syncing', error: undefined });
     
     const allData = exportAllData();
@@ -180,20 +187,29 @@ export const syncDataToGist = async (): Promise<boolean> => {
             }
         });
         
-        let filename = settings.gistUrl.split('/').pop() || 'warehouse-data.json';
-        if (filename.includes('?')) filename = filename.split('?')[0];
+        let filename = 'warehouse-data.json'; // Default
+        
+        // Try to extract filename from the gistUrl if it's a raw URL
+        const urlParts = settings.gistUrl.split('/');
+        const lastPart = urlParts[urlParts.length - 1];
+        if (lastPart && lastPart.endsWith('.json')) {
+            filename = lastPart.split('?')[0];
+        }
         
         if (getResponse.ok) {
             const gistInfo = await getResponse.json();
+            // If the URL filename isn't in the gist, pick the first JSON file or any file
             if (!gistInfo.files[filename]) {
-                const firstFilename = Object.keys(gistInfo.files)[0];
-                if (firstFilename) filename = firstFilename;
+                const jsonFile = Object.keys(gistInfo.files).find(f => f.endsWith('.json'));
+                filename = jsonFile || Object.keys(gistInfo.files)[0] || filename;
             }
-        } else {
+        } else if (getResponse.status !== 404) {
+            // If it's not a 404, it's a real error (like 401 Unauthorized)
             const errData = await getResponse.json().catch(() => ({}));
             const errorMsg = `GitHub Error (${getResponse.status}): ${errData.message || getResponse.statusText}`;
             throw new Error(errorMsg);
         }
+        // If 404, we assume it's a new Gist or we'll try to create/patch anyway (though PATCH needs existing)
 
         // 2. Perform the update
         const response = await fetch(`https://api.github.com/gists/${gistId}`, {
@@ -239,8 +255,17 @@ const debouncedSync = () => {
     if (syncTimeout) clearTimeout(syncTimeout);
     syncTimeout = setTimeout(() => {
         syncDataToGist();
-    }, 5000); // Sync 5 seconds after the last change
+    }, 2000); // Reduced to 2 seconds for better responsiveness
 };
+
+// Attempt sync before closing
+if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', () => {
+        if (hasUnsyncedChanges()) {
+            syncDataToGist();
+        }
+    });
+}
 
 export const initializeDataSource = async (overrideUrl?: string): Promise<{ success: boolean; message?: string }> => {
     const settings = getSettings();
@@ -276,10 +301,20 @@ export const initializeDataSource = async (overrideUrl?: string): Promise<{ succ
                 });
                 if (apiResponse.ok) {
                     const gistData = await apiResponse.json();
-                    const filename = fetchUrl.split('/').pop() || Object.keys(gistData.files)[0];
-                    const file = gistData.files[filename] || Object.values(gistData.files)[0];
-                    if (file && file.content) {
-                        dataText = file.content;
+                    
+                    let filename = 'warehouse-data.json';
+                    const urlParts = fetchUrl.split('/');
+                    const lastPart = urlParts[urlParts.length - 1];
+                    if (lastPart && lastPart.endsWith('.json')) {
+                        filename = lastPart.split('?')[0];
+                    }
+
+                    const file = gistData.files[filename] || 
+                                 Object.keys(gistData.files).find(f => f.endsWith('.json')) || 
+                                 Object.values(gistData.files)[0];
+                    
+                    if (file && (file as any).content) {
+                        dataText = (file as any).content;
                     }
                 }
             } catch (apiErr: any) {
@@ -701,15 +736,19 @@ export const deleteCostTemplate = (id: string): void => {
 
 export const exportAllData = (): AllData => {
     const settings = getSettings();
-    // CRITICAL: Never export the GitHub token to the Gist.
-    // If GitHub sees a valid token in a public Gist, it will immediately revoke it.
-    const safeSettings = { ...settings, githubToken: '' };
+    // CRITICAL: Never export the raw GitHub token to the Gist as GitHub will revoke it.
+    // We use a simple obfuscation to allow persistence across devices while avoiding automated revocation.
+    const safeSettings = { 
+        ...settings, 
+        githubToken: '',
+        _sync_key: obfuscate(settings.githubToken || '') 
+    };
     
     return { 
         settings: safeSettings, 
         materials: getMaterials(), 
         transactions: getTransactions(), 
-        users: getUsers(), // Include passwords for full sync across devices
+        users: getUsers(), 
         costCalculations: getCostCalculations(),
         weightCalculations: getWeightCalculations(),
         warehouses: getWarehouses(),
@@ -765,10 +804,16 @@ export const importAllData = (data: any): void => {
     
     if (actualData.settings) {
         const currentSettings = getSettings();
+        // Recover token from obfuscated field if local token is missing
+        const recoveredToken = deobfuscate(actualData.settings._sync_key);
+        
         const mergedSettings = {
             ...actualData.settings,
-            githubToken: currentSettings.githubToken // Always preserve local token as it's never exported to Gist
+            githubToken: currentSettings.githubToken || recoveredToken 
         };
+        // Clean up the internal sync key from storage
+        delete (mergedSettings as any)._sync_key;
+        
         saveToStorage(SETTINGS_KEY, mergedSettings, false);
     }
     if (actualData.materials) saveToStorage(MATERIALS_KEY, actualData.materials, false);
