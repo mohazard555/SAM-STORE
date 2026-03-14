@@ -219,7 +219,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
         }
         return [...result].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }
-  }, [materials, transactions, dateFilteredTransactions, filterType, selectedMaterialId, selectedCategory, selectedSupplier, selectedBarcode, selectedRecipient]);
+  }, [materials, transactions, dateFilteredTransactions, filterType, selectedMaterialId, selectedCategory, selectedSupplier, selectedBarcode, selectedRecipient, selectedColor, selectedItemBarcode, selectedWarehouseId]);
   
   const exportToXLSX = () => {
     let dataToExport: any[] = [];
