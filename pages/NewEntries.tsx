@@ -25,9 +25,16 @@ const NewEntries: React.FC<NewEntriesProps> = ({ materials, user, settings }) =>
         m.supplier.toLowerCase().includes(searchTerm.toLowerCase()) ||
         m.barcode.toLowerCase().includes(searchTerm.toLowerCase());
       
-      const mDate = m.createdAt ? new Date(m.createdAt) : null;
-      const matchesStartDate = !startDate || (mDate && mDate >= new Date(startDate));
-      const matchesEndDate = !endDate || (mDate && mDate <= new Date(endDate + 'T23:59:59'));
+      if (!m.createdAt) return matchesSearch && !startDate && !endDate;
+
+      // Normalize Arabic numerals if any
+      const dateStr = m.createdAt.replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d).toString());
+      const mDate = new Date(dateStr);
+      
+      if (isNaN(mDate.getTime())) return matchesSearch && !startDate && !endDate;
+
+      const matchesStartDate = !startDate || mDate >= new Date(startDate);
+      const matchesEndDate = !endDate || mDate <= new Date(endDate + 'T23:59:59');
 
       return matchesSearch && matchesStartDate && matchesEndDate;
     }).sort((a, b) => {

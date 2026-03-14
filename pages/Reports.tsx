@@ -20,7 +20,9 @@ import {
   Clock, 
   AlertTriangle,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  PlusCircle,
+  RotateCcw
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { motion, AnimatePresence } from 'motion/react';
@@ -34,7 +36,7 @@ interface ReportsProps {
   user: User;
 }
 
-type ReportType = 'daily' | 'weekly' | 'monthly' | 'byMaterial' | 'byCategory' | 'byColor' | 'byBarcode' | 'byItemBarcode' | 'totalCount' | 'all' | 'bySupplier' | 'mostUsed' | 'inactive' | 'lowStock' | 'inventoryValue';
+type ReportType = 'daily' | 'weekly' | 'monthly' | 'byMaterial' | 'byCategory' | 'byColor' | 'byBarcode' | 'byItemBarcode' | 'totalCount' | 'all' | 'bySupplier' | 'mostUsed' | 'inactive' | 'lowStock' | 'inventoryValue' | 'inTransactions' | 'outTransactions';
 
 const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, settings, user }) => {
   const { triggerPrint } = usePrint();
@@ -104,7 +106,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
   }
 
   const dateFilteredTransactions = useMemo(() => {
-    const timeSensitiveReports: ReportType[] = ['daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byColor', 'byBarcode', 'byItemBarcode', 'bySupplier', 'mostUsed', 'all'];
+    const timeSensitiveReports: ReportType[] = ['daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byColor', 'byBarcode', 'byItemBarcode', 'bySupplier', 'mostUsed', 'all', 'inTransactions', 'outTransactions'];
     if (!timeSensitiveReports.includes(filterType)) {
         return transactions;
     }
@@ -123,7 +125,11 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
     }
     
     return transactions.filter(t => {
-      const tDate = new Date(t.date);
+      if (!t.date) return false;
+      // Normalize Arabic numerals if any
+      const dateStr = t.date.replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d).toString());
+      const tDate = new Date(dateStr);
+      if (isNaN(tDate.getTime())) return false;
       return tDate.getTime() >= start.getTime() && tDate.getTime() <= end.getTime();
     });
   }, [transactions, filterType, startDate, endDate]);
@@ -135,6 +141,12 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
       
       case 'lowStock':
         return materials.filter(m => m.currentStock < m.minStock);
+      
+      case 'inTransactions':
+        return dateFilteredTransactions.filter(t => t.type === 'in' || t.type === 'return_in');
+      
+      case 'outTransactions':
+        return dateFilteredTransactions.filter(t => t.type === 'out' || t.type === 'return');
       
       case 'mostUsed': {
         const usage = dateFilteredTransactions.reduce((acc, t) => {
@@ -310,11 +322,13 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
   };
   
   const canPerformAction = reportData && reportData.length > 0;
-  const showDatePickers = ['all', 'daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byColor', 'byBarcode', 'byItemBarcode', 'bySupplier', 'mostUsed'].includes(filterType);
+  const showDatePickers = ['all', 'daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byColor', 'byBarcode', 'byItemBarcode', 'bySupplier', 'mostUsed', 'inTransactions', 'outTransactions'].includes(filterType);
 
   // Helper for filtered report options
   const reportOptions = [
     { value: 'all', label: 'كل الحركات', icon: History, color: 'blue', bgColor: 'bg-blue-100', textColor: 'text-blue-600', darkBg: 'dark:bg-blue-900/30', darkText: 'dark:text-blue-400', glow: 'bg-blue-500', description: 'عرض جميع حركات الصادر والوارد' },
+    { value: 'inTransactions', label: 'إدخالات المواد', icon: PlusCircle, color: 'emerald', bgColor: 'bg-emerald-100', textColor: 'text-emerald-600', darkBg: 'dark:bg-emerald-900/30', darkText: 'dark:text-emerald-400', glow: 'bg-emerald-500', description: 'عرض جميع عمليات التوريد والإدخال' },
+    { value: 'outTransactions', label: 'صادر المواد', icon: RotateCcw, color: 'orange', bgColor: 'bg-orange-100', textColor: 'text-orange-600', darkBg: 'dark:bg-orange-900/30', darkText: 'dark:text-orange-400', glow: 'bg-orange-500', description: 'عرض جميع عمليات الصرف والإخراج' },
     { value: 'daily', label: 'تقرير يومي', icon: CalendarDays, color: 'indigo', bgColor: 'bg-indigo-100', textColor: 'text-indigo-600', darkBg: 'dark:bg-indigo-900/30', darkText: 'dark:text-indigo-400', glow: 'bg-indigo-500', description: 'حركات المخزن خلال اليوم الحالي' },
     { value: 'weekly', label: 'تقرير أسبوعي', icon: CalendarRange, color: 'purple', bgColor: 'bg-purple-100', textColor: 'text-purple-600', darkBg: 'dark:bg-purple-900/30', darkText: 'dark:text-purple-400', glow: 'bg-purple-500', description: 'ملخص الحركات خلال الأسبوع الجاري' },
     { value: 'monthly', label: 'تقرير شهري', icon: Calendar, color: 'violet', bgColor: 'bg-violet-100', textColor: 'text-violet-600', darkBg: 'dark:bg-violet-900/30', darkText: 'dark:text-violet-400', glow: 'bg-violet-500', description: 'جرد وحركات الشهر الحالي' },

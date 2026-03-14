@@ -1,6 +1,39 @@
 
 import { User, Material, Transaction, SettingsData, AllData, UserPermissions, Page, CostCalculation, WeightCalculation, Warehouse, CostTemplate, SyncStatus, SyncState, AppNotification } from '@/types';
 
+// --- UTILS ---
+const normalizeArabicNumerals = (str: string): string => {
+    const arabicNumerals = [/٠/g, /١/g, /٢/g, /٣/g, /٤/g, /٥/g, /٦/g, /٧/g, /٨/g, /٩/g];
+    return str.replace(/[٠-٩]/g, (d) => {
+        return arabicNumerals.findIndex(re => re.test(d)).toString();
+    });
+};
+
+const parseDateSafely = (dateStr: string): string => {
+    if (!dateStr) return new Date().toISOString();
+    
+    // Normalize Arabic numerals
+    let normalized = normalizeArabicNumerals(dateStr);
+    
+    // Try parsing
+    let date = new Date(normalized);
+    if (isNaN(date.getTime())) {
+        // Try common formats if standard parsing fails
+        // e.g., DD/MM/YYYY or YYYY/MM/DD with slashes
+        const parts = normalized.split(/[/.-]/);
+        if (parts.length === 3) {
+            // Assume YYYY/MM/DD or DD/MM/YYYY
+            if (parts[0].length === 4) {
+                date = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+            } else if (parts[2].length === 4) {
+                date = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+            }
+        }
+    }
+    
+    return isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
+};
+
 // --- INITIAL DATA & HELPERS ---
 
 const USERS_KEY = 'warehouse_users';
@@ -540,19 +573,39 @@ export const getMaterials = (): Material[] => {
 };
 export const addMaterial = (materialData: Omit<Material, 'id' | 'isNew'>): Material => {
     const materials = getMaterials();
+    const initialStocks = materialData.stocks || {};
+    const createdAt = parseDateSafely((materialData as any).createdAt);
+    
+    // Create material with 0 stock initially to avoid double counting when adding transactions
     const newMaterial: Material = { 
         ...materialData, 
         id: `m${Date.now()}`, 
         isNew: true,
-        createdAt: (materialData as any).createdAt || new Date().toISOString(),
-        stocks: materialData.stocks || {}
+        createdAt,
+        stocks: {},
+        currentStock: 0
     };
     
-    if (Object.keys(newMaterial.stocks).length > 0) {
-        newMaterial.currentStock = Object.values(newMaterial.stocks).reduce((sum, val) => sum + val, 0);
-    }
+    // Save material first
+    const updatedMaterials = [...materials, newMaterial];
+    saveToStorage(MATERIALS_KEY, updatedMaterials);
+    
+    // Create transactions for initial stocks
+    Object.entries(initialStocks).forEach(([warehouseId, quantity]) => {
+        if (quantity > 0) {
+            addTransaction({
+                type: 'in',
+                materialId: newMaterial.id,
+                quantity: quantity,
+                warehouseId: warehouseId,
+                recipient: 'رصيد افتتاحي',
+                notes: 'تمت الإضافة عند إنشاء المادة',
+                date: createdAt,
+                color: newMaterial.color
+            });
+        }
+    });
 
-    saveToStorage(MATERIALS_KEY, [...materials, newMaterial]);
     addNotification({
         type: 'material',
         action: 'add',
@@ -560,24 +613,67 @@ export const addMaterial = (materialData: Omit<Material, 'id' | 'isNew'>): Mater
         message: `تم إضافة مادة جديدة: ${newMaterial.name}`
     });
     debouncedSync();
-    return newMaterial;
+    
+    // Return the material with updated stocks (refetched)
+    const finalMaterials = getMaterials();
+    return finalMaterials.find(m => m.id === newMaterial.id) || newMaterial;
 };
 
 export const updateMaterial = (updatedMaterial: Material): Material => {
-    // Recalculate total stock
-    const totalStock = Object.values(updatedMaterial.stocks || {}).reduce((sum, val) => sum + val, 0);
-    const materialToSave = { ...updatedMaterial, currentStock: totalStock };
+    const materials = getMaterials();
+    const oldMaterial = materials.find(m => m.id === updatedMaterial.id);
+    
+    if (oldMaterial) {
+        // Check for stock changes in the modal (Opening Balance edits)
+        Object.entries(updatedMaterial.stocks || {}).forEach(([warehouseId, newQty]) => {
+            const oldQty = oldMaterial.stocks[warehouseId] || 0;
+            if (newQty !== oldQty) {
+                const diff = newQty - oldQty;
+                addTransaction({
+                    type: diff > 0 ? 'in' : 'out',
+                    materialId: updatedMaterial.id,
+                    quantity: Math.abs(diff),
+                    warehouseId: warehouseId,
+                    recipient: 'تعديل رصيد افتتاحي',
+                    notes: `تعديل يدوي من إدارة المواد (الفرق: ${diff})`,
+                    date: new Date().toISOString(),
+                    color: updatedMaterial.color
+                });
+            }
+        });
+    }
 
-    const materials = getMaterials().map(m => m.id === materialToSave.id ? materialToSave : m);
-    saveToStorage(MATERIALS_KEY, materials);
+    // Recalculate total stock based on current state (after transactions)
+    const currentMaterials = getMaterials();
+    const materialToSave = currentMaterials.find(m => m.id === updatedMaterial.id) || updatedMaterial;
+    
+    // Update other fields from updatedMaterial
+    const finalMaterial = {
+        ...materialToSave,
+        name: updatedMaterial.name,
+        materialType: updatedMaterial.materialType,
+        category: updatedMaterial.category,
+        specifications: updatedMaterial.specifications,
+        supplier: updatedMaterial.supplier,
+        barcode: updatedMaterial.barcode,
+        color: updatedMaterial.color,
+        unit: updatedMaterial.unit,
+        price: updatedMaterial.price,
+        minStock: updatedMaterial.minStock,
+        weightFormula: updatedMaterial.weightFormula
+    };
+
+    const finalMaterialsList = getMaterials().map(m => m.id === finalMaterial.id ? finalMaterial : m);
+    saveToStorage(MATERIALS_KEY, finalMaterialsList);
+    
     addNotification({
         type: 'material',
         action: 'update',
         title: 'تحديث مادة',
-        message: `تم تحديث بيانات مادة: ${materialToSave.name}`
+        message: `تم تحديث بيانات مادة: ${finalMaterial.name}`
     });
     debouncedSync();
-    return materialToSave;
+    return finalMaterial;
 };
 
 export const acknowledgeNewMaterial = (materialId: string): void => {
@@ -630,7 +726,7 @@ export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'materi
     const newTransaction: Transaction = {
         ...transactionData,
         id: `t${Date.now()}`,
-        date: transactionData.date || new Date().toISOString(),
+        date: parseDateSafely(transactionData.date || ''),
         materialName: material.name,
         materialType: material.materialType,
         supplier: material.supplier,
