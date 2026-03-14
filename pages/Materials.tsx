@@ -56,7 +56,7 @@ const StockInModal: React.FC<{
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block mb-1 text-sm font-medium dark:text-gray-300">الكمية</label>
-                            <input type="number" min="1" value={amount} onChange={(e) => setAmount(Number(e.target.value))} required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                            <input type="number" step="any" min="0" value={amount} onChange={(e) => setAmount(Number(e.target.value))} required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                         </div>
                         <div>
                             <label className="block mb-1 text-sm font-medium dark:text-gray-300">السعر الحالي ({settings?.currencySymbol || 'ج.م'})</label>
@@ -232,7 +232,7 @@ const MaterialModal: React.FC<{
                 </div>
                 <div>
                     <label className="block mb-1 text-xs font-bold text-gray-500 dark:text-gray-400">الحد الأدنى للمخزون</label>
-                    <input type="number" name="minStock" value={formData.minStock} onChange={handleChange} placeholder="الحد الأدنى" required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                    <input type="number" name="minStock" step="any" value={formData.minStock} onChange={handleChange} placeholder="الحد الأدنى" required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                 </div>
                 
                 <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
@@ -243,6 +243,7 @@ const MaterialModal: React.FC<{
                                 <span className="text-sm w-1/2 truncate dark:text-gray-300" title={w.name}>{w.name}</span>
                                 <input 
                                     type="number" 
+                                    step="any"
                                     min="0"
                                     value={formData.stocks[w.id] || 0} 
                                     onChange={(e) => handleStockChange(w.id, e.target.value)}
@@ -262,6 +263,7 @@ const MaterialModal: React.FC<{
                             <label className="block text-[10px] mb-1 dark:text-gray-400">عدد القطع</label>
                             <input 
                                 type="number" 
+                                step="any"
                                 value={formData.weightFormula.pieces} 
                                 onChange={(e) => setFormData(prev => ({ ...prev, weightFormula: { pieces: Number(e.target.value), weight: prev.weightFormula.weight } }))}
                                 className="w-full p-2 text-sm border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
