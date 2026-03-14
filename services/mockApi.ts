@@ -1,5 +1,5 @@
 
-import { User, Material, Transaction, SettingsData, AllData, UserPermissions, Page, CostCalculation, WeightCalculation, Warehouse, CostTemplate, SyncStatus, SyncState } from '@/types';
+import { User, Material, Transaction, SettingsData, AllData, UserPermissions, Page, CostCalculation, WeightCalculation, Warehouse, CostTemplate, SyncStatus, SyncState, AppNotification } from '@/types';
 
 // --- INITIAL DATA & HELPERS ---
 
@@ -14,6 +14,7 @@ const WAREHOUSES_KEY = 'warehouse_warehouses';
 const COST_TEMPLATES_KEY = 'warehouse_cost_templates';
 const UNSYNCED_CHANGES_KEY = 'warehouse_unsynced_changes';
 const LAST_SYNC_KEY = 'warehouse_last_sync';
+const NOTIFICATIONS_KEY = 'warehouse_notifications';
 
 // --- Obfuscation Helpers for Token Persistence ---
 const obfuscate = (str: string) => {
@@ -106,6 +107,32 @@ const saveToStorage = <T>(key: string, value: T, markUnsynced = true) => {
 };
 
 const hasUnsyncedChanges = () => localStorage.getItem(UNSYNCED_CHANGES_KEY) === 'true';
+
+// --- Notifications ---
+export const getNotifications = (): AppNotification[] => {
+  const notifications = getFromStorage<AppNotification[]>(NOTIFICATIONS_KEY, []);
+  // Sort by timestamp descending
+  return notifications.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+};
+
+export const addNotification = (notification: Omit<AppNotification, 'id' | 'timestamp' | 'user'>) => {
+  const notifications = getNotifications();
+  const currentUser = getCurrentUser();
+  const newNotification: AppNotification = {
+    ...notification,
+    id: `notif-${Date.now()}`,
+    timestamp: new Date().toISOString(),
+    user: currentUser?.username || 'نظام'
+  };
+  
+  // Keep only last 50 notifications
+  const updatedNotifications = [newNotification, ...notifications].slice(0, 50);
+  saveToStorage(NOTIFICATIONS_KEY, updatedNotifications, false); // Don't mark as unsynced for notifications
+};
+
+export const clearNotifications = () => {
+  saveToStorage(NOTIFICATIONS_KEY, [], false);
+};
 
 const initializeData = () => {
     if (!localStorage.getItem(USERS_KEY)) {
@@ -399,6 +426,12 @@ export const addUser = (userData: Omit<User, 'id'>): User => {
         permissions: userData.permissions || getDefaultPermissions(userData.role)
     };
     saveToStorage(USERS_KEY, [...users, newUser]);
+    addNotification({
+        type: 'user',
+        action: 'add',
+        title: 'إضافة مستخدم جديد',
+        message: `تم إضافة المستخدم: ${newUser.username}`
+    });
     debouncedSync();
     return newUser;
 };
@@ -418,13 +451,29 @@ export const updateUser = (updatedUser: User): User => {
         return u;
     });
     saveToStorage(USERS_KEY, users);
+    addNotification({
+        type: 'user',
+        action: 'update',
+        title: 'تحديث مستخدم',
+        message: `تم تحديث بيانات المستخدم: ${updatedUser.username}`
+    });
     debouncedSync();
     if (currentUser && currentUser.id === updatedUser.id) sessionStorage.setItem(CURRENT_USER_KEY, JSON.stringify(updatedUser));
     return updatedUser;
 };
 
 export const deleteUser = (userId: string): void => {
-    saveToStorage(USERS_KEY, getUsers().filter(u => u.id !== userId));
+    const users = getUsers();
+    const userToDelete = users.find(u => u.id === userId);
+    saveToStorage(USERS_KEY, users.filter(u => u.id !== userId));
+    if (userToDelete) {
+        addNotification({
+            type: 'user',
+            action: 'delete',
+            title: 'حذف مستخدم',
+            message: `تم حذف المستخدم: ${userToDelete.username}`
+        });
+    }
     debouncedSync();
 };
 
@@ -435,6 +484,12 @@ export const addWarehouse = (warehouse: Omit<Warehouse, 'id'>): Warehouse => {
   const newWarehouse: Warehouse = { ...warehouse, id: `wh-${Date.now()}` };
   warehouses.push(newWarehouse);
   saveToStorage(WAREHOUSES_KEY, warehouses);
+  addNotification({
+    type: 'warehouse',
+    action: 'add',
+    title: 'إضافة مستودع',
+    message: `تم إضافة مستودع جديد: ${newWarehouse.name}`
+  });
   debouncedSync();
   return newWarehouse;
 };
@@ -445,13 +500,28 @@ export const updateWarehouse = (warehouse: Warehouse): void => {
   if (index !== -1) {
     warehouses[index] = warehouse;
     saveToStorage(WAREHOUSES_KEY, warehouses);
+    addNotification({
+      type: 'warehouse',
+      action: 'update',
+      title: 'تحديث مستودع',
+      message: `تم تحديث بيانات مستودع: ${warehouse.name}`
+    });
     debouncedSync();
   }
 };
 
 export const deleteWarehouse = (id: string): void => {
   const warehouses = getWarehouses();
+  const warehouseToDelete = warehouses.find(w => w.id === id);
   saveToStorage(WAREHOUSES_KEY, warehouses.filter(w => w.id !== id));
+  if (warehouseToDelete) {
+    addNotification({
+      type: 'warehouse',
+      action: 'delete',
+      title: 'حذف مستودع',
+      message: `تم حذف مستودع: ${warehouseToDelete.name}`
+    });
+  }
   debouncedSync();
 };
 
@@ -483,6 +553,12 @@ export const addMaterial = (materialData: Omit<Material, 'id' | 'isNew'>): Mater
     }
 
     saveToStorage(MATERIALS_KEY, [...materials, newMaterial]);
+    addNotification({
+        type: 'material',
+        action: 'add',
+        title: 'إضافة مادة',
+        message: `تم إضافة مادة جديدة: ${newMaterial.name}`
+    });
     debouncedSync();
     return newMaterial;
 };
@@ -494,6 +570,12 @@ export const updateMaterial = (updatedMaterial: Material): Material => {
 
     const materials = getMaterials().map(m => m.id === materialToSave.id ? materialToSave : m);
     saveToStorage(MATERIALS_KEY, materials);
+    addNotification({
+        type: 'material',
+        action: 'update',
+        title: 'تحديث مادة',
+        message: `تم تحديث بيانات مادة: ${materialToSave.name}`
+    });
     debouncedSync();
     return materialToSave;
 };
@@ -504,7 +586,17 @@ export const acknowledgeNewMaterial = (materialId: string): void => {
 };
 
 export const deleteMaterial = (materialId: string): void => {
-    saveToStorage(MATERIALS_KEY, getMaterials().filter(m => m.id !== materialId));
+    const materials = getMaterials();
+    const materialToDelete = materials.find(m => m.id === materialId);
+    saveToStorage(MATERIALS_KEY, materials.filter(m => m.id !== materialId));
+    if (materialToDelete) {
+        addNotification({
+            type: 'material',
+            action: 'delete',
+            title: 'حذف مادة',
+            message: `تم حذف مادة: ${materialToDelete.name}`
+        });
+    }
     debouncedSync();
 };
 
@@ -567,6 +659,12 @@ export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'materi
     
     saveToStorage(MATERIALS_KEY, materials);
     saveToStorage(TRANSACTIONS_KEY, [...transactions, newTransaction]);
+    addNotification({
+        type: 'transaction',
+        action: 'add',
+        title: 'حركة مخزنية جديدة',
+        message: `تم إضافة حركة ${newTransaction.type === 'in' ? 'وارد' : newTransaction.type === 'out' ? 'صادر' : 'تحويل'} للمادة: ${newTransaction.materialName}`
+    });
     debouncedSync();
 
     return newTransaction;
@@ -600,6 +698,12 @@ export const deleteTransaction = (transactionId: string): void => {
     }
 
     saveToStorage(TRANSACTIONS_KEY, transactions.filter(t => t.id !== transactionId));
+    addNotification({
+        type: 'transaction',
+        action: 'delete',
+        title: 'حذف حركة مخزنية',
+        message: `تم حذف حركة للمادة: ${transaction.materialName}`
+    });
     debouncedSync();
 };
 
@@ -649,6 +753,12 @@ export const updateTransaction = (updatedTransaction: Transaction): Transaction 
 
     const updatedTransactions = transactions.map(t => t.id === updatedTransaction.id ? updatedTransaction : t);
     saveToStorage(TRANSACTIONS_KEY, updatedTransactions);
+    addNotification({
+        type: 'transaction',
+        action: 'update',
+        title: 'تحديث حركة مخزنية',
+        message: `تم تحديث بيانات حركة للمادة: ${updatedTransaction.materialName}`
+    });
     debouncedSync();
 
     return updatedTransaction;
@@ -674,6 +784,12 @@ export const getSettings = (): SettingsData => {
 };
 export const saveSettings = (settings: SettingsData): void => { 
     saveToStorage(SETTINGS_KEY, settings); 
+    addNotification({
+        type: 'settings',
+        action: 'update',
+        title: 'تحديث الإعدادات',
+        message: 'تم تحديث إعدادات النظام'
+    });
     debouncedSync(); // Sync immediately when settings are saved
 };
 

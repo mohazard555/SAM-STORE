@@ -163,3 +163,13 @@ export interface SyncStatus {
   lastSync?: string;
   error?: string;
 }
+
+export interface AppNotification {
+  id: string;
+  type: 'material' | 'transaction' | 'warehouse' | 'user' | 'settings';
+  action: 'add' | 'update' | 'delete';
+  title: string;
+  message: string;
+  timestamp: string;
+  user: string;
+}

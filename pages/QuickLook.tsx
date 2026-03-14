@@ -75,6 +75,7 @@ const QuickLook: React.FC<QuickLookProps> = ({ materials, transactions, user, se
   const handleExport = () => {
     const dataToExport = filteredData.map(m => ({
       "اسم المادة": m.name,
+      "اللون": m.color || '-',
       "الفئة": m.category,
       "الوحدة": m.unit,
       "الرصيد الكامل": m.fullBalance,
@@ -110,6 +111,7 @@ const QuickLook: React.FC<QuickLookProps> = ({ materials, transactions, user, se
           <thead>
             <tr>
               <th>اسم المادة</th>
+              <th>اللون</th>
               <th>الفئة</th>
               <th>الوحدة</th>
               <th>الرصيد الكامل</th>
@@ -122,6 +124,7 @@ const QuickLook: React.FC<QuickLookProps> = ({ materials, transactions, user, se
             ${filteredData.map(m => `
               <tr>
                 <td>${m.name}</td>
+                <td>${m.color || '-'}</td>
                 <td>${m.category}</td>
                 <td>${m.unit}</td>
                 <td>${m.fullBalance}</td>
@@ -212,6 +215,7 @@ const QuickLook: React.FC<QuickLookProps> = ({ materials, transactions, user, se
                   <th className="p-4 border-b dark:border-gray-600 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" onClick={() => handleSort('name')}>
                     <div className="flex items-center gap-1">اسم المادة {sortConfig?.key === 'name' && (sortConfig.direction === 'asc' ? <ChevronUp size={14}/> : <ChevronDown size={14}/>)}</div>
                   </th>
+                  <th className="p-4 border-b dark:border-gray-600">اللون</th>
                   <th className="p-4 border-b dark:border-gray-600">الفئة</th>
                   <th className="p-4 border-b dark:border-gray-600">الوحدة</th>
                   <th className="p-4 border-b dark:border-gray-600 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600" onClick={() => handleSort('fullBalance')}>
@@ -230,6 +234,7 @@ const QuickLook: React.FC<QuickLookProps> = ({ materials, transactions, user, se
                 {filteredData.length > 0 ? filteredData.map((m) => (
                   <tr key={m.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
                     <td className="p-4 text-gray-900 dark:text-white font-medium">{m.name}</td>
+                    <td className="p-4 text-gray-600 dark:text-gray-400 text-xs">{m.color || '-'}</td>
                     <td className="p-4 text-gray-600 dark:text-gray-400">{m.category}</td>
                     <td className="p-4 text-gray-600 dark:text-gray-400">{m.unit}</td>
                     <td className="p-4 text-emerald-600 dark:text-emerald-400 font-bold">{m.fullBalance}</td>
@@ -243,7 +248,7 @@ const QuickLook: React.FC<QuickLookProps> = ({ materials, transactions, user, se
                   </tr>
                 )) : (
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-gray-500 dark:text-gray-400 italic">لا توجد مواد تطابق البحث</td>
+                    <td colSpan={8} className="p-8 text-center text-gray-500 dark:text-gray-400 italic">لا توجد مواد تطابق البحث</td>
                   </tr>
                 )}
               </tbody>

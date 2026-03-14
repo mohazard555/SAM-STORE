@@ -247,13 +247,12 @@ const MaterialModal: React.FC<{
                                     value={formData.stocks[w.id] || 0} 
                                     onChange={(e) => handleStockChange(w.id, e.target.value)}
                                     className="w-1/2 p-1 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm"
-                                    disabled={isEditing} // Prevent editing stock directly if editing material
-                                    title={isEditing ? "لا يمكن تعديل الرصيد من هنا. استخدم الحركات اليومية." : ""}
+                                    title="يمكنك تعديل الرصيد الافتتاحي هنا أو عبر الحركات اليومية."
                                 />
                             </div>
                         ))}
                     </div>
-                    {isEditing && <p className="text-[10px] text-amber-500 mt-1">تعديل الأرصدة يتم عبر الحركات اليومية فقط.</p>}
+                    {isEditing && <p className="text-[10px] text-amber-500 mt-1">تنبيه: تعديل الرصيد الافتتاحي سيؤثر على الرصيد الإجمالي للمادة.</p>}
                 </div>
 
                 <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-dashed border-gray-300 dark:border-gray-600">

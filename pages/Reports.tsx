@@ -34,7 +34,7 @@ interface ReportsProps {
   user: User;
 }
 
-type ReportType = 'daily' | 'weekly' | 'monthly' | 'byMaterial' | 'byCategory' | 'byBarcode' | 'byItemBarcode' | 'totalCount' | 'all' | 'bySupplier' | 'mostUsed' | 'inactive' | 'lowStock' | 'inventoryValue';
+type ReportType = 'daily' | 'weekly' | 'monthly' | 'byMaterial' | 'byCategory' | 'byColor' | 'byBarcode' | 'byItemBarcode' | 'totalCount' | 'all' | 'bySupplier' | 'mostUsed' | 'inactive' | 'lowStock' | 'inventoryValue';
 
 const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, settings, user }) => {
   const { triggerPrint } = usePrint();
@@ -45,6 +45,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
   const [selectedBarcode, setSelectedBarcode] = useState('');
   const [selectedItemBarcode, setSelectedItemBarcode] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedColor, setSelectedColor] = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState('');
   const [selectedWarehouseId, setSelectedWarehouseId] = useState('');
 
@@ -55,6 +56,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
   const [searchFilterType, setSearchFilterType] = useState('');
   const [searchMaterial, setSearchMaterial] = useState('');
   const [searchCategory, setSearchCategory] = useState('');
+  const [searchColor, setSearchColor] = useState('');
   const [searchSupplier, setSearchSupplier] = useState('');
   const [searchBarcode, setSearchBarcode] = useState('');
   const [searchItemBarcode, setSearchItemBarcode] = useState('');
@@ -62,6 +64,11 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
   const uniqueCategories = useMemo(() => {
     const categories = materials.map(m => m.category);
     return [...new Set(categories)].filter(Boolean);
+  }, [materials]);
+
+  const uniqueColors = useMemo(() => {
+    const colors = materials.map(m => m.color);
+    return [...new Set(colors)].filter(Boolean);
   }, [materials]);
   
   const uniqueSuppliers = useMemo(() => {
@@ -97,26 +104,27 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
   }
 
   const dateFilteredTransactions = useMemo(() => {
-    const timeSensitiveReports: ReportType[] = ['daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byBarcode', 'byItemBarcode', 'bySupplier', 'mostUsed', 'all'];
+    const timeSensitiveReports: ReportType[] = ['daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byColor', 'byBarcode', 'byItemBarcode', 'bySupplier', 'mostUsed', 'all'];
     if (!timeSensitiveReports.includes(filterType)) {
         return transactions;
     }
 
+    // Use UTC for consistent filtering
     const start = new Date(startDate);
-    start.setHours(0, 0, 0, 0);
+    start.setUTCHours(0, 0, 0, 0);
 
     let end: Date;
     if (filterType === 'daily') {
         end = new Date(start);
-        end.setHours(23, 59, 59, 999);
+        end.setUTCHours(23, 59, 59, 999);
     } else {
         end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
+        end.setUTCHours(23, 59, 59, 999);
     }
     
     return transactions.filter(t => {
       const tDate = new Date(t.date);
-      return tDate >= start && tDate <= end;
+      return tDate.getTime() >= start.getTime() && tDate.getTime() <= end.getTime();
     });
   }, [transactions, filterType, startDate, endDate]);
 
@@ -169,6 +177,9 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
         if (filterType === 'byCategory' && selectedCategory) {
             const materialIdsInCategory = materials.filter(m => m.category === selectedCategory).map(m => m.id);
             result = result.filter(t => materialIdsInCategory.includes(t.materialId));
+        }
+        if (filterType === 'byColor' && selectedColor) {
+            result = result.filter(t => t.color === selectedColor);
         }
         if (filterType === 'bySupplier' && selectedSupplier) {
             const materialIdsFromSupplier = materials.filter(m => m.supplier === selectedSupplier).map(m => m.id);
@@ -299,7 +310,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
   };
   
   const canPerformAction = reportData && reportData.length > 0;
-  const showDatePickers = ['all', 'daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byBarcode', 'byItemBarcode', 'bySupplier', 'mostUsed'].includes(filterType);
+  const showDatePickers = ['all', 'daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byColor', 'byBarcode', 'byItemBarcode', 'bySupplier', 'mostUsed'].includes(filterType);
 
   // Helper for filtered report options
   const reportOptions = [
@@ -309,6 +320,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
     { value: 'monthly', label: 'تقرير شهري', icon: Calendar, color: 'violet', bgColor: 'bg-violet-100', textColor: 'text-violet-600', darkBg: 'dark:bg-violet-900/30', darkText: 'dark:text-violet-400', glow: 'bg-violet-500', description: 'جرد وحركات الشهر الحالي' },
     { value: 'byMaterial', label: 'حسب المادة', icon: Package, color: 'emerald', bgColor: 'bg-emerald-100', textColor: 'text-emerald-600', darkBg: 'dark:bg-emerald-900/30', darkText: 'dark:text-emerald-400', glow: 'bg-emerald-500', description: 'تتبع حركات مادة محددة بالتفصيل' },
     { value: 'byCategory', label: 'حسب الفئة', icon: Layers, color: 'teal', bgColor: 'bg-teal-100', textColor: 'text-teal-600', darkBg: 'dark:bg-teal-900/30', darkText: 'dark:text-teal-400', glow: 'bg-teal-500', description: 'عرض الحركات لمجموعة مواد معينة' },
+    { value: 'byColor', label: 'حسب اللون', icon: Layers, color: 'pink', bgColor: 'bg-pink-100', textColor: 'text-pink-600', darkBg: 'dark:bg-pink-900/30', darkText: 'dark:text-pink-400', glow: 'bg-pink-500', description: 'عرض الحركات لمواد بلون محدد' },
     { value: 'bySupplier', label: 'حسب المورد', icon: Truck, color: 'orange', bgColor: 'bg-orange-100', textColor: 'text-orange-600', darkBg: 'dark:bg-orange-900/30', darkText: 'dark:text-orange-400', glow: 'bg-orange-500', description: 'تقارير المواد المرتبطة بمورد محدد' },
     { value: 'byBarcode', label: 'حسب الباركود', icon: Barcode, color: 'cyan', bgColor: 'bg-cyan-100', textColor: 'text-cyan-600', darkBg: 'dark:bg-cyan-900/30', darkText: 'dark:text-cyan-400', glow: 'bg-cyan-500', description: 'البحث عن حركات مادة عبر الباركود' },
     { value: 'byItemBarcode', label: 'باركود الصنف', icon: QrCode, color: 'pink', bgColor: 'bg-pink-100', textColor: 'text-pink-600', darkBg: 'dark:bg-pink-900/30', darkText: 'dark:text-pink-400', glow: 'bg-pink-500', description: 'تتبع صنف محدد عبر باركود القصة' },
@@ -464,7 +476,23 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
                           </div>
                           <select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)} className="p-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white w-48 focus:ring-2 focus:ring-blue-500 outline-none" disabled={uniqueCategories.length === 0}>
                               <option value="">-- اختر الفئة --</option>
-                              {uniqueCategories.filter(c => c.includes(searchCategory)).map(c => <option key={c} value={c}>{c}</option>)}
+                              {uniqueCategories.filter(c => c && c.includes(searchCategory)).map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                      </div>
+                  </div>
+              )}
+
+              {filterType === 'byColor' && (
+                  <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-400 block mr-1">اختر اللون</label>
+                      <div className="flex gap-2">
+                          <div className="relative">
+                            <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                            <input type="text" placeholder="بحث..." value={searchColor} onChange={e => setSearchColor(e.target.value)} className="w-24 p-2 pr-7 border rounded-lg text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                          </div>
+                          <select value={selectedColor} onChange={e => setSelectedColor(e.target.value)} className="p-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white w-48 focus:ring-2 focus:ring-blue-500 outline-none" disabled={uniqueColors.length === 0}>
+                              <option value="">-- اختر اللون --</option>
+                              {uniqueColors.filter(c => c && c.includes(searchColor)).map(c => <option key={c} value={c}>{c}</option>)}
                           </select>
                       </div>
                   </div>
@@ -480,7 +508,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
                           </div>
                           <select value={selectedSupplier} onChange={e => setSelectedSupplier(e.target.value)} className="p-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white w-48 focus:ring-2 focus:ring-blue-500 outline-none" disabled={uniqueSuppliers.length === 0}>
                               <option value="">-- اختر المورد --</option>
-                              {uniqueSuppliers.filter(s => s.includes(searchSupplier)).map(s => <option key={s} value={s}>{s}</option>)}
+                              {uniqueSuppliers.filter(s => s && s.includes(searchSupplier)).map(s => <option key={s} value={s}>{s}</option>)}
                           </select>
                       </div>
                   </div>
@@ -496,7 +524,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
                           </div>
                           <select value={selectedBarcode} onChange={e => setSelectedBarcode(e.target.value)} className="p-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white w-48 focus:ring-2 focus:ring-blue-500 outline-none" disabled={uniqueBarcodes.length === 0}>
                               <option value="">-- اختر الباركود --</option>
-                              {uniqueBarcodes.filter(b => b.includes(searchBarcode)).map(b => <option key={b} value={b}>{b}</option>)}
+                              {uniqueBarcodes.filter(b => b && b.includes(searchBarcode)).map(b => <option key={b} value={b}>{b}</option>)}
                           </select>
                       </div>
                   </div>
