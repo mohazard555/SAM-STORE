@@ -22,7 +22,8 @@ import {
   ChevronLeft,
   ChevronRight,
   PlusCircle,
-  RotateCcw
+  RotateCcw,
+  User as UserIcon
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { motion, AnimatePresence } from 'motion/react';
@@ -36,12 +37,15 @@ interface ReportsProps {
   user: User;
 }
 
-type ReportType = 'daily' | 'weekly' | 'monthly' | 'byMaterial' | 'byCategory' | 'byColor' | 'byBarcode' | 'byItemBarcode' | 'totalCount' | 'all' | 'bySupplier' | 'mostUsed' | 'inactive' | 'lowStock' | 'inventoryValue' | 'inTransactions' | 'outTransactions';
+type ReportType = 'daily' | 'weekly' | 'monthly' | 'byMaterial' | 'byCategory' | 'byColor' | 'byBarcode' | 'byItemBarcode' | 'totalCount' | 'all' | 'bySupplier' | 'mostUsed' | 'inactive' | 'lowStock' | 'inventoryValue' | 'inTransactions' | 'outTransactions' | 'byRecipient';
 
 const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, settings, user }) => {
   const { triggerPrint } = usePrint();
   const [filterType, setFilterType] = useState<ReportType>('all');
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  });
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedMaterialId, setSelectedMaterialId] = useState(materials[0]?.id || '');
   const [selectedBarcode, setSelectedBarcode] = useState('');
@@ -49,6 +53,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState('');
+  const [selectedRecipient, setSelectedRecipient] = useState('');
   const [selectedWarehouseId, setSelectedWarehouseId] = useState('');
 
   const canPrint = user.role === 'admin' || user.permissions?.canPrint;
@@ -60,6 +65,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
   const [searchCategory, setSearchCategory] = useState('');
   const [searchColor, setSearchColor] = useState('');
   const [searchSupplier, setSearchSupplier] = useState('');
+  const [searchRecipient, setSearchRecipient] = useState('');
   const [searchBarcode, setSearchBarcode] = useState('');
   const [searchItemBarcode, setSearchItemBarcode] = useState('');
 
@@ -88,6 +94,11 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
     return [...new Set(barcodes)].filter(Boolean);
   }, [transactions]);
 
+  const uniqueRecipients = useMemo(() => {
+    const recipients = transactions.map(t => t.recipient);
+    return [...new Set(recipients)].filter(Boolean);
+  }, [transactions]);
+
   const handleFilterChange = (type: ReportType) => {
     setFilterType(type);
     const today = new Date();
@@ -106,7 +117,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
   }
 
   const dateFilteredTransactions = useMemo(() => {
-    const timeSensitiveReports: ReportType[] = ['daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byColor', 'byBarcode', 'byItemBarcode', 'bySupplier', 'mostUsed', 'all', 'inTransactions', 'outTransactions'];
+    const timeSensitiveReports: ReportType[] = ['daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byColor', 'byBarcode', 'byItemBarcode', 'bySupplier', 'mostUsed', 'all', 'inTransactions', 'outTransactions', 'byRecipient'];
     if (!timeSensitiveReports.includes(filterType)) {
         return transactions;
     }
@@ -203,9 +214,12 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
         if (filterType === 'byItemBarcode' && selectedItemBarcode) {
             result = result.filter(t => t.itemBarcode === selectedItemBarcode);
         }
+        if (filterType === 'byRecipient' && selectedRecipient) {
+            result = result.filter(t => t.recipient === selectedRecipient);
+        }
         return [...result].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }
-  }, [materials, transactions, dateFilteredTransactions, filterType, selectedMaterialId, selectedCategory, selectedSupplier, selectedBarcode]);
+  }, [materials, transactions, dateFilteredTransactions, filterType, selectedMaterialId, selectedCategory, selectedSupplier, selectedBarcode, selectedRecipient]);
   
   const exportToXLSX = () => {
     let dataToExport: any[] = [];
@@ -322,13 +336,14 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
   };
   
   const canPerformAction = reportData && reportData.length > 0;
-  const showDatePickers = ['all', 'daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byColor', 'byBarcode', 'byItemBarcode', 'bySupplier', 'mostUsed', 'inTransactions', 'outTransactions'].includes(filterType);
+  const showDatePickers = ['all', 'daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byColor', 'byBarcode', 'byItemBarcode', 'bySupplier', 'mostUsed', 'inTransactions', 'outTransactions', 'byRecipient'].includes(filterType);
 
   // Helper for filtered report options
   const reportOptions = [
     { value: 'all', label: 'كل الحركات', icon: History, color: 'blue', bgColor: 'bg-blue-100', textColor: 'text-blue-600', darkBg: 'dark:bg-blue-900/30', darkText: 'dark:text-blue-400', glow: 'bg-blue-500', description: 'عرض جميع حركات الصادر والوارد' },
     { value: 'inTransactions', label: 'إدخالات المواد', icon: PlusCircle, color: 'emerald', bgColor: 'bg-emerald-100', textColor: 'text-emerald-600', darkBg: 'dark:bg-emerald-900/30', darkText: 'dark:text-emerald-400', glow: 'bg-emerald-500', description: 'عرض جميع عمليات التوريد والإدخال' },
     { value: 'outTransactions', label: 'صادر المواد', icon: RotateCcw, color: 'orange', bgColor: 'bg-orange-100', textColor: 'text-orange-600', darkBg: 'dark:bg-orange-900/30', darkText: 'dark:text-orange-400', glow: 'bg-orange-500', description: 'عرض جميع عمليات الصرف والإخراج' },
+    { value: 'byRecipient', label: 'حسب المستلم', icon: UserIcon, color: 'sky', bgColor: 'bg-sky-100', textColor: 'text-sky-600', darkBg: 'dark:bg-sky-900/30', darkText: 'dark:text-sky-400', glow: 'bg-sky-500', description: 'عرض الحركات لشخص مستلم محدد' },
     { value: 'daily', label: 'تقرير يومي', icon: CalendarDays, color: 'indigo', bgColor: 'bg-indigo-100', textColor: 'text-indigo-600', darkBg: 'dark:bg-indigo-900/30', darkText: 'dark:text-indigo-400', glow: 'bg-indigo-500', description: 'حركات المخزن خلال اليوم الحالي' },
     { value: 'weekly', label: 'تقرير أسبوعي', icon: CalendarRange, color: 'purple', bgColor: 'bg-purple-100', textColor: 'text-purple-600', darkBg: 'dark:bg-purple-900/30', darkText: 'dark:text-purple-400', glow: 'bg-purple-500', description: 'ملخص الحركات خلال الأسبوع الجاري' },
     { value: 'monthly', label: 'تقرير شهري', icon: Calendar, color: 'violet', bgColor: 'bg-violet-100', textColor: 'text-violet-600', darkBg: 'dark:bg-violet-900/30', darkText: 'dark:text-violet-400', glow: 'bg-violet-500', description: 'جرد وحركات الشهر الحالي' },
@@ -555,6 +570,22 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
                           <select value={selectedItemBarcode} onChange={e => setSelectedItemBarcode(e.target.value)} className="p-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white w-48 focus:ring-2 focus:ring-blue-500 outline-none" disabled={uniqueItemBarcodes.length === 0}>
                               <option value="">-- اختر الباركود --</option>
                               {uniqueItemBarcodes.filter(b => b && b.includes(searchItemBarcode)).map(b => <option key={b} value={b}>{b}</option>)}
+                          </select>
+                      </div>
+                  </div>
+              )}
+
+              {filterType === 'byRecipient' && (
+                  <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-400 block mr-1">اختر المستلم</label>
+                      <div className="flex gap-2">
+                          <div className="relative">
+                            <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                            <input type="text" placeholder="بحث..." value={searchRecipient} onChange={e => setSearchRecipient(e.target.value)} className="w-24 p-2 pr-7 border rounded-lg text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                          </div>
+                          <select value={selectedRecipient} onChange={e => setSelectedRecipient(e.target.value)} className="p-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white w-48 focus:ring-2 focus:ring-blue-500 outline-none" disabled={uniqueRecipients.length === 0}>
+                              <option value="">-- اختر المستلم --</option>
+                              {uniqueRecipients.filter(r => r && r.includes(searchRecipient)).map(r => <option key={r} value={r}>{r}</option>)}
                           </select>
                       </div>
                   </div>

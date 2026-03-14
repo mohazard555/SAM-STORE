@@ -698,6 +698,44 @@ export const deleteMaterial = (materialId: string): void => {
 
 export const getTransactions = (): Transaction[] => getFromStorage<Transaction[]>(TRANSACTIONS_KEY, []);
 
+export const repairInitialTransactions = (): void => {
+    const materials = getMaterials();
+    const transactions = getTransactions();
+    
+    let repairedCount = 0;
+    
+    materials.forEach(material => {
+        // Check if this material has any 'in' or 'return_in' transactions
+        const hasInTransaction = transactions.some((t: Transaction) => 
+            t.materialId === material.id && (t.type === 'in' || t.type === 'return_in')
+        );
+        
+        // If it has stock but no "In" transaction, create one for the opening balance
+        if (!hasInTransaction && material.currentStock > 0) {
+            Object.entries(material.stocks || {}).forEach(([warehouseId, quantity]) => {
+                if (quantity > 0) {
+                    addTransaction({
+                        type: 'in',
+                        materialId: material.id,
+                        quantity: quantity,
+                        warehouseId: warehouseId,
+                        recipient: 'رصيد افتتاحي (إصلاح تلقائي)',
+                        notes: 'تم توليد هذه الحركة تلقائياً لضمان ظهور الرصيد في التقارير',
+                        date: material.createdAt || new Date().toISOString(),
+                        color: material.color
+                    });
+                    repairedCount++;
+                }
+            });
+        }
+    });
+    
+    if (repairedCount > 0) {
+        console.log(`Repaired ${repairedCount} initial stock transactions.`);
+        debouncedSync();
+    }
+};
+
 export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'materialName' | 'supplier' | 'category' | 'barcode' | 'unit' | 'materialType'>): Transaction => {
     const transactions = getTransactions();
     let materials = getMaterials();
@@ -725,7 +763,7 @@ export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'materi
 
     const newTransaction: Transaction = {
         ...transactionData,
-        id: `t${Date.now()}`,
+        id: `t${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         date: parseDateSafely(transactionData.date || ''),
         materialName: material.name,
         materialType: material.materialType,
@@ -768,7 +806,7 @@ export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'materi
 
 export const deleteTransaction = (transactionId: string): void => {
     const transactions = getTransactions();
-    const transaction = transactions.find(t => t.id === transactionId);
+    const transaction = transactions.find((t: Transaction) => t.id === transactionId);
     if (!transaction) return;
 
     let materials = getMaterials();
@@ -793,7 +831,7 @@ export const deleteTransaction = (transactionId: string): void => {
         saveToStorage(MATERIALS_KEY, materials);
     }
 
-    saveToStorage(TRANSACTIONS_KEY, transactions.filter(t => t.id !== transactionId));
+    saveToStorage(TRANSACTIONS_KEY, transactions.filter((t: Transaction) => t.id !== transactionId));
     addNotification({
         type: 'transaction',
         action: 'delete',
@@ -805,7 +843,7 @@ export const deleteTransaction = (transactionId: string): void => {
 
 export const updateTransaction = (updatedTransaction: Transaction): Transaction => {
     const transactions = getTransactions();
-    const oldTransaction = transactions.find(t => t.id === updatedTransaction.id);
+    const oldTransaction = transactions.find((t: Transaction) => t.id === updatedTransaction.id);
     if (!oldTransaction) return updatedTransaction;
 
     let materials = getMaterials();
@@ -847,7 +885,7 @@ export const updateTransaction = (updatedTransaction: Transaction): Transaction 
         saveToStorage(MATERIALS_KEY, materials);
     }
 
-    const updatedTransactions = transactions.map(t => t.id === updatedTransaction.id ? updatedTransaction : t);
+    const updatedTransactions = transactions.map((t: Transaction) => t.id === updatedTransaction.id ? updatedTransaction : t);
     saveToStorage(TRANSACTIONS_KEY, updatedTransactions);
     addNotification({
         type: 'transaction',

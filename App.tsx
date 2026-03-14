@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Login from '@/pages/Login';
 import MainLayout from '@/components/layout/MainLayout';
-import { getCurrentUser, initializeDataSource, getSettings } from '@/services/mockApi';
+import { getCurrentUser, initializeDataSource, getSettings, repairInitialTransactions } from '@/services/mockApi';
 import { usePrint } from '@/services/PrintContext';
 import { User } from '@/types';
 
@@ -36,6 +36,9 @@ function App() {
       }
 
       const currentUser = getCurrentUser();
+      if (currentUser) {
+          repairInitialTransactions();
+      }
       setUser(currentUser);
       setLoading(false);
     };
