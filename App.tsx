@@ -65,6 +65,7 @@ function App() {
   }, [darkMode]);
 
   const handleLogin = (loggedInUser: User) => {
+    repairInitialTransactions();
     setUser(loggedInUser);
   };
 

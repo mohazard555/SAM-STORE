@@ -699,6 +699,7 @@ export const deleteMaterial = (materialId: string): void => {
 export const getTransactions = (): Transaction[] => getFromStorage<Transaction[]>(TRANSACTIONS_KEY, []);
 
 export const repairInitialTransactions = (): void => {
+    console.log("Checking for missing initial transactions...");
     const materials = getMaterials();
     const transactions = getTransactions();
     
@@ -712,27 +713,39 @@ export const repairInitialTransactions = (): void => {
         
         // If it has stock but no "In" transaction, create one for the opening balance
         if (!hasInTransaction && material.currentStock > 0) {
+            console.log(`Repairing initial stock for material: ${material.name}`);
             Object.entries(material.stocks || {}).forEach(([warehouseId, quantity]) => {
                 if (quantity > 0) {
-                    addTransaction({
-                        type: 'in',
-                        materialId: material.id,
-                        quantity: quantity,
-                        warehouseId: warehouseId,
-                        recipient: 'رصيد افتتاحي (إصلاح تلقائي)',
-                        notes: 'تم توليد هذه الحركة تلقائياً لضمان ظهور الرصيد في التقارير',
-                        date: material.createdAt || new Date().toISOString(),
-                        color: material.color
-                    });
-                    repairedCount++;
+                    // Double check if we already added this specific repair in this session
+                    const isAlreadyRepaired = transactions.some((t: Transaction) => 
+                        t.materialId === material.id && 
+                        t.warehouseId === warehouseId && 
+                        t.notes === 'تم توليد هذه الحركة تلقائياً لضمان ظهور الرصيد في التقارير'
+                    );
+
+                    if (!isAlreadyRepaired) {
+                        addTransaction({
+                            type: 'in',
+                            materialId: material.id,
+                            quantity: quantity,
+                            warehouseId: warehouseId,
+                            recipient: 'رصيد افتتاحي (إصلاح تلقائي)',
+                            notes: 'تم توليد هذه الحركة تلقائياً لضمان ظهور الرصيد في التقارير',
+                            date: material.createdAt || new Date().toISOString(),
+                            color: material.color
+                        });
+                        repairedCount++;
+                    }
                 }
             });
         }
     });
     
     if (repairedCount > 0) {
-        console.log(`Repaired ${repairedCount} initial stock transactions.`);
+        console.log(`Successfully repaired ${repairedCount} initial stock transactions.`);
         debouncedSync();
+    } else {
+        console.log("No missing initial transactions found.");
     }
 };
 
