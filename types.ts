@@ -22,6 +22,8 @@ export interface Material {
   stocks: Record<string, number>; // warehouseId -> quantity
   isNew: boolean;
   createdAt: string;
+  expiryDate?: string;
+  reservedStock?: number;
   // Weight formula: X pieces = Y kg
   weightFormula?: {
     pieces: number;
