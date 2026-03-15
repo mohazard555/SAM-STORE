@@ -299,6 +299,9 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
   const [materialToDelete, setMaterialToDelete] = useState<Material | null>(null);
 
+  const [pendingMaterialUpdate, setPendingMaterialUpdate] = useState<Material | null>(null);
+  const [isUpdateConfirmOpen, setIsUpdateConfirmOpen] = useState(false);
+
   const canPrint = user.role === 'admin' || user.permissions?.canPrint;
   const canExport = user.role === 'admin' || user.permissions?.canExport;
   const isAdmin = user.role === 'admin';
@@ -329,8 +332,31 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
   }, [materials, warehouses]);
 
   const handleSave = (material: Omit<Material, 'id' | 'isNew'> | Material) => {
-    if ('id' in material) { updateMaterial(material); } else { addMaterial(material); }
+    if ('id' in material) {
+        const oldMaterial = materials.find(m => m.id === material.id);
+        const stockChanged = oldMaterial && Object.entries(material.stocks).some(([whId, qty]) => (oldMaterial.stocks[whId] || 0) !== qty);
+        
+        if (stockChanged) {
+            setPendingMaterialUpdate(material as Material);
+            setIsUpdateConfirmOpen(true);
+            return;
+        }
+        updateMaterial(material as Material);
+    } else {
+        addMaterial(material);
+    }
     onDataChange(); setIsModalOpen(false); setSelectedMaterial(null);
+  };
+
+  const confirmUpdate = (isCorrection: boolean) => {
+    if (pendingMaterialUpdate) {
+        updateMaterial(pendingMaterialUpdate, isCorrection);
+        setPendingMaterialUpdate(null);
+        setIsUpdateConfirmOpen(false);
+        onDataChange();
+        setIsModalOpen(false);
+        setSelectedMaterial(null);
+    }
   };
   
   // Added date property to transaction to fix TypeScript error
@@ -619,6 +645,44 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
           </tbody>
         </table>
       </div>
+
+      {isUpdateConfirmOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex justify-center items-center p-4">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md text-center">
+                  <div className="flex justify-center mb-4">
+                      <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-full">
+                          <AlertTriangle className="text-amber-600 dark:text-amber-400" size={32} />
+                      </div>
+                  </div>
+                  <h3 className="text-lg font-bold mb-2 dark:text-white">تأكيد تعديل الكمية</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                      لقد قمت بتعديل كمية المخزون. كيف تريد تسجيل هذا التغيير؟
+                  </p>
+                  <div className="grid grid-cols-1 gap-3">
+                      <button 
+                          onClick={() => confirmUpdate(false)} 
+                          className="w-full py-3 px-4 bg-sky-500 hover:bg-sky-600 text-white rounded-xl font-bold transition-colors flex flex-col items-center"
+                      >
+                          <span>تسجيل كحركة (وارد/صادر)</span>
+                          <span className="text-[10px] font-normal opacity-80">سيظهر التغيير في الحركات اليومية والتقارير</span>
+                      </button>
+                      <button 
+                          onClick={() => confirmUpdate(true)} 
+                          className="w-full py-3 px-4 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-white rounded-xl font-bold transition-colors flex flex-col items-center"
+                      >
+                          <span>تصحيح خطأ إدخال فقط</span>
+                          <span className="text-[10px] font-normal text-gray-500 dark:text-gray-400">سيتم تعديل الرصيد مباشرة دون تسجيل حركة</span>
+                      </button>
+                      <button 
+                          onClick={() => { setIsUpdateConfirmOpen(false); setPendingMaterialUpdate(null); }} 
+                          className="w-full py-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-sm"
+                      >
+                          إلغاء
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
 
       {isModalOpen && <MaterialModal material={selectedMaterial} warehouses={warehouses} settings={settings} onClose={() => setIsModalOpen(false)} onSave={handleSave} />}
       {isStockInModalOpen && selectedMaterial && (

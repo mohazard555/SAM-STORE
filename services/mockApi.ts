@@ -619,11 +619,11 @@ export const addMaterial = (materialData: Omit<Material, 'id' | 'isNew'>): Mater
     return finalMaterials.find(m => m.id === newMaterial.id) || newMaterial;
 };
 
-export const updateMaterial = (updatedMaterial: Material): Material => {
+export const updateMaterial = (updatedMaterial: Material, isCorrection: boolean = false): Material => {
     const materials = getMaterials();
     const oldMaterial = materials.find(m => m.id === updatedMaterial.id);
     
-    if (oldMaterial) {
+    if (oldMaterial && !isCorrection) {
         // Check for stock changes in the modal (Opening Balance edits)
         Object.entries(updatedMaterial.stocks || {}).forEach(([warehouseId, newQty]) => {
             const oldQty = oldMaterial.stocks[warehouseId] || 0;
@@ -645,7 +645,7 @@ export const updateMaterial = (updatedMaterial: Material): Material => {
 
     // Recalculate total stock based on current state (after transactions)
     const currentMaterials = getMaterials();
-    const materialToSave = currentMaterials.find(m => m.id === updatedMaterial.id) || updatedMaterial;
+    const materialToSave = isCorrection ? updatedMaterial : (currentMaterials.find(m => m.id === updatedMaterial.id) || updatedMaterial);
     
     // Update other fields from updatedMaterial
     const finalMaterial = {
@@ -660,7 +660,9 @@ export const updateMaterial = (updatedMaterial: Material): Material => {
         unit: updatedMaterial.unit,
         price: updatedMaterial.price,
         minStock: updatedMaterial.minStock,
-        weightFormula: updatedMaterial.weightFormula
+        weightFormula: updatedMaterial.weightFormula,
+        currentStock: Object.values(updatedMaterial.stocks || {}).reduce((a, b) => a + b, 0),
+        stocks: updatedMaterial.stocks
     };
 
     const finalMaterialsList = getMaterials().map(m => m.id === finalMaterial.id ? finalMaterial : m);
