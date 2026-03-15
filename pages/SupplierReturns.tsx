@@ -50,7 +50,7 @@ const SupplierReturns: React.FC<SupplierReturnsProps> = ({ transactions, materia
     }, 0);
   }, [filteredReturns, materials]);
 
-  const handleExportExcel = async () => {
+  const handleExportExcel = () => {
     const data = filteredReturns.map(t => {
       const material = materials.find(m => m.id === t.materialId);
       const price = material?.price || 0;
@@ -67,7 +67,7 @@ const SupplierReturns: React.FC<SupplierReturnsProps> = ({ transactions, materia
       };
     });
 
-    await exportToExcel(data, "supplier_returns", "مرتجعات الموردين");
+    exportToExcel(data, "supplier_returns", "مرتجعات الموردين");
   };
 
   const handlePrint = () => {

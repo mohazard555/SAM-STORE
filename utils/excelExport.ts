@@ -7,7 +7,7 @@ import * as XLSX from 'xlsx';
  * @param fileName Name of the file to save
  * @param sheetName Name of the sheet
  */
-export const exportToExcel = async (data: any[], fileName: string, sheetName: string = 'Sheet1') => {
+export const exportToExcel = (data: any[], fileName: string, sheetName: string = 'Sheet1') => {
   if (!data || data.length === 0) return;
 
   // Create worksheet from JSON
@@ -37,31 +37,6 @@ export const exportToExcel = async (data: any[], fileName: string, sheetName: st
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
 
-  const fullFileName = fileName.endsWith('.xlsx') ? fileName : `${fileName}.xlsx`;
-
-  // Try to use File System Access API for "Save As" dialog
-  if ('showSaveFilePicker' in window) {
-    try {
-      const handle = await (window as any).showSaveFilePicker({
-        suggestedName: fullFileName,
-        types: [{
-          description: 'Excel file',
-          accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] }
-        }]
-      });
-      
-      const writable = await handle.createWritable();
-      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-      await writable.write(excelBuffer);
-      await writable.close();
-      return;
-    } catch (err: any) {
-      // If user cancels, just return
-      if (err.name === 'AbortError') return;
-      console.error('File System Access API error, falling back to standard download:', err);
-    }
-  }
-
-  // Fallback to standard browser download
-  XLSX.writeFile(workbook, fullFileName);
+  // Write file
+  XLSX.writeFile(workbook, fileName.endsWith('.xlsx') ? fileName : `${fileName}.xlsx`);
 };

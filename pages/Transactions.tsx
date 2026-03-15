@@ -272,7 +272,7 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, wa
   };
 
   const filteredTransactions = useMemo(() => {
-      let result = transactions.filter(t => !t.isOpeningBalance);
+      let result = [...transactions];
       if (filterStartDate) {
           const start = new Date(filterStartDate);
           start.setHours(0,0,0,0);

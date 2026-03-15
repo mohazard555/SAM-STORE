@@ -153,7 +153,7 @@ const CostMeter: React.FC<CostMeterProps> = ({ materials, user, settings }) => {
     });
   }, [savedCalculations, archiveSearch, archiveStartDate, archiveEndDate]);
 
-  const handleExportArchive = async () => {
+  const handleExportArchive = () => {
     const data = filteredArchive.map(c => ({
       'العنوان': c.title,
       'التاريخ': new Date(c.date).toLocaleString('ar-EG'),
@@ -163,7 +163,7 @@ const CostMeter: React.FC<CostMeterProps> = ({ materials, user, settings }) => {
       'التكلفة الإجمالية': c.totalCost,
       'الوصف': c.description || ''
     }));
-    await exportToExcel(data, "cost_meter_archive", "أرشيف حاسبة الكلف");
+    exportToExcel(data, "cost_meter_archive", "أرشيف حاسبة الكلف");
   };
 
   const handlePrintArchive = () => {

@@ -47,7 +47,7 @@ const Warehouses: React.FC<WarehousesProps> = ({ warehouses, materials, user, se
 
   const totalQuantity = filteredMaterials.reduce((sum, m) => sum + (m.stocks?.[selectedWarehouseId!] || 0), 0);
 
-  const handleExportExcel = async () => {
+  const handleExportExcel = () => {
     if (!selectedWarehouse) return;
     const data = filteredMaterials.map(m => ({
       'الباركود': m.barcode,
@@ -58,7 +58,7 @@ const Warehouses: React.FC<WarehousesProps> = ({ warehouses, materials, user, se
       'الوحدة': m.unit,
     }));
 
-    await exportToExcel(data, `warehouse_${selectedWarehouse.name}_materials`, `مواد ${selectedWarehouse.name}`);
+    exportToExcel(data, `warehouse_${selectedWarehouse.name}_materials`, `مواد ${selectedWarehouse.name}`);
   };
 
   const handlePrint = () => {

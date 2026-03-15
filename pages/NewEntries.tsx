@@ -18,7 +18,7 @@ const NewEntries: React.FC<NewEntriesProps> = ({ materials, user, settings }) =>
   const [endDate, setEndDate] = useState('');
 
   const filteredMaterials = useMemo(() => {
-    return materials.filter(m => m.isNew).filter(m => {
+    return materials.filter(m => {
       const matchesSearch = 
         m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         m.materialType.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -44,7 +44,7 @@ const NewEntries: React.FC<NewEntriesProps> = ({ materials, user, settings }) =>
     });
   }, [materials, searchTerm, startDate, endDate]);
 
-  const handleExportExcel = async () => {
+  const handleExportExcel = () => {
     const data = filteredMaterials.map(m => ({
       'اسم المادة': m.name,
       'التاريخ': m.createdAt ? new Date(m.createdAt).toLocaleDateString('ar-EG') : '-',
@@ -57,7 +57,7 @@ const NewEntries: React.FC<NewEntriesProps> = ({ materials, user, settings }) =>
       'المواصفات': m.specifications
     }));
 
-    await exportToExcel(data, "new_entries", "إدخالات المواد الجديدة");
+    exportToExcel(data, "new_entries", "إدخالات المواد الجديدة");
   };
 
   const handlePrint = () => {
