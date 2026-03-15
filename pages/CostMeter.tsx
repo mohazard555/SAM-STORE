@@ -153,7 +153,7 @@ const CostMeter: React.FC<CostMeterProps> = ({ materials, user, settings }) => {
     });
   }, [savedCalculations, archiveSearch, archiveStartDate, archiveEndDate]);
 
-  const handleExportArchive = () => {
+  const handleExportArchive = async () => {
     const data = filteredArchive.map(c => ({
       'العنوان': c.title,
       'التاريخ': new Date(c.date).toLocaleString('ar-EG'),
@@ -163,7 +163,7 @@ const CostMeter: React.FC<CostMeterProps> = ({ materials, user, settings }) => {
       'التكلفة الإجمالية': c.totalCost,
       'الوصف': c.description || ''
     }));
-    exportToExcel(data, "cost_meter_archive", "أرشيف حاسبة الكلف");
+    await exportToExcel(data, "cost_meter_archive", "أرشيف حاسبة الكلف");
   };
 
   const handlePrintArchive = () => {
@@ -447,6 +447,7 @@ const CostMeter: React.FC<CostMeterProps> = ({ materials, user, settings }) => {
                 <input 
                   type="number" 
                   min="1"
+                  step="0.1"
                   className="w-full p-3 border rounded-xl dark:bg-gray-700 dark:border-gray-600 dark:text-white outline-none focus:ring-2 focus:ring-violet-500 shadow-sm"
                   value={pieceCount}
                   onChange={(e) => setPieceCount(Number(e.target.value))}
@@ -478,6 +479,7 @@ const CostMeter: React.FC<CostMeterProps> = ({ materials, user, settings }) => {
                   <div className="w-32">
                     <input 
                       type="number" 
+                      step="0.1"
                       placeholder="القيمة"
                       className="w-full p-2 border rounded-lg dark:bg-gray-800 dark:border-gray-600 dark:text-white outline-none focus:ring-2 focus:ring-violet-500"
                       value={baseCost}
@@ -502,6 +504,7 @@ const CostMeter: React.FC<CostMeterProps> = ({ materials, user, settings }) => {
                       <div className="w-32">
                         <input 
                           type="number" 
+                          step="0.1"
                           placeholder="القيمة"
                           className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white outline-none focus:ring-2 focus:ring-violet-500"
                           value={part.valuePerPiece}

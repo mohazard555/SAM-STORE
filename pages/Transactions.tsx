@@ -196,7 +196,7 @@ const TransactionModal: React.FC<{
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block mb-1.5 text-sm font-bold text-gray-700 dark:text-gray-300">الكمية</label>
-                            <input type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} step="any" min="0.01" required className="w-full p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm" />
+                            <input type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} step="0.1" min="0.01" required className="w-full p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm" />
                         </div>
                         <div>
                             <label className="block mb-1.5 text-sm font-bold text-gray-700 dark:text-gray-300">اللون</label>

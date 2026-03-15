@@ -1,8 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Material, SettingsData, Transaction, User, Warehouse } from '@/types';
 import { addMaterial, updateMaterial, deleteMaterial, acknowledgeNewMaterial, addTransaction } from '@/services/mockApi';
-import { Plus, Edit, Trash2, AlertTriangle, Printer, Download, CheckCircle, PlusCircle, RotateCcw, Upload } from 'lucide-react';
+import { Plus, Edit, Trash2, AlertTriangle, Printer, Download, CheckCircle, PlusCircle, RotateCcw, Upload, Users, Warehouse as WarehouseIcon } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { exportToExcel } from '@/utils/excelExport';
 import { usePrint } from '@/services/PrintContext';
@@ -56,7 +56,7 @@ const StockInModal: React.FC<{
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block mb-1 text-sm font-medium dark:text-gray-300">الكمية</label>
-                            <input type="number" step="any" min="0" value={amount} onChange={(e) => setAmount(Number(e.target.value))} required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                            <input type="number" step="0.1" min="0" value={amount} onChange={(e) => setAmount(Number(e.target.value))} required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                         </div>
                         <div>
                             <label className="block mb-1 text-sm font-medium dark:text-gray-300">السعر الحالي ({settings?.currencySymbol || 'ج.م'})</label>
@@ -232,7 +232,7 @@ const MaterialModal: React.FC<{
                 </div>
                 <div>
                     <label className="block mb-1 text-xs font-bold text-gray-500 dark:text-gray-400">الحد الأدنى للمخزون</label>
-                    <input type="number" name="minStock" step="any" value={formData.minStock} onChange={handleChange} placeholder="الحد الأدنى" required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                    <input type="number" name="minStock" step="0.1" value={formData.minStock} onChange={handleChange} placeholder="الحد الأدنى" required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                 </div>
                 
                 <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
@@ -243,7 +243,7 @@ const MaterialModal: React.FC<{
                                 <span className="text-sm w-1/2 truncate dark:text-gray-300" title={w.name}>{w.name}</span>
                                 <input 
                                     type="number" 
-                                    step="any"
+                                    step="0.1"
                                     min="0"
                                     value={formData.stocks[w.id] || 0} 
                                     onChange={(e) => handleStockChange(w.id, e.target.value)}
@@ -263,7 +263,7 @@ const MaterialModal: React.FC<{
                             <label className="block text-[10px] mb-1 dark:text-gray-400">عدد القطع</label>
                             <input 
                                 type="number" 
-                                step="any"
+                                step="0.1"
                                 value={formData.weightFormula.pieces} 
                                 onChange={(e) => setFormData(prev => ({ ...prev, weightFormula: { pieces: Number(e.target.value), weight: prev.weightFormula.weight } }))}
                                 className="w-full p-2 text-sm border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
@@ -303,6 +303,31 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
   const canExport = user.role === 'admin' || user.permissions?.canExport;
   const isAdmin = user.role === 'admin';
 
+  const supplierSummary = useMemo(() => {
+    const summary: Record<string, { total: number; count: number; unit: string }> = {};
+    materials.forEach(m => {
+      const key = `${m.supplier}-${m.unit}`;
+      if (!summary[key]) {
+        summary[key] = { total: 0, count: 0, unit: m.unit };
+      }
+      summary[key].total += m.currentStock;
+      summary[key].count += 1;
+    });
+    return summary;
+  }, [materials]);
+
+  const warehouseSummary = useMemo(() => {
+    const summary: Record<string, Record<string, number>> = {};
+    materials.forEach(m => {
+      Object.entries(m.stocks).forEach(([whId, qty]) => {
+        if (!summary[whId]) summary[whId] = {};
+        if (!summary[whId][m.unit]) summary[whId][m.unit] = 0;
+        summary[whId][m.unit] += qty;
+      });
+    });
+    return summary;
+  }, [materials, warehouses]);
+
   const handleSave = (material: Omit<Material, 'id' | 'isNew'> | Material) => {
     if ('id' in material) { updateMaterial(material); } else { addMaterial(material); }
     onDataChange(); setIsModalOpen(false); setSelectedMaterial(null);
@@ -341,7 +366,7 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
   const handleDelete = (id: string) => { deleteMaterial(id); onDataChange(); setMaterialToDelete(null); };
   const handleAcknowledge = (id: string) => { acknowledgeNewMaterial(id); onDataChange(); };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     const dataToExport = materials.map(m => ({ 
       "اسم المادة": m.name, 
       "اللون": m.color || '-', 
@@ -355,7 +380,7 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
       "الحد الأدنى": m.minStock, 
       "المواصفات": m.specifications, 
     }));
-    exportToExcel(dataToExport, "materials_report", "المواد");
+    await exportToExcel(dataToExport, "materials_report", "المواد");
   };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -488,6 +513,49 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
             </button>
           )}
         </div>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border dark:border-gray-700">
+              <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-gray-800 dark:text-white border-b pb-2 dark:border-gray-700">
+                  <Users size={20} className="text-sky-500" /> ملخص حسب المورد والوحدة
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {Object.entries(supplierSummary).map(([key, data]) => {
+                      const [supplier] = key.split('-');
+                      return (
+                          <div key={key} className="p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg border dark:border-gray-700">
+                              <div className="text-[10px] text-gray-500 dark:text-gray-400 font-bold truncate" title={supplier}>{supplier}</div>
+                              <div className="text-lg font-black text-sky-600 dark:text-sky-400">{data.total.toLocaleString()} <span className="text-[10px] font-normal text-gray-400">{data.unit}</span></div>
+                              <div className="text-[10px] text-gray-400">{data.count} أصناف</div>
+                          </div>
+                      );
+                  })}
+                  {Object.keys(supplierSummary).length === 0 && <div className="col-span-full text-center py-4 text-gray-400 italic text-sm">لا توجد بيانات</div>}
+              </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border dark:border-gray-700">
+              <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-gray-800 dark:text-white border-b pb-2 dark:border-gray-700">
+                  <WarehouseIcon size={20} className="text-emerald-500" /> إجمالي الكميات حسب المستودع والوحدة
+              </h3>
+              <div className="space-y-3 max-h-[200px] overflow-y-auto pr-2">
+                  {Object.entries(warehouseSummary).map(([whId, units]) => (
+                      <div key={whId} className="flex flex-col gap-1 p-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg border dark:border-gray-700">
+                          <div className="text-xs font-bold text-gray-700 dark:text-gray-300">{warehouses.find(w => w.id === whId)?.name || 'مستودع غير معروف'}</div>
+                          <div className="flex flex-wrap gap-2">
+                              {Object.entries(units).map(([unit, total]) => (
+                                  <span key={unit} className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded text-[10px] font-bold">
+                                      {total.toLocaleString()} {unit}
+                                  </span>
+                              ))}
+                          </div>
+                      </div>
+                  ))}
+                  {Object.keys(warehouseSummary).length === 0 && <div className="text-center py-4 text-gray-400 italic text-sm">لا توجد بيانات</div>}
+              </div>
+          </div>
       </div>
 
       <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg overflow-x-auto border dark:border-gray-700 transition-colors">

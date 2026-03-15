@@ -159,7 +159,7 @@ const CostWeight: React.FC<CostWeightProps> = ({ materials, user, settings, onMa
     triggerPrint(html);
   };
 
-  const handleExportArchive = () => {
+  const handleExportArchive = async () => {
     const data = filteredArchive.map(c => ({
       'العنوان': c.title,
       'التاريخ': new Date(c.date).toLocaleString('ar-EG'),
@@ -170,7 +170,7 @@ const CostWeight: React.FC<CostWeightProps> = ({ materials, user, settings, onMa
       'الوزن الإجمالي': c.totalWeight,
       'ملاحظات': c.notes || ''
     }));
-    exportToExcel(data, "weight_calculator_archive", "أرشيف حاسبة الوزن");
+    await exportToExcel(data, "weight_calculator_archive", "أرشيف حاسبة الوزن");
   };
 
   return (
@@ -322,6 +322,7 @@ const CostWeight: React.FC<CostWeightProps> = ({ materials, user, settings, onMa
                         <label className="block text-[10px] text-gray-500">عدد القطع</label>
                         <input 
                           type="number" 
+                          step="0.1"
                           className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
                           value={editPieces}
                           onChange={(e) => setEditPieces(Number(e.target.value))}
@@ -332,6 +333,7 @@ const CostWeight: React.FC<CostWeightProps> = ({ materials, user, settings, onMa
                         <label className="block text-[10px] text-gray-500">الوزن (كغم)</label>
                         <input 
                           type="number" 
+                          step="0.1"
                           className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
                           value={editWeight}
                           onChange={(e) => setEditWeight(Number(e.target.value))}
@@ -357,6 +359,7 @@ const CostWeight: React.FC<CostWeightProps> = ({ materials, user, settings, onMa
                 <input 
                   type="number" 
                   min="0"
+                  step="0.1"
                   placeholder="أدخل العدد..."
                   className="w-full p-3 border rounded-xl dark:bg-gray-700 dark:border-gray-600 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm"
                   value={pieceCount || ''}

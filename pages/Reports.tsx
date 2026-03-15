@@ -221,7 +221,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
     }
   }, [materials, transactions, dateFilteredTransactions, filterType, selectedMaterialId, selectedCategory, selectedSupplier, selectedBarcode, selectedRecipient, selectedColor, selectedItemBarcode, selectedWarehouseId]);
   
-  const exportToXLSX = () => {
+  const exportToXLSX = async () => {
     let dataToExport: any[] = [];
     let fileName = 'report';
     let sheetName = 'تقرير';
@@ -266,7 +266,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
             sheetName = 'حركات المخزن';
     }
     
-    exportToExcel(dataToExport, fileName, sheetName);
+    await exportToExcel(dataToExport, fileName, sheetName);
   };
   
   const handlePrint = () => {
