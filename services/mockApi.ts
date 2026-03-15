@@ -601,59 +601,48 @@ export const addMaterial = (materialData: Omit<Material, 'id' | 'isNew'>): Mater
 
 export const updateMaterial = (updatedMaterial: Material): Material => {
     const materials = getMaterials();
-    const oldMaterial = materials.find(m => m.id === updatedMaterial.id);
     
-    if (oldMaterial) {
-        // Check for stock changes in the modal
-        Object.entries(updatedMaterial.stocks || {}).forEach(([warehouseId, newQty]) => {
-            const oldQty = oldMaterial.stocks[warehouseId] || 0;
-            if (newQty !== oldQty) {
-                const diff = newQty - oldQty;
-                addTransaction({
-                    type: diff > 0 ? 'in' : 'out',
-                    materialId: updatedMaterial.id,
-                    quantity: Math.abs(diff),
-                    warehouseId: warehouseId,
-                    recipient: 'تعديل رصيد',
-                    notes: 'تعديل يدوي من إدارة المواد',
-                    date: new Date().toISOString(),
-                    color: updatedMaterial.color
-                });
-            }
-        });
-    }
-
-    // Refetch the latest material state from storage (updated by transactions if any)
-    const currentMaterials = getMaterials();
-    const materialToSave = currentMaterials.find(m => m.id === updatedMaterial.id) || updatedMaterial;
+    // We don't create transactions for edits in the Manage Materials modal 
+    // because the user considers these "Opening Balance" adjustments.
+    // The updatedMaterial already contains the new stocks and currentStock from the form.
     
-    const finalMaterial: Material = {
-        ...materialToSave,
-        name: updatedMaterial.name,
-        materialType: updatedMaterial.materialType,
-        category: updatedMaterial.category,
-        specifications: updatedMaterial.specifications,
-        supplier: updatedMaterial.supplier,
-        barcode: updatedMaterial.barcode,
-        color: updatedMaterial.color,
-        unit: updatedMaterial.unit,
-        price: updatedMaterial.price,
-        minStock: updatedMaterial.minStock,
-        weightFormula: updatedMaterial.weightFormula,
-        isNew: updatedMaterial.isNew
-    };
-
-    const finalMaterialsList = getMaterials().map(m => m.id === finalMaterial.id ? finalMaterial : m);
+    const finalMaterialsList = materials.map(m => m.id === updatedMaterial.id ? updatedMaterial : m);
     saveToStorage(MATERIALS_KEY, finalMaterialsList);
     
     addNotification({
         type: 'material',
         action: 'update',
         title: 'تحديث مادة',
-        message: `تم تحديث بيانات مادة: ${finalMaterial.name}`
+        message: `تم تحديث بيانات مادة: ${updatedMaterial.name}`
     });
     debouncedSync();
-    return finalMaterial;
+    return updatedMaterial;
+};
+
+/**
+ * Cleans up duplicate or unwanted opening balance transactions from existing data.
+ * This is a one-time fix for data entered before the logic was improved.
+ */
+export const cleanupOpeningTransactions = (): void => {
+    const transactions = getTransactions();
+    
+    const openingTransactions = transactions.filter(t => 
+        t.isOpeningBalance || 
+        t.notes?.includes('تمت الإضافة عند إنشاء المادة') || 
+        t.notes?.includes('تم توليد هذه الحركة تلقائياً') ||
+        t.recipient === 'رصيد افتتاحي' ||
+        t.recipient === 'رصيد افتتاحي (إصلاح تلقائي)' ||
+        t.notes?.includes('تعديل الرصيد الافتتاحي') ||
+        t.notes === 'تعديل يدوي من إدارة المواد' ||
+        t.recipient === 'تعديل رصيد'
+    );
+
+    if (openingTransactions.length > 0) {
+        const remainingTransactions = transactions.filter(t => !openingTransactions.includes(t));
+        saveToStorage(TRANSACTIONS_KEY, remainingTransactions);
+        console.log(`[Cleanup] Removed ${openingTransactions.length} opening transactions.`);
+        debouncedSync();
+    }
 };
 
 export const acknowledgeNewMaterial = (materialId: string): void => {
