@@ -563,61 +563,40 @@ export const getMaterials = (): Material[] => {
   const warehouses = getWarehouses();
   const defaultWarehouseId = warehouses.length > 0 ? warehouses[0].id : 'wh-default';
   
-  // Ensure all materials have stocks object
+  // Ensure all materials have stocks object and it's not empty if currentStock > 0
   return materials.map(m => {
-    if (!m.stocks) {
-      return { ...m, stocks: { [defaultWarehouseId]: m.currentStock } };
+    if (!m.stocks || Object.keys(m.stocks).length === 0) {
+      if (m.currentStock > 0) {
+        return { ...m, stocks: { [defaultWarehouseId]: m.currentStock } };
+      }
+      return { ...m, stocks: {} };
     }
     return m;
   });
 };
 export const addMaterial = (materialData: Omit<Material, 'id' | 'isNew'>): Material => {
     const materials = getMaterials();
-    const initialStocks = materialData.stocks || {};
     const createdAt = parseDateSafely((materialData as any).createdAt);
     
-    // Create material with 0 stock initially to avoid double counting when adding transactions
     const newMaterial: Material = { 
         ...materialData, 
         id: `m${Date.now()}`, 
         isNew: true,
         createdAt,
-        stocks: {},
-        currentStock: 0
+        // stocks and currentStock are already in materialData from the modal
     };
     
-    // Save material first
     const updatedMaterials = [...materials, newMaterial];
     saveToStorage(MATERIALS_KEY, updatedMaterials);
-    
-    // Create transactions for initial stocks
-    Object.entries(initialStocks).forEach(([warehouseId, quantity]) => {
-        if (quantity > 0) {
-            addTransaction({
-                type: 'in',
-                materialId: newMaterial.id,
-                quantity: quantity,
-                warehouseId: warehouseId,
-                recipient: 'رصيد افتتاحي',
-                notes: 'تمت الإضافة عند إنشاء المادة',
-                date: createdAt,
-                color: newMaterial.color,
-                isOpeningBalance: true
-            });
-        }
-    });
 
     addNotification({
         type: 'material',
         action: 'add',
         title: 'إضافة مادة',
-        message: `تم إضافة مادة جديدة: ${newMaterial.name}`
+        message: `تم إضافة مادة جديدة: ${newMaterial.name} برصيد افتتاحي: ${newMaterial.currentStock}`
     });
     debouncedSync();
-    
-    // Return the material with updated stocks (refetched)
-    const finalMaterials = getMaterials();
-    return finalMaterials.find(m => m.id === newMaterial.id) || newMaterial;
+    return newMaterial;
 };
 
 export const updateMaterial = (updatedMaterial: Material): Material => {
@@ -625,7 +604,7 @@ export const updateMaterial = (updatedMaterial: Material): Material => {
     const oldMaterial = materials.find(m => m.id === updatedMaterial.id);
     
     if (oldMaterial) {
-        // Check for stock changes in the modal (Opening Balance edits)
+        // Check for stock changes in the modal
         Object.entries(updatedMaterial.stocks || {}).forEach(([warehouseId, newQty]) => {
             const oldQty = oldMaterial.stocks[warehouseId] || 0;
             if (newQty !== oldQty) {
@@ -635,8 +614,8 @@ export const updateMaterial = (updatedMaterial: Material): Material => {
                     materialId: updatedMaterial.id,
                     quantity: Math.abs(diff),
                     warehouseId: warehouseId,
-                    recipient: 'تعديل رصيد افتتاحي',
-                    notes: `تعديل يدوي من إدارة المواد (الفرق: ${diff})`,
+                    recipient: 'تعديل رصيد',
+                    notes: 'تعديل يدوي من إدارة المواد',
                     date: new Date().toISOString(),
                     color: updatedMaterial.color
                 });
@@ -644,12 +623,11 @@ export const updateMaterial = (updatedMaterial: Material): Material => {
         });
     }
 
-    // Recalculate total stock based on current state (after transactions)
+    // Refetch the latest material state from storage (updated by transactions if any)
     const currentMaterials = getMaterials();
     const materialToSave = currentMaterials.find(m => m.id === updatedMaterial.id) || updatedMaterial;
     
-    // Update other fields from updatedMaterial
-    const finalMaterial = {
+    const finalMaterial: Material = {
         ...materialToSave,
         name: updatedMaterial.name,
         materialType: updatedMaterial.materialType,
@@ -661,7 +639,8 @@ export const updateMaterial = (updatedMaterial: Material): Material => {
         unit: updatedMaterial.unit,
         price: updatedMaterial.price,
         minStock: updatedMaterial.minStock,
-        weightFormula: updatedMaterial.weightFormula
+        weightFormula: updatedMaterial.weightFormula,
+        isNew: updatedMaterial.isNew
     };
 
     const finalMaterialsList = getMaterials().map(m => m.id === finalMaterial.id ? finalMaterial : m);
@@ -700,55 +679,8 @@ export const deleteMaterial = (materialId: string): void => {
 export const getTransactions = (): Transaction[] => getFromStorage<Transaction[]>(TRANSACTIONS_KEY, []);
 
 export const repairInitialTransactions = (): void => {
-    console.log("Checking for missing initial transactions...");
-    const materials = getMaterials();
-    const transactions = getTransactions();
-    
-    let repairedCount = 0;
-    
-    materials.forEach(material => {
-        // Check if this material has any 'in' or 'return_in' transactions
-        const hasInTransaction = transactions.some((t: Transaction) => 
-            t.materialId === material.id && (t.type === 'in' || t.type === 'return_in')
-        );
-        
-        // If it has stock but no "In" transaction, create one for the opening balance
-        if (!hasInTransaction && material.currentStock > 0) {
-            console.log(`Repairing initial stock for material: ${material.name}`);
-            Object.entries(material.stocks || {}).forEach(([warehouseId, quantity]) => {
-                if (quantity > 0) {
-                    // Double check if we already added this specific repair in this session
-                    const isAlreadyRepaired = transactions.some((t: Transaction) => 
-                        t.materialId === material.id && 
-                        t.warehouseId === warehouseId && 
-                        t.notes === 'تم توليد هذه الحركة تلقائياً لضمان ظهور الرصيد في التقارير'
-                    );
-
-                    if (!isAlreadyRepaired) {
-                        addTransaction({
-                            type: 'in',
-                            materialId: material.id,
-                            quantity: quantity,
-                            warehouseId: warehouseId,
-                            recipient: 'رصيد افتتاحي (إصلاح تلقائي)',
-                            notes: 'تم توليد هذه الحركة تلقائياً لضمان ظهور الرصيد في التقارير',
-                            date: material.createdAt || new Date().toISOString(),
-                            color: material.color,
-                            isOpeningBalance: true
-                        }, true); // Pass true to skip stock update
-                        repairedCount++;
-                    }
-                }
-            });
-        }
-    });
-    
-    if (repairedCount > 0) {
-        console.log(`Successfully repaired ${repairedCount} initial stock transactions.`);
-        debouncedSync();
-    } else {
-        console.log("No missing initial transactions found.");
-    }
+    // This function is now empty as we no longer want to force initial balance into transactions
+    console.log("Initial transactions repair is disabled per user request.");
 };
 
 export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'materialName' | 'supplier' | 'category' | 'barcode' | 'unit' | 'materialType'>, skipStockUpdate: boolean = false): Transaction => {

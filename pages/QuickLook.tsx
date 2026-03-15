@@ -26,16 +26,17 @@ const QuickLook: React.FC<QuickLookProps> = ({ materials, transactions, user, se
 
   const tableData = useMemo(() => {
     return materials.map(m => {
+      const totalOut = transactions
+        .filter(t => t.materialId === m.id && (t.type === 'out' || t.type === 'return'))
+        .reduce((sum, t) => sum + t.quantity, 0);
+      
       const used = transactions
         .filter(t => t.materialId === m.id && t.type === 'out')
-        .reduce((sum, t) => sum + t.quantity, 0);
-      const totalIn = transactions
-        .filter(t => t.materialId === m.id && t.type === 'in')
         .reduce((sum, t) => sum + t.quantity, 0);
       
       return {
         ...m,
-        fullBalance: totalIn,
+        fullBalance: m.currentStock + totalOut,
         usedQuantity: used,
         remainingQuantity: m.currentStock
       };

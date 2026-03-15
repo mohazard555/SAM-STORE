@@ -18,7 +18,7 @@ const NewEntries: React.FC<NewEntriesProps> = ({ materials, user, settings }) =>
   const [endDate, setEndDate] = useState('');
 
   const filteredMaterials = useMemo(() => {
-    return materials.filter(m => {
+    return materials.filter(m => m.isNew).filter(m => {
       const matchesSearch = 
         m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         m.materialType.toLowerCase().includes(searchTerm.toLowerCase()) ||
