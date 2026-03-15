@@ -761,12 +761,26 @@ export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'materi
     const warehouseId = transactionData.warehouseId;
     const currentWarehouseStock = material.stocks[warehouseId] || 0;
 
-    if (transactionData.type === 'out' && currentWarehouseStock < transactionData.quantity) {
-        throw new Error(`الكمية المطلوبة غير متوفرة في المستودع المحدد. المتوفر: ${currentWarehouseStock}`);
+    if (transactionData.type === 'out') {
+        if (material.reservedStock && material.reservedStock > 0 && transactionData.recipient !== material.reservedBy) {
+            if (material.currentStock - transactionData.quantity < material.reservedStock) {
+                throw new Error(`المادة محجوزة بواسطة ${material.reservedBy}. الكمية المتاحة لغير الحاجز هي ${material.currentStock - material.reservedStock}`);
+            }
+        }
+        if (currentWarehouseStock < transactionData.quantity) {
+            throw new Error(`الكمية المطلوبة غير متوفرة في المستودع المحدد. المتوفر: ${currentWarehouseStock}`);
+        }
     }
 
-    if (transactionData.type === 'return' && currentWarehouseStock < transactionData.quantity) {
-        throw new Error(`لا يوجد رصيد كافي لإتمام عملية المرتجع للمورد من هذا المستودع. المتوفر: ${currentWarehouseStock}`);
+    if (transactionData.type === 'return') {
+        if (material.reservedStock && material.reservedStock > 0) {
+             if (material.currentStock - transactionData.quantity < material.reservedStock) {
+                 throw new Error(`المادة محجوزة جزئياً. لا يمكن إرجاع كمية تؤثر على الرصيد المحجوز.`);
+             }
+        }
+        if (currentWarehouseStock < transactionData.quantity) {
+            throw new Error(`لا يوجد رصيد كافي لإتمام عملية المرتجع للمورد من هذا المستودع. المتوفر: ${currentWarehouseStock}`);
+        }
     }
 
     if (transactionData.type === 'transfer') {
@@ -797,6 +811,13 @@ export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'materi
         updatedMaterial.stocks[warehouseId] = currentWarehouseStock + transactionData.quantity;
     } else if (transactionData.type === 'out' || transactionData.type === 'return') {
         updatedMaterial.stocks[warehouseId] = currentWarehouseStock - transactionData.quantity;
+        if (transactionData.type === 'out' && transactionData.recipient === material.reservedBy && material.reservedStock && material.reservedStock > 0) {
+            updatedMaterial.reservedStock = Math.max(0, material.reservedStock - transactionData.quantity);
+            if (updatedMaterial.reservedStock === 0) {
+                updatedMaterial.reservedBy = '';
+                updatedMaterial.reservationReason = '';
+            }
+        }
     } else if (transactionData.type === 'transfer' && transactionData.toWarehouseId) {
         updatedMaterial.stocks[warehouseId] = currentWarehouseStock - transactionData.quantity;
         updatedMaterial.stocks[transactionData.toWarehouseId] = (updatedMaterial.stocks[transactionData.toWarehouseId] || 0) + transactionData.quantity;

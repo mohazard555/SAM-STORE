@@ -140,6 +140,10 @@ const MaterialModal: React.FC<{
         price: number;
         minStock: number;
         createdAt: string;
+        expiryDate?: string;
+        reservedStock?: number;
+        reservationReason?: string;
+        reservedBy?: string;
         weightFormula: { pieces: number; weight: number };
         stocks: Record<string, number>;
     }>({
@@ -154,6 +158,10 @@ const MaterialModal: React.FC<{
         price: material?.price || 0,
         minStock: material?.minStock || 0,
         createdAt: material?.createdAt ? new Date(material.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        expiryDate: material?.expiryDate || '',
+        reservedStock: material?.reservedStock || 0,
+        reservationReason: material?.reservationReason || '',
+        reservedBy: material?.reservedBy || '',
         weightFormula: material?.weightFormula || { pieces: 100, weight: 5 },
         stocks: material?.stocks || (warehouses.length > 0 ? { [warehouses[0].id]: 0 } : {}),
     });
@@ -162,7 +170,7 @@ const MaterialModal: React.FC<{
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: (name === 'minStock' || name === 'price') ? Number(value) : value }));
+        setFormData(prev => ({ ...prev, [name]: (name === 'minStock' || name === 'price' || name === 'reservedStock') ? Number(value) : value }));
     };
 
     const handleStockChange = (warehouseId: string, value: string) => {
@@ -197,11 +205,35 @@ const MaterialModal: React.FC<{
                     <input type="text" name="barcode" value={formData.barcode} onChange={handleChange} placeholder="الباركود" required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                 </div>
                 <input type="text" name="color" value={formData.color} onChange={handleChange} placeholder="اللون (اختياري)" className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-                <div>
-                    <label className="block mb-1 text-xs font-bold text-gray-500 dark:text-gray-400">تاريخ الإضافة</label>
-                    <input type="date" name="createdAt" value={formData.createdAt} onChange={handleChange} required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block mb-1 text-xs font-bold text-gray-500 dark:text-gray-400">تاريخ الإضافة</label>
+                        <input type="date" name="createdAt" value={formData.createdAt} onChange={handleChange} required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                    </div>
+                    <div>
+                        <label className="block mb-1 text-xs font-bold text-gray-500 dark:text-gray-400">تاريخ انتهاء الصلاحية</label>
+                        <input type="date" name="expiryDate" value={formData.expiryDate} onChange={handleChange} className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                    </div>
                 </div>
                 <textarea name="specifications" value={formData.specifications} onChange={handleChange} placeholder="المواصفات" required rows={3} className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                
+                <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800/50 space-y-3">
+                    <label className="block text-sm font-bold text-yellow-800 dark:text-yellow-500">بيانات الحجز (اختياري)</label>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block mb-1 text-xs font-bold text-gray-500 dark:text-gray-400">الكمية المحجوزة</label>
+                            <input type="number" name="reservedStock" step="0.1" min="0" value={formData.reservedStock} onChange={handleChange} placeholder="الكمية" className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                        </div>
+                        <div>
+                            <label className="block mb-1 text-xs font-bold text-gray-500 dark:text-gray-400">محجوزة بواسطة</label>
+                            <input type="text" name="reservedBy" value={formData.reservedBy} onChange={handleChange} placeholder="اسم الشخص/الجهة" className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block mb-1 text-xs font-bold text-gray-500 dark:text-gray-400">سبب الحجز</label>
+                        <input type="text" name="reservationReason" value={formData.reservationReason} onChange={handleChange} placeholder="سبب الحجز" className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                    </div>
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="block mb-1 text-xs font-bold text-gray-500 dark:text-gray-400">الوحدة (اختر أو اكتب)</label>
@@ -403,6 +435,10 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
       "الباركود": m.barcode, 
       "الوحدة": m.unit, 
       "الكمية الحالية": m.currentStock, 
+      "الكمية المحجوزة": m.reservedStock || 0,
+      "محجوزة بواسطة": m.reservedBy || '-',
+      "سبب الحجز": m.reservationReason || '-',
+      "تاريخ الصلاحية": m.expiryDate ? new Date(m.expiryDate).toLocaleDateString('ar-EG') : '-',
       "الحد الأدنى": m.minStock, 
       "المواصفات": m.specifications, 
     }));
@@ -490,6 +526,8 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
               <th>اللون</th>
               <th>الباركود</th>
               <th>الكمية الحالية</th>
+              <th>الكمية المحجوزة</th>
+              <th>تاريخ الصلاحية</th>
               <th>الحد الأدنى</th>
             </tr>
           </thead>
@@ -501,6 +539,8 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
                 <td>${m.color || '-'}</td>
                 <td>${m.barcode}</td>
                 <td>${m.currentStock} ${m.unit}</td>
+                <td>${m.reservedStock ? `${m.reservedStock} ${m.unit}` : '-'}</td>
+                <td>${m.expiryDate ? new Date(m.expiryDate).toLocaleDateString('ar-EG') : '-'}</td>
                 <td>${m.minStock} ${m.unit}</td>
               </tr>
             `).join('')}
@@ -593,6 +633,8 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
               <th scope="col" className="px-6 py-3">السعر</th>
               <th scope="col" className="px-6 py-3">الباركود</th>
               <th scope="col" className="px-6 py-3">الكمية الحالية</th>
+              <th scope="col" className="px-6 py-3">الكمية المحجوزة</th>
+              <th scope="col" className="px-6 py-3">تاريخ الصلاحية</th>
               <th scope="col" className="px-6 py-3">الحد الأدنى</th>
               <th scope="col" className="px-6 py-3">المورد</th>
               {isAdmin && <th scope="col" className="px-6 py-3 text-center">عمليات سريعة</th>}
@@ -612,6 +654,24 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
                 <td className={`px-6 py-4 font-bold ${material.currentStock < material.minStock ? 'text-red-500' : 'text-emerald-500'}`}>
                     {material.currentStock} {material.unit}
                     {material.currentStock < material.minStock && <AlertTriangle className="inline-block mr-1 text-red-500" size={16}/>}
+                </td>
+                <td className="px-6 py-4">
+                    {material.reservedStock && material.reservedStock > 0 ? (
+                        <div className="flex flex-col">
+                            <span className="font-bold text-amber-600 dark:text-amber-400">{material.reservedStock} {material.unit}</span>
+                            {material.reservedBy && <span className="text-[10px] text-gray-500">لـ: {material.reservedBy}</span>}
+                            {material.reservationReason && <span className="text-[10px] text-gray-400 truncate max-w-[100px]" title={material.reservationReason}>{material.reservationReason}</span>}
+                        </div>
+                    ) : (
+                        <span className="text-gray-400">-</span>
+                    )}
+                </td>
+                <td className="px-6 py-4 text-xs">
+                    {material.expiryDate ? (
+                        <span className={`${new Date(material.expiryDate) < new Date() ? 'text-red-500 font-bold' : 'text-gray-600 dark:text-gray-400'}`}>
+                            {new Date(material.expiryDate).toLocaleDateString('ar-EG')}
+                        </span>
+                    ) : '-'}
                 </td>
                 <td className="px-6 py-4">{material.minStock} {material.unit}</td>
                 <td className="px-6 py-4 text-xs">{material.supplier}</td>

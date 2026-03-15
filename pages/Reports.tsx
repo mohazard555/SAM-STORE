@@ -466,6 +466,8 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
                 "المورد": m.supplier, "الباركود": m.barcode, "الكمية الحالية": m.currentStock,
                 "المحجوز": m.reservedStock || 0,
                 "المتاح": m.currentStock - (m.reservedStock || 0),
+                "محجوز بواسطة": m.reservedBy || '-',
+                "سبب الحجز": m.reservationReason || '-',
                 "تاريخ الانتهاء": m.expiryDate || '-',
                 "الحد الأدنى": m.minStock, "وحدة القياس": m.unit,
             }));
@@ -532,8 +534,8 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
                 return `<tr><td>${m.name}</td><td>${m.barcode}</td><td>${m.currentStock} ${m.unit}</td><td>${m.expiryDate}</td><td style="color: ${isExpired ? 'red' : 'orange'}">${isExpired ? 'منتهي' : 'قريب الانتهاء'}</td></tr>`;
               }).join('');
             } else if (filterType === 'reservedStockReport') {
-              tableHeaders = `<th>اسم المادة</th><th>الباركود</th><th>الكمية الكلية</th><th>المحجوز</th><th>المتاح</th>`;
-              tableContent = (reportData as Material[]).map(m => `<tr><td>${m.name}</td><td>${m.barcode}</td><td>${m.currentStock} ${m.unit}</td><td>${m.reservedStock || 0} ${m.unit}</td><td>${m.currentStock - (m.reservedStock || 0)} ${m.unit}</td></tr>`).join('');
+              tableHeaders = `<th>اسم المادة</th><th>الباركود</th><th>الكمية الكلية</th><th>المحجوز</th><th>المتاح</th><th>محجوز بواسطة</th><th>السبب</th>`;
+              tableContent = (reportData as Material[]).map(m => `<tr><td>${m.name}</td><td>${m.barcode}</td><td>${m.currentStock} ${m.unit}</td><td>${m.reservedStock || 0} ${m.unit}</td><td>${m.currentStock - (m.reservedStock || 0)} ${m.unit}</td><td>${m.reservedBy || '-'}</td><td>${m.reservationReason || '-'}</td></tr>`).join('');
             } else {
               tableHeaders = `<th>اسم المادة</th><th>الفئة</th><th>الباركود</th><th>المورد</th><th>الكمية الحالية</th><th>الحد الأدنى</th>`;
               tableContent = (reportData as Material[]).map(m => `<tr><td>${m.name}</td><td>${m.category}</td><td>${m.barcode}</td><td>${m.supplier}</td><td>${m.currentStock} ${m.unit}</td><td>${m.minStock} ${m.unit}</td></tr>`).join('');
@@ -1009,6 +1011,8 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
                             <th scope="col" className="px-6 py-3">الكمية الكلية</th>
                             <th scope="col" className="px-6 py-3">المحجوز</th>
                             <th scope="col" className="px-6 py-3">المتاح</th>
+                            <th scope="col" className="px-6 py-3">محجوز بواسطة</th>
+                            <th scope="col" className="px-6 py-3">السبب</th>
                           </>
                         ) : (
                           <>
@@ -1042,6 +1046,8 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
                                 <td className="px-6 py-4 font-bold">{material.currentStock.toLocaleString('ar-EG')} {material.unit}</td>
                                 <td className="px-6 py-4 font-bold text-blue-500">{(material.reservedStock || 0).toLocaleString('ar-EG')} {material.unit}</td>
                                 <td className="px-6 py-4 font-black text-emerald-500">{(material.currentStock - (material.reservedStock || 0)).toLocaleString('ar-EG')} {material.unit}</td>
+                                <td className="px-6 py-4 text-xs">{material.reservedBy || '-'}</td>
+                                <td className="px-6 py-4 text-xs">{material.reservationReason || '-'}</td>
                               </>
                             ) : (
                               <>

@@ -24,6 +24,8 @@ export interface Material {
   createdAt: string;
   expiryDate?: string;
   reservedStock?: number;
+  reservedBy?: string;
+  reservationReason?: string;
   // Weight formula: X pieces = Y kg
   weightFormula?: {
     pieces: number;
