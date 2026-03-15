@@ -44,7 +44,7 @@ const NewEntries: React.FC<NewEntriesProps> = ({ materials, user, settings }) =>
     });
   }, [materials, searchTerm, startDate, endDate]);
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     const data = filteredMaterials.map(m => ({
       'اسم المادة': m.name,
       'التاريخ': m.createdAt ? new Date(m.createdAt).toLocaleDateString('ar-EG') : '-',
@@ -57,7 +57,7 @@ const NewEntries: React.FC<NewEntriesProps> = ({ materials, user, settings }) =>
       'المواصفات': m.specifications
     }));
 
-    exportToExcel(data, "new_entries", "إدخالات المواد الجديدة");
+    await exportToExcel(data, "new_entries", "إدخالات المواد الجديدة");
   };
 
   const handlePrint = () => {

@@ -159,7 +159,7 @@ const CostWeight: React.FC<CostWeightProps> = ({ materials, user, settings, onMa
     triggerPrint(html);
   };
 
-  const handleExportArchive = () => {
+  const handleExportArchive = async () => {
     const data = filteredArchive.map(c => ({
       'العنوان': c.title,
       'التاريخ': new Date(c.date).toLocaleString('ar-EG'),
@@ -170,7 +170,7 @@ const CostWeight: React.FC<CostWeightProps> = ({ materials, user, settings, onMa
       'الوزن الإجمالي': c.totalWeight,
       'ملاحظات': c.notes || ''
     }));
-    exportToExcel(data, "weight_calculator_archive", "أرشيف حاسبة الوزن");
+    await exportToExcel(data, "weight_calculator_archive", "أرشيف حاسبة الوزن");
   };
 
   return (

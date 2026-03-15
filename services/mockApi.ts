@@ -601,7 +601,8 @@ export const addMaterial = (materialData: Omit<Material, 'id' | 'isNew'>): Mater
                 recipient: 'رصيد افتتاحي',
                 notes: 'تمت الإضافة عند إنشاء المادة',
                 date: createdAt,
-                color: newMaterial.color
+                color: newMaterial.color,
+                isOpeningBalance: true
             });
         }
     });
@@ -732,8 +733,9 @@ export const repairInitialTransactions = (): void => {
                             recipient: 'رصيد افتتاحي (إصلاح تلقائي)',
                             notes: 'تم توليد هذه الحركة تلقائياً لضمان ظهور الرصيد في التقارير',
                             date: material.createdAt || new Date().toISOString(),
-                            color: material.color
-                        });
+                            color: material.color,
+                            isOpeningBalance: true
+                        }, true); // Pass true to skip stock update
                         repairedCount++;
                     }
                 }
@@ -749,7 +751,7 @@ export const repairInitialTransactions = (): void => {
     }
 };
 
-export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'materialName' | 'supplier' | 'category' | 'barcode' | 'unit' | 'materialType'>): Transaction => {
+export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'materialName' | 'supplier' | 'category' | 'barcode' | 'unit' | 'materialType'>, skipStockUpdate: boolean = false): Transaction => {
     const transactions = getTransactions();
     let materials = getMaterials();
     const material = materials.find(m => m.id === transactionData.materialId);
@@ -759,18 +761,20 @@ export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'materi
     const warehouseId = transactionData.warehouseId;
     const currentWarehouseStock = material.stocks[warehouseId] || 0;
 
-    if (transactionData.type === 'out' && currentWarehouseStock < transactionData.quantity) {
-        throw new Error(`الكمية المطلوبة غير متوفرة في المستودع المحدد. المتوفر: ${currentWarehouseStock}`);
-    }
-
-    if (transactionData.type === 'return' && currentWarehouseStock < transactionData.quantity) {
-        throw new Error(`لا يوجد رصيد كافي لإتمام عملية المرتجع للمورد من هذا المستودع. المتوفر: ${currentWarehouseStock}`);
-    }
-
-    if (transactionData.type === 'transfer') {
-        if (!transactionData.toWarehouseId) throw new Error('يجب تحديد المستودع المحول إليه');
-        if (currentWarehouseStock < transactionData.quantity) {
+    if (!skipStockUpdate) {
+        if (transactionData.type === 'out' && currentWarehouseStock < transactionData.quantity) {
             throw new Error(`الكمية المطلوبة غير متوفرة في المستودع المحدد. المتوفر: ${currentWarehouseStock}`);
+        }
+
+        if (transactionData.type === 'return' && currentWarehouseStock < transactionData.quantity) {
+            throw new Error(`لا يوجد رصيد كافي لإتمام عملية المرتجع للمورد من هذا المستودع. المتوفر: ${currentWarehouseStock}`);
+        }
+
+        if (transactionData.type === 'transfer') {
+            if (!transactionData.toWarehouseId) throw new Error('يجب تحديد المستودع المحول إليه');
+            if (currentWarehouseStock < transactionData.quantity) {
+                throw new Error(`الكمية المطلوبة غير متوفرة في المستودع المحدد. المتوفر: ${currentWarehouseStock}`);
+            }
         }
     }
 
@@ -788,23 +792,25 @@ export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'materi
         color: transactionData.color || material.color
     };
     
-    // Calculate new stock based on type
-    const updatedMaterial = { ...material, stocks: { ...material.stocks } };
+    if (!skipStockUpdate) {
+        // Calculate new stock based on type
+        const updatedMaterial = { ...material, stocks: { ...material.stocks } };
 
-    if (transactionData.type === 'in' || transactionData.type === 'return_in') {
-        updatedMaterial.stocks[warehouseId] = currentWarehouseStock + transactionData.quantity;
-    } else if (transactionData.type === 'out' || transactionData.type === 'return') {
-        updatedMaterial.stocks[warehouseId] = currentWarehouseStock - transactionData.quantity;
-    } else if (transactionData.type === 'transfer' && transactionData.toWarehouseId) {
-        updatedMaterial.stocks[warehouseId] = currentWarehouseStock - transactionData.quantity;
-        updatedMaterial.stocks[transactionData.toWarehouseId] = (updatedMaterial.stocks[transactionData.toWarehouseId] || 0) + transactionData.quantity;
+        if (transactionData.type === 'in' || transactionData.type === 'return_in') {
+            updatedMaterial.stocks[warehouseId] = currentWarehouseStock + transactionData.quantity;
+        } else if (transactionData.type === 'out' || transactionData.type === 'return') {
+            updatedMaterial.stocks[warehouseId] = currentWarehouseStock - transactionData.quantity;
+        } else if (transactionData.type === 'transfer' && transactionData.toWarehouseId) {
+            updatedMaterial.stocks[warehouseId] = currentWarehouseStock - transactionData.quantity;
+            updatedMaterial.stocks[transactionData.toWarehouseId] = (updatedMaterial.stocks[transactionData.toWarehouseId] || 0) + transactionData.quantity;
+        }
+
+        updatedMaterial.currentStock = Object.values(updatedMaterial.stocks).reduce((sum, val) => sum + val, 0);
+
+        materials = materials.map(m => m.id === updatedMaterial.id ? updatedMaterial : m);
+        saveToStorage(MATERIALS_KEY, materials);
     }
-
-    updatedMaterial.currentStock = Object.values(updatedMaterial.stocks).reduce((sum, val) => sum + val, 0);
-
-    materials = materials.map(m => m.id === updatedMaterial.id ? updatedMaterial : m);
     
-    saveToStorage(MATERIALS_KEY, materials);
     saveToStorage(TRANSACTIONS_KEY, [...transactions, newTransaction]);
     addNotification({
         type: 'transaction',

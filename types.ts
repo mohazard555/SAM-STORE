@@ -47,6 +47,7 @@ export interface Transaction {
   recipient: string;
   notes?: string;
   date: string;
+  isOpeningBalance?: boolean;
 }
 
 export interface UserPermissions {

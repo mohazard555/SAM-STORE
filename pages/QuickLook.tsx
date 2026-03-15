@@ -72,7 +72,7 @@ const QuickLook: React.FC<QuickLookProps> = ({ materials, transactions, user, se
     setSortConfig({ key, direction });
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     const dataToExport = filteredData.map(m => ({
       "اسم المادة": m.name,
       "اللون": m.color || '-',
@@ -83,7 +83,7 @@ const QuickLook: React.FC<QuickLookProps> = ({ materials, transactions, user, se
       "الكمية المتبقية": m.remainingQuantity,
       "المورد": m.supplier
     }));
-    exportToExcel(dataToExport, "quick_look_report", "نظرة سريعة");
+    await exportToExcel(dataToExport, "quick_look_report", "نظرة سريعة");
   };
 
   const handlePrint = () => {
