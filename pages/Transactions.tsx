@@ -375,9 +375,9 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, wa
   };
   
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 pb-6">
       <div className="flex justify-between items-center flex-wrap gap-4">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">الحركات اليومية</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">الحركات اليومية</h1>
         <div className="flex gap-3">
             <button onClick={() => setShowArchive(!showArchive)} className={`flex items-center px-4 py-2 rounded-lg shadow transition-all ${showArchive ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
                 <Archive className="ml-2" size={20} /> أرشيف
@@ -397,7 +397,7 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, wa
 
       {/* Date Filter Bar */}
       {showArchive && (
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border dark:border-gray-700 flex flex-wrap items-center gap-4 animate-in fade-in slide-in-from-top-2">
+          <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm border dark:border-gray-700 flex flex-wrap items-center gap-4 animate-in fade-in slide-in-from-top-2">
               <div className="flex items-center gap-2">
                   <label className="text-sm font-bold text-gray-500 dark:text-gray-400">من تاريخ:</label>
                   <input type="date" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} className="p-1.5 border rounded text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
@@ -416,22 +416,23 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, wa
         <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
           <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400 border-b dark:border-gray-600">
             <tr>
-              <th scope="col" className="px-6 py-3">التاريخ</th>
-              <th scope="col" className="px-6 py-3">النوع</th>
-              <th scope="col" className="px-6 py-3">المادة / اللون</th>
-              <th scope="col" className="px-6 py-3">المستودع</th>
-              <th scope="col" className="px-6 py-3">باركود المادة</th>
-              <th scope="col" className="px-6 py-3">باركود الصنف</th>
-              <th scope="col" className="px-6 py-3">الكمية</th>
-              <th scope="col" className="px-6 py-3">المستلم / المورد</th>
-              <th scope="col" className="px-6 py-3">إجراءات</th>
+              <th scope="col" className="px-4 py-3">التاريخ</th>
+              <th scope="col" className="px-4 py-3">النوع</th>
+              <th scope="col" className="px-4 py-3">المادة / اللون</th>
+              <th scope="col" className="px-4 py-3">المستودع</th>
+              <th scope="col" className="px-4 py-3">باركود المادة</th>
+              <th scope="col" className="px-4 py-3">باركود الصنف</th>
+              <th scope="col" className="px-4 py-3">الكمية</th>
+              <th scope="col" className="px-4 py-3">المستلم / المورد</th>
+              <th scope="col" className="px-4 py-3">الملاحظات</th>
+              <th scope="col" className="px-4 py-3">إجراءات</th>
             </tr>
           </thead>
           <tbody>
             {filteredTransactions.map(transaction => (
               <tr key={transaction.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                <td className="px-6 py-4 text-xs whitespace-nowrap">{new Date(transaction.date).toLocaleDateString('ar-EG')}</td>
-                <td className="px-6 py-4">
+                <td className="px-4 py-3 text-xs whitespace-nowrap">{new Date(transaction.date).toLocaleDateString('ar-EG')}</td>
+                <td className="px-4 py-3">
                     {transaction.type === 'in' ? (
                         <span className="flex items-center text-emerald-600 dark:text-emerald-400 font-bold text-xs bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded">
                             <ArrowUpRight size={14} className="ml-1"/> وارد
@@ -454,11 +455,11 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, wa
                         </span>
                     )}
                 </td>
-                <td className="px-6 py-4">
+                <td className="px-4 py-3">
                     <div className="font-bold text-gray-900 dark:text-white">{transaction.materialName}</div>
                     {transaction.color && <div className="text-[10px] text-gray-400">اللون: {transaction.color}</div>}
                 </td>
-                <td className="px-6 py-4 text-xs">
+                <td className="px-4 py-3 text-xs">
                     <div className="font-bold text-gray-900 dark:text-white">{warehouses.find(w => w.id === transaction.warehouseId)?.name || '-'}</div>
                     {transaction.type === 'transfer' && transaction.toWarehouseId && (
                         <div className="text-[10px] text-blue-500 mt-1">
@@ -466,15 +467,16 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, wa
                         </div>
                     )}
                 </td>
-                <td className="px-6 py-4 font-mono text-xs">{transaction.barcode}</td>
-                <td className="px-6 py-4 font-mono text-xs text-blue-500 font-bold">{transaction.itemBarcode || '-'}</td>
-                <td className={`px-6 py-4 font-black ${transaction.type === 'in' || transaction.type === 'return' ? 'text-emerald-500' : transaction.type === 'transfer' ? 'text-blue-500' : 'text-red-500'}`}>
+                <td className="px-4 py-3 font-mono text-xs">{transaction.barcode}</td>
+                <td className="px-4 py-3 font-mono text-xs text-blue-500 font-bold">{transaction.itemBarcode || '-'}</td>
+                <td className={`px-4 py-3 font-black ${transaction.type === 'in' || transaction.type === 'return' ? 'text-emerald-500' : transaction.type === 'transfer' ? 'text-blue-500' : 'text-red-500'}`}>
                     {transaction.type === 'in' || transaction.type === 'return' ? '+' : transaction.type === 'transfer' ? '' : '-'}{transaction.quantity} {transaction.unit}
                 </td>
-                <td className="px-6 py-4">
+                <td className="px-4 py-3">
                     <div className="font-medium text-gray-700 dark:text-gray-300">{transaction.recipient}</div>
                 </td>
-                <td className="px-6 py-4 flex items-center gap-3">
+                <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-300">{transaction.notes || '-'}</td>
+                <td className="px-4 py-3 flex items-center gap-2">
                     {canPrint && <button onClick={() => handlePrintVoucher(transaction)} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" title="طباعة سند"><Printer size={18}/></button>}
                     {isAdmin && (
                         <>
@@ -492,7 +494,7 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, wa
             ))}
           </tbody>
         </table>
-        {filteredTransactions.length === 0 && <div className="p-12 text-center text-gray-500 dark:text-gray-400">لا توجد حركات مسجلة للفترة المحددة.</div>}
+        {filteredTransactions.length === 0 && <div className="p-8 text-center text-gray-500 dark:text-gray-400">لا توجد حركات مسجلة للفترة المحددة.</div>}
       </div>
 
       {isModalOpen && <TransactionModal materials={materials} warehouses={warehouses} editTransaction={editingTransaction} onClose={() => { setIsModalOpen(false); setEditingTransaction(null); }} onSave={handleSave} />}

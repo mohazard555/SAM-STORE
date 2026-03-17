@@ -552,9 +552,9 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 pb-6">
       <div className="flex justify-between items-center flex-wrap gap-4">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">إدارة المواد</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">إدارة المواد</h1>
         <div className="flex items-center gap-2">
           {isAdmin && (
             <label className="flex items-center px-4 py-2 bg-amber-500 text-white rounded-lg shadow hover:bg-amber-600 transition-colors cursor-pointer">
@@ -582,10 +582,10 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border dark:border-gray-700">
-              <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-gray-800 dark:text-white border-b pb-2 dark:border-gray-700">
-                  <Users size={20} className="text-sky-500" /> ملخص حسب المورد والوحدة
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border dark:border-gray-700">
+              <h3 className="text-sm font-bold mb-3 flex items-center gap-2 text-gray-800 dark:text-white border-b pb-2 dark:border-gray-700">
+                  <Users size={16} className="text-sky-500" /> ملخص حسب المورد والوحدة
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {Object.entries(supplierSummary).map(([key, data]) => {
@@ -602,11 +602,11 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
               </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border dark:border-gray-700">
-              <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-gray-800 dark:text-white border-b pb-2 dark:border-gray-700">
-                  <WarehouseIcon size={20} className="text-emerald-500" /> إجمالي الكميات حسب المستودع والوحدة
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border dark:border-gray-700">
+              <h3 className="text-sm font-bold mb-3 flex items-center gap-2 text-gray-800 dark:text-white border-b pb-2 dark:border-gray-700">
+                  <WarehouseIcon size={16} className="text-emerald-500" /> إجمالي الكميات حسب المستودع والوحدة
               </h3>
-              <div className="space-y-3 max-h-[200px] overflow-y-auto pr-2">
+              <div className="space-y-2 max-h-[150px] overflow-y-auto pr-2">
                   {Object.entries(warehouseSummary).map(([whId, units]) => (
                       <div key={whId} className="flex flex-col gap-1 p-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg border dark:border-gray-700">
                           <div className="text-xs font-bold text-gray-700 dark:text-gray-300">{warehouses.find(w => w.id === whId)?.name || 'مستودع غير معروف'}</div>
@@ -628,34 +628,34 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
         <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
           <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
             <tr>
-              <th scope="col" className="px-6 py-3">المادة / اللون</th>
-              <th scope="col" className="px-6 py-3">تاريخ الإضافة</th>
-              <th scope="col" className="px-6 py-3">السعر</th>
-              <th scope="col" className="px-6 py-3">الباركود</th>
-              <th scope="col" className="px-6 py-3">الكمية الحالية</th>
-              <th scope="col" className="px-6 py-3">الكمية المحجوزة</th>
-              <th scope="col" className="px-6 py-3">تاريخ الصلاحية</th>
-              <th scope="col" className="px-6 py-3">الحد الأدنى</th>
-              <th scope="col" className="px-6 py-3">المورد</th>
-              {isAdmin && <th scope="col" className="px-6 py-3 text-center">عمليات سريعة</th>}
-              {isAdmin && <th scope="col" className="px-6 py-3 text-center">إدارة</th>}
+              <th scope="col" className="px-4 py-3">المادة / اللون</th>
+              <th scope="col" className="px-4 py-3">تاريخ الإضافة</th>
+              <th scope="col" className="px-4 py-3">السعر</th>
+              <th scope="col" className="px-4 py-3">الباركود</th>
+              <th scope="col" className="px-4 py-3">الكمية الحالية</th>
+              <th scope="col" className="px-4 py-3">الكمية المحجوزة</th>
+              <th scope="col" className="px-4 py-3">تاريخ الصلاحية</th>
+              <th scope="col" className="px-4 py-3">الحد الأدنى</th>
+              <th scope="col" className="px-4 py-3">المورد</th>
+              {isAdmin && <th scope="col" className="px-4 py-3 text-center">عمليات سريعة</th>}
+              {isAdmin && <th scope="col" className="px-4 py-3 text-center">إدارة</th>}
             </tr>
           </thead>
           <tbody>
             {materials.map(material => (
               <tr key={material.id} className={`border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors ${material.isNew ? 'bg-red-50 dark:bg-red-900/10' : 'bg-white dark:bg-gray-800'}`}>
-                <td className="px-6 py-4">
+                <td className="px-4 py-3">
                     <div className="font-medium text-gray-900 whitespace-nowrap dark:text-white">{material.name}</div>
                     {material.color && <div className="text-[10px] text-gray-400">اللون: {material.color}</div>}
                 </td>
-                <td className="px-6 py-4 text-xs">{material.createdAt ? new Date(material.createdAt).toLocaleDateString('ar-EG') : '-'}</td>
-                <td className="px-6 py-4 text-xs font-bold text-gray-700 dark:text-gray-300">{material.price?.toLocaleString('ar-EG')} {settings?.currencySymbol || 'ج.م'}</td>
-                <td className="px-6 py-4 font-mono text-xs">{material.barcode}</td>
-                <td className={`px-6 py-4 font-bold ${material.currentStock < material.minStock ? 'text-red-500' : 'text-emerald-500'}`}>
+                <td className="px-4 py-3 text-xs">{material.createdAt ? new Date(material.createdAt).toLocaleDateString('ar-EG') : '-'}</td>
+                <td className="px-4 py-3 text-xs font-bold text-gray-700 dark:text-gray-300">{material.price?.toLocaleString('ar-EG')} {settings?.currencySymbol || 'ج.م'}</td>
+                <td className="px-4 py-3 font-mono text-xs">{material.barcode}</td>
+                <td className={`px-4 py-3 font-bold ${material.currentStock < material.minStock ? 'text-red-500' : 'text-emerald-500'}`}>
                     {material.currentStock} {material.unit}
                     {material.currentStock < material.minStock && <AlertTriangle className="inline-block mr-1 text-red-500" size={16}/>}
                 </td>
-                <td className="px-6 py-4">
+                <td className="px-4 py-3">
                     {material.reservedStock && material.reservedStock > 0 ? (
                         <div className="flex flex-col">
                             <span className="font-bold text-amber-600 dark:text-amber-400">{material.reservedStock} {material.unit}</span>
@@ -666,38 +666,38 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
                         <span className="text-gray-400">-</span>
                     )}
                 </td>
-                <td className="px-6 py-4 text-xs">
+                <td className="px-4 py-3 text-xs">
                     {material.expiryDate ? (
                         <span className={`${new Date(material.expiryDate) < new Date() ? 'text-red-500 font-bold' : 'text-gray-600 dark:text-gray-400'}`}>
                             {new Date(material.expiryDate).toLocaleDateString('ar-EG')}
                         </span>
                     ) : '-'}
                 </td>
-                <td className="px-6 py-4">{material.minStock} {material.unit}</td>
-                <td className="px-6 py-4 text-xs">{material.supplier}</td>
+                <td className="px-4 py-3">{material.minStock} {material.unit}</td>
+                <td className="px-4 py-3 text-xs">{material.supplier}</td>
                 {isAdmin && (
-                  <td className="px-6 py-4 flex items-center justify-center gap-4">
+                  <td className="px-4 py-3 flex items-center justify-center gap-3">
                     <button onClick={() => openStockModal(material, 'supply')} className="text-emerald-500 hover:text-emerald-700 flex flex-col items-center transition-colors" title="توريد جديد">
-                        <PlusCircle size={22}/>
+                        <PlusCircle size={18}/>
                         <span className="text-[10px] mt-0.5 font-bold">توريد</span>
                     </button>
                     <button onClick={() => openStockModal(material, 'return')} className="text-amber-500 hover:text-amber-700 flex flex-col items-center transition-colors" title="مرتجع من مستلم">
-                        <RotateCcw size={22}/>
+                        <RotateCcw size={18}/>
                         <span className="text-[10px] mt-0.5 font-bold">مرتجع</span>
                     </button>
                     <button onClick={() => openStockModal(material, 'supplier-return')} className="text-red-500 hover:text-red-700 flex flex-col items-center transition-colors" title="مرتجع للمورد">
-                        <RotateCcw size={22} className="rotate-180"/>
+                        <RotateCcw size={18} className="rotate-180"/>
                         <span className="text-[10px] mt-0.5 font-bold">للمورد</span>
                     </button>
                   </td>
                 )}
                 {isAdmin && (
-                  <td className="px-6 py-4 flex items-center justify-center gap-3 border-r dark:border-gray-700">
+                  <td className="px-4 py-3 flex items-center justify-center gap-2 border-r dark:border-gray-700">
                     {material.isNew && (
-                        <button onClick={() => handleAcknowledge(material.id)} className="text-sky-500 hover:text-sky-700" title="تأكيد الاستلام"><CheckCircle size={22}/></button>
+                        <button onClick={() => handleAcknowledge(material.id)} className="text-sky-500 hover:text-sky-700" title="تأكيد الاستلام"><CheckCircle size={18}/></button>
                     )}
-                    <button onClick={() => { setSelectedMaterial(material); setIsModalOpen(true); }} className="text-blue-500 hover:text-blue-700" title="تعديل"><Edit size={22}/></button>
-                    <button onClick={() => setMaterialToDelete(material)} className="text-red-500 hover:text-red-700" title="حذف"><Trash2 size={22}/></button>
+                    <button onClick={() => { setSelectedMaterial(material); setIsModalOpen(true); }} className="text-blue-500 hover:text-blue-700" title="تعديل"><Edit size={18}/></button>
+                    <button onClick={() => setMaterialToDelete(material)} className="text-red-500 hover:text-red-700" title="حذف"><Trash2 size={18}/></button>
                   </td>
                 )}
               </tr>

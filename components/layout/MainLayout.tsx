@@ -136,7 +136,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, onLogout, darkMode, setDa
           darkMode={darkMode}
           setDarkMode={setDarkMode}
         />
-        <main className="flex-1 p-4 md:p-6 overflow-y-auto">
+        <main className="flex-1 p-4 overflow-y-auto">
           {renderPage()}
         </main>
         <Footer />
