@@ -661,6 +661,11 @@ export const updateMaterial = (updatedMaterial: Material, isCorrection: boolean 
         price: updatedMaterial.price,
         minStock: updatedMaterial.minStock,
         weightFormula: updatedMaterial.weightFormula,
+        createdAt: updatedMaterial.createdAt,
+        expiryDate: updatedMaterial.expiryDate,
+        reservedStock: updatedMaterial.reservedStock,
+        reservationReason: updatedMaterial.reservationReason,
+        reservedBy: updatedMaterial.reservedBy,
         currentStock: Object.values(updatedMaterial.stocks || {}).reduce((a, b) => a + b, 0),
         stocks: updatedMaterial.stocks
     };

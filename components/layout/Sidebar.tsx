@@ -39,7 +39,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, currentPage, onNavigate, isOpen
   return (
     <>
       <aside
-        className={`fixed top-0 right-0 z-40 w-64 h-screen transition-transform ${
+        className={`fixed top-0 right-0 z-40 w-64 h-full transition-transform ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         } md:translate-x-0 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700`}
         aria-label="Sidebar"

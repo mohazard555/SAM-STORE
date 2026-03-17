@@ -76,7 +76,7 @@ function App() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="flex flex-col items-center justify-center h-full w-full bg-gray-50 dark:bg-gray-900">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-500 mb-4"></div>
         <p className="text-gray-600 dark:text-gray-400">جار تحضير المستودع...</p>
       </div>
@@ -86,7 +86,7 @@ function App() {
   const { printContent } = usePrint();
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-900 min-h-screen font-sans transition-colors duration-300">
+    <div className="bg-gray-50 dark:bg-gray-900 h-full w-full font-sans transition-colors duration-300">
       {/* Print Section - only visible during print */}
       <div id="print-section" dangerouslySetInnerHTML={{ __html: printContent || '' }} />
       

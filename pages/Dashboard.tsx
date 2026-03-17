@@ -14,13 +14,13 @@ interface DashboardProps {
 }
 
 const StatCard: React.FC<{ title: string; value: string | number; icon: React.ReactNode; color: string; }> = ({ title, value, icon, color }) => (
-    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md flex items-center space-x-4 space-x-reverse">
-        <div className={`p-3 rounded-full ${color}`}>
+    <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border dark:border-gray-700 flex items-center space-x-3 space-x-reverse">
+        <div className={`p-2.5 rounded-full ${color}`}>
             {icon}
         </div>
         <div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{title}</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{title}</p>
+            <p className="text-xl font-bold text-gray-900 dark:text-white">{value}</p>
         </div>
     </div>
 );
@@ -65,16 +65,16 @@ const Dashboard: React.FC<DashboardProps> = ({ materials, transactions, warehous
   }));
 
   return (
-    <div className="space-y-8 pb-10">
+    <div className="space-y-4 pb-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">لوحة المعلومات</h1>
-          <div className="text-sm text-gray-500 dark:text-gray-400">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">لوحة المعلومات</h1>
+          <div className="text-xs text-gray-500 dark:text-gray-400">
             {new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </div>
         </div>
         
         {/* --- Basic Stats --- */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard title="إجمالي المواد" value={totalMaterials} icon={<Package className="text-white"/>} color="bg-sky-500" />
             <StatCard title="مواد منخفضة المخزون" value={lowStockMaterials} icon={<AlertTriangle className="text-white"/>} color="bg-amber-500" />
             <StatCard title="إجمالي الكميات" value={totalStock} icon={<ArrowDown className="text-white"/>} color="bg-emerald-500" />
@@ -92,13 +92,13 @@ const Dashboard: React.FC<DashboardProps> = ({ materials, transactions, warehous
         </div>
 
         {/* --- Charts --- */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md border border-gray-100 dark:border-gray-700">
-                <h3 className="font-bold text-lg mb-4 text-gray-900 dark:text-white flex items-center gap-2">
-                  <Package size={20} className="text-sky-500" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+                <h3 className="font-bold text-base mb-3 text-gray-900 dark:text-white flex items-center gap-2">
+                  <Package size={18} className="text-sky-500" />
                   المواد الأعلى كمية
                 </h3>
-                 <ResponsiveContainer width="100%" height={300}>
+                 <ResponsiveContainer width="100%" height={250}>
                     <BarChart data={topMaterialsData} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                         <XAxis type="number" stroke="#9ca3af" />
@@ -109,12 +109,12 @@ const Dashboard: React.FC<DashboardProps> = ({ materials, transactions, warehous
                     </BarChart>
                 </ResponsiveContainer>
             </div>
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md border border-gray-100 dark:border-gray-700">
-                <h3 className="font-bold text-lg mb-4 text-gray-900 dark:text-white flex items-center gap-2">
-                  <ArrowDown size={20} className="text-emerald-500" />
+            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+                <h3 className="font-bold text-base mb-3 text-gray-900 dark:text-white flex items-center gap-2">
+                  <ArrowDown size={18} className="text-emerald-500" />
                   حركة السحب (آخر 7 أيام)
                 </h3>
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={250}>
                     <LineChart data={transactionChartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="name" stroke="#9ca3af" tick={{fontSize: 10}}/>

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Transaction, Material, SettingsData, User, Warehouse } from '@/types';
 import { addTransaction, deleteTransaction, updateTransaction, getSettings } from '@/services/mockApi';
 import { usePrint } from '@/services/PrintContext';
-import { Plus, ArrowDownLeft, ArrowUpRight, Calendar, Info, Search, Edit, Trash2, Printer, RotateCcw, Layers } from 'lucide-react';
+import { Plus, ArrowDownLeft, ArrowUpRight, Calendar, Info, Search, Edit, Trash2, Printer, RotateCcw, Layers, Archive } from 'lucide-react';
 import BulkTransactionModal from '@/components/BulkTransactionModal';
 
 interface TransactionsProps {
@@ -262,6 +262,7 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, wa
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
+  const [showArchive, setShowArchive] = useState(false);
 
   const canPrint = user.role === 'admin' || user.permissions?.canPrint;
   const isAdmin = user.role === 'admin';
@@ -377,32 +378,39 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, wa
     <div className="space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-4">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">الحركات اليومية</h1>
-        {isAdmin && (
-            <div className="flex gap-3">
-                <button onClick={() => setIsBulkModalOpen(true)} className="flex items-center px-4 py-2 bg-emerald-500 text-white rounded-lg shadow hover:bg-emerald-600 disabled:bg-emerald-300 transition-all" disabled={materials.length === 0}>
-                    <Layers className="ml-2" size={20} /> حركة مجمعة
-                </button>
-                <button onClick={() => { setEditingTransaction(null); setIsModalOpen(true); }} className="flex items-center px-4 py-2 bg-sky-500 text-white rounded-lg shadow hover:bg-sky-600 disabled:bg-sky-300 transition-all" disabled={materials.length === 0}>
-                    <Plus className="ml-2" size={20} /> إضافة حركة صرف
-                </button>
-            </div>
-        )}
+        <div className="flex gap-3">
+            <button onClick={() => setShowArchive(!showArchive)} className={`flex items-center px-4 py-2 rounded-lg shadow transition-all ${showArchive ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
+                <Archive className="ml-2" size={20} /> أرشيف
+            </button>
+            {isAdmin && (
+                <>
+                    <button onClick={() => setIsBulkModalOpen(true)} className="flex items-center px-4 py-2 bg-emerald-500 text-white rounded-lg shadow hover:bg-emerald-600 disabled:bg-emerald-300 transition-all" disabled={materials.length === 0}>
+                        <Layers className="ml-2" size={20} /> حركة مجمعة
+                    </button>
+                    <button onClick={() => { setEditingTransaction(null); setIsModalOpen(true); }} className="flex items-center px-4 py-2 bg-sky-500 text-white rounded-lg shadow hover:bg-sky-600 disabled:bg-sky-300 transition-all" disabled={materials.length === 0}>
+                        <Plus className="ml-2" size={20} /> إضافة حركة صرف
+                    </button>
+                </>
+            )}
+        </div>
       </div>
 
       {/* Date Filter Bar */}
-      <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border dark:border-gray-700 flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2">
-              <label className="text-sm font-bold text-gray-500 dark:text-gray-400">من تاريخ:</label>
-              <input type="date" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} className="p-1.5 border rounded text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+      {showArchive && (
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border dark:border-gray-700 flex flex-wrap items-center gap-4 animate-in fade-in slide-in-from-top-2">
+              <div className="flex items-center gap-2">
+                  <label className="text-sm font-bold text-gray-500 dark:text-gray-400">من تاريخ:</label>
+                  <input type="date" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} className="p-1.5 border rounded text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+              </div>
+              <div className="flex items-center gap-2">
+                  <label className="text-sm font-bold text-gray-500 dark:text-gray-400">إلى تاريخ:</label>
+                  <input type="date" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} className="p-1.5 border rounded text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+              </div>
+              {(filterStartDate || filterEndDate) && (
+                  <button onClick={() => { setFilterStartDate(''); setFilterEndDate(''); }} className="text-xs text-red-500 hover:underline">إلغاء الفلتر</button>
+              )}
           </div>
-          <div className="flex items-center gap-2">
-              <label className="text-sm font-bold text-gray-500 dark:text-gray-400">إلى تاريخ:</label>
-              <input type="date" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} className="p-1.5 border rounded text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-          </div>
-          {(filterStartDate || filterEndDate) && (
-              <button onClick={() => { setFilterStartDate(''); setFilterEndDate(''); }} className="text-xs text-red-500 hover:underline">إلغاء الفلتر</button>
-          )}
-      </div>
+      )}
 
       <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg overflow-x-auto border dark:border-gray-700">
         <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">

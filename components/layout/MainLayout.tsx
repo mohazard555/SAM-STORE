@@ -118,7 +118,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, onLogout, darkMode, setDa
   const { printContent } = usePrint();
 
   return (
-    <div className="flex h-screen bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 overflow-hidden">
+    <div className="flex h-full w-full bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 overflow-hidden">
       <Sidebar 
         user={user}
         currentPage={currentPage} 
@@ -136,7 +136,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, onLogout, darkMode, setDa
           darkMode={darkMode}
           setDarkMode={setDarkMode}
         />
-        <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto">
+        <main className="flex-1 p-4 md:p-6 overflow-y-auto">
           {renderPage()}
         </main>
         <Footer />
