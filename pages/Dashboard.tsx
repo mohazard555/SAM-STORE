@@ -30,6 +30,7 @@ const Dashboard: React.FC<DashboardProps> = ({ materials, transactions, warehous
   const totalMaterials = materials.length;
   const lowStockMaterials = materials.filter(m => m.currentStock < m.minStock).length;
   const totalStock = materials.reduce((sum, m) => sum + m.currentStock, 0);
+  const formattedTotalStock = Number.isInteger(totalStock) ? totalStock : parseFloat(totalStock.toFixed(2));
   const totalRecipients = new Set(transactions.map(t => t.recipient)).size;
 
   // --- Unit Stats ---
@@ -38,7 +39,7 @@ const Dashboard: React.FC<DashboardProps> = ({ materials, transactions, warehous
     materials.forEach(m => {
       stats[m.unit] = (stats[m.unit] || 0) + m.currentStock;
     });
-    return Object.entries(stats);
+    return Object.entries(stats).map(([unit, total]) => [unit, Number.isInteger(total) ? total : parseFloat(total.toFixed(2))]);
   }, [materials]);
 
   // --- Charts Data ---
@@ -77,7 +78,7 @@ const Dashboard: React.FC<DashboardProps> = ({ materials, transactions, warehous
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard title="إجمالي المواد" value={totalMaterials} icon={<Package className="text-white" size={20}/>} color="bg-sky-500" />
             <StatCard title="مواد منخفضة المخزون" value={lowStockMaterials} icon={<AlertTriangle className="text-white" size={20}/>} color="bg-amber-500" />
-            <StatCard title="إجمالي الكميات" value={totalStock} icon={<ArrowDown className="text-white" size={20}/>} color="bg-emerald-500" />
+            <StatCard title="إجمالي الكميات" value={formattedTotalStock} icon={<ArrowDown className="text-white" size={20}/>} color="bg-emerald-500" />
             <StatCard title="عدد المستلمين" value={totalRecipients} icon={<Users className="text-white" size={20}/>} color="bg-violet-500" />
         </div>
 

@@ -201,7 +201,7 @@ const BulkTransactionModal: React.FC<BulkTransactionModalProps> = ({ materials, 
                                     </div>
                                     <div className="md:col-span-2">
                                         <label className="block mb-1 text-xs font-bold text-gray-500 dark:text-gray-400">الكمية</label>
-                                        <input type="number" value={item.quantity} onChange={(e) => handleItemChange(item.id, 'quantity', Number(e.target.value))} step="any" min="0" required className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm" />
+                                        <input type="number" value={item.quantity} onChange={(e) => handleItemChange(item.id, 'quantity', parseFloat(e.target.value))} step="any" min="0" required className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm" />
                                     </div>
                                     <div className="md:col-span-2">
                                         <label className="block mb-1 text-xs font-bold text-gray-500 dark:text-gray-400">اللون</label>
