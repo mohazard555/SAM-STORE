@@ -3,7 +3,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Transaction, Material, SettingsData, User, Warehouse } from '@/types';
 import { addTransaction, deleteTransaction, updateTransaction, getSettings } from '@/services/mockApi';
 import { usePrint } from '@/services/PrintContext';
-import { Plus, ArrowDownLeft, ArrowUpRight, Calendar, Info, Search, Edit, Trash2, Printer, RotateCcw } from 'lucide-react';
+import { Plus, ArrowDownLeft, ArrowUpRight, Calendar, Info, Search, Edit, Trash2, Printer, RotateCcw, Layers } from 'lucide-react';
+import BulkTransactionModal from '@/components/BulkTransactionModal';
 
 interface TransactionsProps {
   transactions: Transaction[];
@@ -43,6 +44,12 @@ const TransactionModal: React.FC<{
     const [error, setError] = useState('');
 
     const selectedMaterial = materials.find(m => m.id === materialId);
+
+    useEffect(() => {
+        if (!editTransaction && filteredMaterials.length > 0 && !filteredMaterials.find(m => m.id === materialId)) {
+            setMaterialId(filteredMaterials[0].id);
+        }
+    }, [searchTerm]);
 
     useEffect(() => {
         if (!editTransaction && selectedMaterial?.color) {
@@ -196,7 +203,7 @@ const TransactionModal: React.FC<{
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block mb-1.5 text-sm font-bold text-gray-700 dark:text-gray-300">الكمية</label>
-                            <input type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} step="0.1" min="0.01" required className="w-full p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm" />
+                            <input type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} step="any" min="0" required className="w-full p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm" />
                         </div>
                         <div>
                             <label className="block mb-1.5 text-sm font-bold text-gray-700 dark:text-gray-300">اللون</label>
@@ -250,6 +257,7 @@ const TransactionModal: React.FC<{
 const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, warehouses, onDataChange, user }) => {
   const { triggerPrint } = usePrint();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [filterStartDate, setFilterStartDate] = useState('');
@@ -283,7 +291,11 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, wa
           end.setHours(23,59,59,999);
           result = result.filter(t => new Date(t.date) <= end);
       }
-      return result.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      return result.sort((a,b) => {
+          const dateDiff = new Date(b.date).getTime() - new Date(a.date).getTime();
+          if (dateDiff !== 0) return dateDiff;
+          return b.id.localeCompare(a.id);
+      });
   }, [transactions, filterStartDate, filterEndDate]);
 
   const handleSave = (transaction: any) => {
@@ -296,6 +308,16 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, wa
         onDataChange();
         setIsModalOpen(false);
         setEditingTransaction(null);
+    } catch (err: any) {
+        alert(err.message);
+    }
+  };
+
+  const handleSaveBulk = (bulkTransactions: any[]) => {
+    try {
+        bulkTransactions.forEach(t => addTransaction(t));
+        onDataChange();
+        setIsBulkModalOpen(false);
     } catch (err: any) {
         alert(err.message);
     }
@@ -356,9 +378,14 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, wa
       <div className="flex justify-between items-center flex-wrap gap-4">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">الحركات اليومية</h1>
         {isAdmin && (
-            <button onClick={() => { setEditingTransaction(null); setIsModalOpen(true); }} className="flex items-center px-4 py-2 bg-sky-500 text-white rounded-lg shadow hover:bg-sky-600 disabled:bg-sky-300 transition-all" disabled={materials.length === 0}>
-                <Plus className="ml-2" size={20} /> إضافة حركة صرف
-            </button>
+            <div className="flex gap-3">
+                <button onClick={() => setIsBulkModalOpen(true)} className="flex items-center px-4 py-2 bg-emerald-500 text-white rounded-lg shadow hover:bg-emerald-600 disabled:bg-emerald-300 transition-all" disabled={materials.length === 0}>
+                    <Layers className="ml-2" size={20} /> حركة مجمعة
+                </button>
+                <button onClick={() => { setEditingTransaction(null); setIsModalOpen(true); }} className="flex items-center px-4 py-2 bg-sky-500 text-white rounded-lg shadow hover:bg-sky-600 disabled:bg-sky-300 transition-all" disabled={materials.length === 0}>
+                    <Plus className="ml-2" size={20} /> إضافة حركة صرف
+                </button>
+            </div>
         )}
       </div>
 
@@ -462,6 +489,8 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, wa
 
       {isModalOpen && <TransactionModal materials={materials} warehouses={warehouses} editTransaction={editingTransaction} onClose={() => { setIsModalOpen(false); setEditingTransaction(null); }} onSave={handleSave} />}
       
+      {isBulkModalOpen && <BulkTransactionModal materials={materials} warehouses={warehouses} onClose={() => setIsBulkModalOpen(false)} onSave={handleSaveBulk} />}
+
       {deleteConfirm && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex justify-center items-center p-4">
               <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-sm w-full text-center border dark:border-gray-700 shadow-2xl">
