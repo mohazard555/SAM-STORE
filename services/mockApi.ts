@@ -882,7 +882,7 @@ export const deleteTransaction = (transactionId: string): void => {
     debouncedSync();
 };
 
-export const updateTransaction = (updatedTransaction: Transaction): Transaction => {
+export const updateTransaction = (updatedTransaction: Transaction & { affectInventory?: boolean }): Transaction => {
     const transactions = getTransactions();
     const oldTransaction = transactions.find((t: Transaction) => t.id === updatedTransaction.id);
     if (!oldTransaction) return updatedTransaction;
@@ -890,7 +890,7 @@ export const updateTransaction = (updatedTransaction: Transaction): Transaction 
     let materials = getMaterials();
     const material = materials.find(m => m.id === updatedTransaction.materialId);
 
-    if (material) {
+    if (material && updatedTransaction.affectInventory !== false) {
         const updatedMaterial = { ...material, stocks: { ...material.stocks } };
         
         // 1. Reverse old stock change

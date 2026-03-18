@@ -42,6 +42,7 @@ const TransactionModal: React.FC<{
     const [color, setColor] = useState(editTransaction?.color || '');
     const [date, setDate] = useState(editTransaction ? new Date(editTransaction.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
     const [error, setError] = useState('');
+    const [affectInventory, setAffectInventory] = useState(true);
 
     const selectedMaterial = materials.find(m => m.id === materialId);
 
@@ -80,7 +81,8 @@ const TransactionModal: React.FC<{
             itemBarcode,
             notes, 
             color,
-            date: new Date(date).toISOString() 
+            date: new Date(date).toISOString(),
+            affectInventory: editTransaction ? affectInventory : true
         };
 
         if (editTransaction) {
@@ -104,6 +106,21 @@ const TransactionModal: React.FC<{
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
+                {editTransaction && (
+                    <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800 mb-4">
+                        <label className="block text-sm font-bold text-amber-800 dark:text-amber-200 mb-2">هل تريد أن تؤثر على المخزون أم مجرد خطأ إدخال؟</label>
+                        <div className="flex gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="affectInventory" checked={affectInventory} onChange={() => setAffectInventory(true)} className="w-4 h-4 text-amber-600" />
+                                <span className="text-sm text-gray-700 dark:text-gray-300">تأثير على المخزون</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="affectInventory" checked={!affectInventory} onChange={() => setAffectInventory(false)} className="w-4 h-4 text-amber-600" />
+                                <span className="text-sm text-gray-700 dark:text-gray-300">مجرد خطأ إدخال (لا يؤثر)</span>
+                            </label>
+                        </div>
+                    </div>
+                )}
                 {!editTransaction && (
                     <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg border dark:border-gray-700">
                         <label className="block mb-2 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">نوع الحركة</label>
@@ -203,7 +220,7 @@ const TransactionModal: React.FC<{
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block mb-1.5 text-sm font-bold text-gray-700 dark:text-gray-300">الكمية</label>
-                            <input type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} step="any" min="0" required className="w-full p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm" />
+                            <input type="number" value={quantity} onChange={(e) => setQuantity(parseFloat(e.target.value))} step="0.1" min="0" required className="w-full p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm" />
                         </div>
                         <div>
                             <label className="block mb-1.5 text-sm font-bold text-gray-700 dark:text-gray-300">اللون</label>

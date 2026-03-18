@@ -39,7 +39,7 @@ interface ReportsProps {
   user: User;
 }
 
-type ReportType = 'daily' | 'weekly' | 'monthly' | 'byMaterial' | 'byCategory' | 'byColor' | 'byBarcode' | 'byItemBarcode' | 'totalCount' | 'all' | 'bySupplier' | 'mostUsed' | 'inactive' | 'lowStock' | 'inventoryValue' | 'inTransactions' | 'outTransactions' | 'byRecipient' | 'materialLedger' | 'warehouseTransfers' | 'deadStock' | 'fastMoving' | 'slowMoving' | 'warehouseComparison' | 'userPerformance' | 'auditReport' | 'consumptionAnalysis' | 'stockForecast' | 'periodComparison' | 'trendReport' | 'expiryReport' | 'reservedStockReport';
+type ReportType = 'daily' | 'weekly' | 'monthly' | 'byMaterial' | 'byCategory' | 'byColor' | 'byBarcode' | 'byItemBarcode' | 'totalCount' | 'all' | 'bySupplier' | 'mostUsed' | 'inactive' | 'lowStock' | 'inventoryValue' | 'inTransactions' | 'outTransactions' | 'byRecipient' | 'materialLedger' | 'warehouseTransfers' | 'deadStock' | 'fastMoving' | 'slowMoving' | 'warehouseComparison' | 'userPerformance' | 'auditReport' | 'consumptionAnalysis' | 'stockForecast' | 'periodComparison' | 'trendReport' | 'expiryReport' | 'reservedStockReport' | 'modifiedOperationsReport' | 'supplierInventoryValue' | 'supplierReturns';
 
 const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, settings, user }) => {
   const { triggerPrint } = usePrint();
@@ -256,8 +256,14 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
         return Object.entries(userStats).map(([username, stats]) => ({ username, ...stats }));
       }
 
+      case 'modifiedOperationsReport':
       case 'auditReport':
-        return notifications.filter(n => n.action === 'update' || n.action === 'delete');
+        return notifications.filter(n => {
+            const nDate = new Date(n.timestamp).getTime();
+            const start = new Date(startDate).getTime();
+            const end = new Date(endDate).getTime();
+            return (n.action === 'update' || n.action === 'delete') && nDate >= start && nDate <= end;
+        });
 
       case 'consumptionAnalysis': {
         // Group consumption by month
@@ -301,7 +307,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
           if (t.type === 'out') acc[t.materialId] = (acc[t.materialId] || 0) + t.quantity;
           return acc;
         }, {} as Record<string, number>);
-
+        
         // Comparison period usage
         const compStart = new Date(comparisonStartDate).getTime();
         const compEnd = new Date(comparisonEndDate).getTime();
@@ -363,17 +369,32 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
       }
 
       case 'expiryReport': {
-        const now = new Date();
-        const next30Days = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000));
         return materials.filter(m => {
           if (!m.expiryDate) return false;
-          const expiry = new Date(m.expiryDate);
-          return expiry.getTime() <= next30Days.getTime();
+          const expiry = new Date(m.expiryDate).getTime();
+          const start = new Date(startDate).getTime();
+          const end = new Date(endDate).getTime();
+          return expiry >= start && expiry <= end;
         }).sort((a, b) => new Date(a.expiryDate!).getTime() - new Date(b.expiryDate!).getTime());
       }
 
       case 'reservedStockReport':
-        return materials.filter(m => (m.reservedStock || 0) > 0);
+        return materials.filter(m => {
+          const created = new Date(m.createdAt).getTime();
+          const start = new Date(startDate).getTime();
+          const end = new Date(endDate).getTime();
+          return (m.reservedStock || 0) > 0 && created >= start && created <= end;
+        });
+
+      case 'supplierInventoryValue':
+        return materials.filter(m => !selectedSupplier || m.supplier === selectedSupplier).map(m => ({
+            ...m,
+            totalValue: m.currentStock * (m.price || 0)
+        }));
+
+      case 'supplierReturns':
+        return dateFilteredTransactions.filter(t => t.type === 'return' && (!selectedSupplier || t.supplier === selectedSupplier));
+
 
       case 'totalCount':
         return materials;
@@ -494,6 +515,24 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
             fileName = 'inventory_value_report';
             sheetName = 'قيمة المخزون';
             break;
+        case 'supplierInventoryValue':
+            dataToExport = (reportData as (Material & {totalValue: number})[]).map(m => ({
+                "اسم المادة": m.name, "نوع المادة": m.materialType, "الفئة": m.category,
+                "المورد": m.supplier, "الباركود": m.barcode, "الكمية الحالية": m.currentStock,
+                "السعر": m.price || 0, "القيمة الإجمالية": m.totalValue
+            }));
+            fileName = 'supplier_inventory_value';
+            sheetName = 'قيمة بضاعة المورد';
+            break;
+        case 'supplierReturns':
+            dataToExport = (reportData as Transaction[]).map(t => ({
+                'التاريخ': new Date(t.date).toLocaleDateString('ar-EG'), 'اسم المادة': t.materialName,
+                'الكمية': t.quantity, 'وحدة القياس': t.unit, 'المستلم': t.recipient,
+                'ملاحظات': t.notes || ''
+            }));
+            fileName = 'supplier_returns';
+            sheetName = 'مرتجعات المورد';
+            break;
         default: // Transaction reports
             dataToExport = (reportData as Transaction[]).map(t => ({
                 'التاريخ والوقت': new Date(t.date).toLocaleString('ar-EG'), 'اسم المادة': t.materialName,
@@ -552,6 +591,18 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
             tableContent = (reportData as any[]).map(m => `<tr><td>${m.name}</td><td>${m.barcode}</td><td>${m.displayStock} ${m.unit}</td><td>${(m.price || 0).toLocaleString('ar-EG')}</td><td>${m.totalValue.toLocaleString('ar-EG')}</td></tr>`).join('');
             const totalInventoryValue = (reportData as any[]).reduce((sum, m) => sum + m.totalValue, 0);
             tableContent += `<tr><td colspan="4" style="text-align:left; font-weight:bold;">إجمالي قيمة المخزون:</td><td style="font-weight:bold;">${totalInventoryValue.toLocaleString('ar-EG')} ${settings?.currencySymbol || 'ج.م'}</td></tr>`;
+            break;
+        case 'supplierInventoryValue':
+            reportTitle = `تقرير قيمة بضاعة المورد: ${selectedSupplier || 'الكل'}`;
+            tableHeaders = `<th>اسم المادة</th><th>الفئة</th><th>الباركود</th><th>الكمية الحالية</th><th>السعر</th><th>القيمة الإجمالية</th>`;
+            tableContent = (reportData as (Material & {totalValue: number})[]).map(m => `<tr><td>${m.name}</td><td>${m.category}</td><td>${m.barcode}</td><td>${m.currentStock} ${m.unit}</td><td>${(m.price || 0).toLocaleString('ar-EG')}</td><td>${m.totalValue.toLocaleString('ar-EG')}</td></tr>`).join('');
+            const totalSupplierValue = (reportData as (Material & {totalValue: number})[]).reduce((sum, m) => sum + m.totalValue, 0);
+            tableContent += `<tr><td colspan="5" style="text-align:left; font-weight:bold;">إجمالي قيمة بضاعة المورد:</td><td style="font-weight:bold;">${totalSupplierValue.toLocaleString('ar-EG')} ${settings?.currencySymbol || 'ج.م'}</td></tr>`;
+            break;
+        case 'supplierReturns':
+            reportTitle = `تقرير مرتجعات المورد: ${selectedSupplier || 'الكل'}`;
+            tableHeaders = `<th>التاريخ</th><th>اسم المادة</th><th>الكمية</th><th>وحدة القياس</th><th>المستلم</th><th>ملاحظات</th>`;
+            tableContent = (reportData as Transaction[]).map(t => `<tr><td>${new Date(t.date).toLocaleDateString('ar-EG')}</td><td>${t.materialName}</td><td>${t.quantity}</td><td>${t.unit}</td><td>${t.recipient}</td><td>${t.notes || ''}</td></tr>`).join('');
             break;
         default: // Transaction reports
             reportTitle = `تقرير حركات`;
@@ -645,6 +696,8 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
 
     // Suppliers
     { value: 'bySupplier', category: 'suppliers', label: 'حسب المورد', icon: Truck, color: 'orange', bgColor: 'bg-orange-100', textColor: 'text-orange-600', darkBg: 'dark:bg-orange-900/30', darkText: 'dark:text-orange-400', glow: 'bg-orange-500', description: 'تقارير المواد المرتبطة بمورد محدد' },
+    { value: 'supplierInventoryValue', category: 'suppliers', label: 'قيمة بضاعة مورد', icon: TrendingUp, color: 'emerald', bgColor: 'bg-emerald-100', textColor: 'text-emerald-600', darkBg: 'dark:bg-emerald-900/30', darkText: 'dark:text-emerald-400', glow: 'bg-emerald-500', description: 'تقرير قيمة بضاعة مورد مع تفاصيل مواد' },
+    { value: 'supplierReturns', category: 'suppliers', label: 'مرتجعات مورد', icon: RotateCcw, color: 'rose', bgColor: 'bg-rose-100', textColor: 'text-rose-600', darkBg: 'dark:bg-rose-900/30', darkText: 'dark:text-rose-400', glow: 'bg-rose-500', description: 'تقرير مرتجعات مورد' },
 
     // Users
     { value: 'userPerformance', category: 'users', label: 'أداء المستخدمين', icon: UserIcon, color: 'purple', bgColor: 'bg-purple-100', textColor: 'text-purple-600', darkBg: 'dark:bg-purple-900/30', darkText: 'dark:text-purple-400', glow: 'bg-purple-500', description: 'إحصائيات العمليات لكل مستخدم' },
