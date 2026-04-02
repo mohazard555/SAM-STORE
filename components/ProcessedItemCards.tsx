@@ -3,6 +3,7 @@ import { Transaction, Material, ProcessedItemCard } from '@/types';
 import { getProcessedItemCards, updateProcessedItemCard, deleteProcessedItemCard, updateProcessedItemCardQuantities } from '@/services/mockApi';
 import { Search, Filter, CheckCircle, Clock, Trash2, Printer, Copy, Package, Calendar, Edit2, Save, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { usePrint } from '@/services/PrintContext';
 
 interface ProcessedItemCardsProps {
   transactions: Transaction[];
@@ -10,6 +11,7 @@ interface ProcessedItemCardsProps {
 }
 
 export const ProcessedItemCards: React.FC<ProcessedItemCardsProps> = ({ transactions, materials }) => {
+  const { triggerPrint } = usePrint();
   const [cards, setCards] = useState<ProcessedItemCard[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -76,55 +78,37 @@ ${cardData.materialsList.map((m: any) => `- ${m.name}: ${m.quantity} (السعر
   };
 
   const handlePrint = (cardData: any) => {
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(`
-        <html dir="rtl">
-          <head>
-            <title>طباعة بطاقة صنف</title>
-            <style>
-              body { font-family: Arial, sans-serif; padding: 20px; }
-              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-              th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
-              th { background-color: #f2f2f2; }
-              .header { margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <h2>بطاقة صنف: ${cardData.itemBarcode}</h2>
-              <p>الحالة: ${cardData.status === 'delivered' ? 'تم التسليم' : 'قيد الانتظار'}</p>
-              <p>إجمالي الكمية: ${cardData.totalQuantity}</p>
-              <p>إجمالي التكلفة: ${cardData.totalCost}</p>
-            </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>المادة</th>
-                  <th>الكمية</th>
-                  <th>السعر الإفرادي</th>
-                  <th>الإجمالي</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${cardData.materialsList.map((m: any) => `
-                  <tr>
-                    <td>${m.name}</td>
-                    <td>${m.quantity}</td>
-                    <td>${m.price}</td>
-                    <td>${m.total}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-            <script>
-              window.onload = () => { window.print(); window.close(); }
-            </script>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-    }
+    const html = `
+      <div dir="rtl" style="font-family: Arial, sans-serif; padding: 20px;">
+        <div style="margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px;">
+          <h2>بطاقة صنف: ${cardData.itemBarcode}</h2>
+          <p>الحالة: ${cardData.status === 'delivered' ? 'تم التسليم' : 'قيد الانتظار'}</p>
+          <p>إجمالي الكمية: ${cardData.totalQuantity}</p>
+          <p>إجمالي التكلفة: ${cardData.totalCost}</p>
+        </div>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+          <thead>
+            <tr>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: right; background-color: #f2f2f2;">المادة</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: right; background-color: #f2f2f2;">الكمية</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: right; background-color: #f2f2f2;">السعر الإفرادي</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: right; background-color: #f2f2f2;">الإجمالي</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${cardData.materialsList.map((m: any) => `
+              <tr>
+                <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${m.name}</td>
+                <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${m.quantity}</td>
+                <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${m.price}</td>
+                <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${m.total}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+    triggerPrint(html);
   };
 
   const processedData = useMemo(() => {
