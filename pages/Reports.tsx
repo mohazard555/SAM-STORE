@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { Transaction, Material, SettingsData, User, Warehouse } from '@/types';
 import { usePrint } from '@/services/PrintContext';
+import { ProcessedItemCards } from '@/components/ProcessedItemCards';
 import { 
   Download, 
   Printer, 
@@ -39,7 +40,7 @@ interface ReportsProps {
   user: User;
 }
 
-type ReportType = 'daily' | 'weekly' | 'monthly' | 'byMaterial' | 'byCategory' | 'byColor' | 'byBarcode' | 'byItemBarcode' | 'totalCount' | 'all' | 'bySupplier' | 'mostUsed' | 'inactive' | 'lowStock' | 'inventoryValue' | 'inTransactions' | 'outTransactions' | 'byRecipient' | 'materialLedger' | 'warehouseTransfers' | 'deadStock' | 'fastMoving' | 'slowMoving' | 'warehouseComparison' | 'userPerformance' | 'auditReport' | 'consumptionAnalysis' | 'stockForecast' | 'periodComparison' | 'trendReport' | 'expiryReport' | 'reservedStockReport' | 'modifiedOperationsReport' | 'supplierInventoryValue' | 'supplierReturns';
+type ReportType = 'daily' | 'weekly' | 'monthly' | 'byMaterial' | 'byCategory' | 'byColor' | 'byBarcode' | 'byItemBarcode' | 'totalCount' | 'all' | 'bySupplier' | 'mostUsed' | 'inactive' | 'lowStock' | 'inventoryValue' | 'inTransactions' | 'outTransactions' | 'byRecipient' | 'materialLedger' | 'warehouseTransfers' | 'deadStock' | 'fastMoving' | 'slowMoving' | 'warehouseComparison' | 'userPerformance' | 'auditReport' | 'consumptionAnalysis' | 'stockForecast' | 'periodComparison' | 'trendReport' | 'expiryReport' | 'reservedStockReport' | 'modifiedOperationsReport' | 'supplierInventoryValue' | 'supplierReturns' | 'processedItemCards';
 
 const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, settings, user }) => {
   const { triggerPrint } = usePrint();
@@ -668,6 +669,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
     { value: 'reservedStockReport', category: 'inventory', label: 'المحجوزات', icon: ClipboardList, color: 'blue', bgColor: 'bg-blue-100', textColor: 'text-blue-600', darkBg: 'dark:bg-blue-900/30', darkText: 'dark:text-blue-400', glow: 'bg-blue-500', description: 'المواد المحجوزة لطلبيات أو مشاريع محددة' },
     { value: 'inventoryValue', category: 'inventory', label: 'قيمة المخزون', icon: TrendingUp, color: 'emerald', bgColor: 'bg-emerald-100', textColor: 'text-emerald-600', darkBg: 'dark:bg-emerald-900/30', darkText: 'dark:text-emerald-400', glow: 'bg-emerald-500', description: 'حساب القيمة المالية للمخزون الحالي' },
     { value: 'warehouseComparison', category: 'inventory', label: 'مقارنة المخازن', icon: Layers, color: 'sky', bgColor: 'bg-sky-100', textColor: 'text-sky-600', darkBg: 'dark:bg-sky-900/30', darkText: 'dark:text-sky-400', glow: 'bg-sky-500', description: 'عرض رصيد المادة في جميع المخازن' },
+    { value: 'processedItemCards', category: 'inventory', label: 'بطاقة أصناف مرحلة', icon: Package, color: 'emerald', bgColor: 'bg-emerald-100', textColor: 'text-emerald-600', darkBg: 'dark:bg-emerald-900/30', darkText: 'dark:text-emerald-400', glow: 'bg-emerald-500', description: 'تجميع الحركات الصادرة على أساس باركود الصنف' },
 
     // Movement
     { value: 'all', category: 'movement', label: 'كل الحركات', icon: History, color: 'blue', bgColor: 'bg-blue-100', textColor: 'text-blue-600', darkBg: 'dark:bg-blue-900/30', darkText: 'dark:text-blue-400', glow: 'bg-blue-500', description: 'عرض جميع حركات الصادر والوارد' },
@@ -814,10 +816,14 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
         })}
       </div>
 
-      {/* Filters and Actions Section */}
-      <AnimatePresence mode="wait">
-        <motion.div 
-          key={filterType}
+      {filterType === 'processedItemCards' ? (
+        <ProcessedItemCards transactions={transactions} materials={materials} />
+      ) : (
+        <>
+          {/* Filters and Actions Section */}
+          <AnimatePresence mode="wait">
+            <motion.div 
+              key={filterType}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
@@ -1431,6 +1437,8 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
         )}
         {!canPerformAction && <div className="p-12 text-center text-gray-400">لا توجد بيانات تطابق الفلتر المختار.</div>}
       </div>
+      </>
+      )}
     </div>
   );
 };

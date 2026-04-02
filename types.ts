@@ -133,6 +133,11 @@ export interface WeightCalculation {
   notes?: string;
 }
 
+export interface ProcessedItemCard {
+  itemBarcode: string;
+  status: 'pending' | 'delivered';
+}
+
 export interface CostTemplatePart {
   id: string;
   name: string;
@@ -158,6 +163,7 @@ export interface AllData {
   costCalculations?: CostCalculation[];
   weightCalculations?: WeightCalculation[];
   costTemplates?: CostTemplate[];
+  processedItemCards?: ProcessedItemCard[];
 }
 
 export type SyncState = 'idle' | 'syncing' | 'success' | 'error';

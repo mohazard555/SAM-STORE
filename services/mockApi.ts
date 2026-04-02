@@ -1,5 +1,5 @@
 
-import { User, Material, Transaction, SettingsData, AllData, UserPermissions, Page, CostCalculation, WeightCalculation, Warehouse, CostTemplate, SyncStatus, SyncState, AppNotification } from '@/types';
+import { User, Material, Transaction, SettingsData, AllData, UserPermissions, Page, CostCalculation, WeightCalculation, Warehouse, CostTemplate, SyncStatus, SyncState, AppNotification, ProcessedItemCard } from '@/types';
 
 // --- UTILS ---
 const normalizeArabicNumerals = (str: string): string => {
@@ -45,6 +45,7 @@ const COST_CALCULATIONS_KEY = 'warehouse_cost_calculations';
 const WEIGHT_CALCULATIONS_KEY = 'warehouse_weight_calculations';
 const WAREHOUSES_KEY = 'warehouse_warehouses';
 const COST_TEMPLATES_KEY = 'warehouse_cost_templates';
+const PROCESSED_ITEM_CARDS_KEY = 'warehouse_processed_item_cards';
 const UNSYNCED_CHANGES_KEY = 'warehouse_unsynced_changes';
 const LAST_SYNC_KEY = 'warehouse_last_sync';
 const NOTIFICATIONS_KEY = 'warehouse_notifications';
@@ -1025,6 +1026,105 @@ export const deleteCostTemplate = (id: string): void => {
     debouncedSync();
 };
 
+export const getProcessedItemCards = (): ProcessedItemCard[] => getFromStorage<ProcessedItemCard[]>(PROCESSED_ITEM_CARDS_KEY, []);
+
+export const updateProcessedItemCard = (card: ProcessedItemCard): void => {
+    const cards = getProcessedItemCards();
+    const index = cards.findIndex(c => c.itemBarcode === card.itemBarcode);
+    if (index !== -1) {
+        cards[index] = card;
+    } else {
+        cards.push(card);
+    }
+    saveToStorage(PROCESSED_ITEM_CARDS_KEY, cards);
+    debouncedSync();
+};
+
+export const deleteProcessedItemCard = (itemBarcode: string): void => {
+    const cards = getProcessedItemCards();
+    saveToStorage(PROCESSED_ITEM_CARDS_KEY, cards.filter(c => c.itemBarcode !== itemBarcode));
+    
+    // Delete associated transactions
+    const transactions = getTransactions();
+    const transactionsToDelete = transactions.filter(t => t.itemBarcode === itemBarcode && t.type === 'out');
+    if (transactionsToDelete.length > 0) {
+        const remainingTransactions = transactions.filter(t => !(t.itemBarcode === itemBarcode && t.type === 'out'));
+        saveToStorage(TRANSACTIONS_KEY, remainingTransactions);
+        
+        // Restore stock for deleted 'out' transactions
+        const materials = getMaterials();
+        let materialsUpdated = false;
+        
+        transactionsToDelete.forEach(t => {
+            const material = materials.find(m => m.id === t.materialId);
+            if (material) {
+                material.currentStock += t.quantity;
+                if (material.stocks[t.warehouseId] !== undefined) {
+                    material.stocks[t.warehouseId] += t.quantity;
+                }
+                materialsUpdated = true;
+            }
+        });
+        
+        if (materialsUpdated) {
+            saveToStorage(MATERIALS_KEY, materials);
+        }
+    }
+    debouncedSync();
+};
+
+export const updateProcessedItemCardQuantities = (itemBarcode: string, updatedMaterials: { materialId: string, newQuantity: number }[]): void => {
+    const transactions = getTransactions();
+    const materials = getMaterials();
+    let materialsUpdated = false;
+    let transactionsUpdated = false;
+
+    updatedMaterials.forEach(update => {
+        const relatedTxs = transactions.filter(t => t.itemBarcode === itemBarcode && t.type === 'out' && t.materialId === update.materialId);
+        const currentTotalQty = relatedTxs.reduce((sum, t) => sum + t.quantity, 0);
+        const diff = update.newQuantity - currentTotalQty;
+
+        if (diff !== 0) {
+            const material = materials.find(m => m.id === update.materialId);
+            if (material) {
+                material.currentStock -= diff;
+                const warehouseId = relatedTxs[0]?.warehouseId;
+                if (warehouseId && material.stocks[warehouseId] !== undefined) {
+                    material.stocks[warehouseId] -= diff;
+                }
+                materialsUpdated = true;
+
+                if (diff > 0) {
+                    if (relatedTxs.length > 0) {
+                        relatedTxs[0].quantity += diff;
+                        transactionsUpdated = true;
+                    }
+                } else {
+                    let remainingDiff = Math.abs(diff);
+                    for (const tx of relatedTxs) {
+                        if (remainingDiff <= 0) break;
+                        if (tx.quantity >= remainingDiff) {
+                            tx.quantity -= remainingDiff;
+                            remainingDiff = 0;
+                        } else {
+                            remainingDiff -= tx.quantity;
+                            tx.quantity = 0;
+                        }
+                    }
+                    transactionsUpdated = true;
+                }
+            }
+        }
+    });
+
+    const finalTransactions = transactions.filter(t => t.quantity > 0);
+
+    if (materialsUpdated) saveToStorage(MATERIALS_KEY, materials);
+    if (transactionsUpdated || finalTransactions.length !== transactions.length) saveToStorage(TRANSACTIONS_KEY, finalTransactions);
+    
+    if (materialsUpdated || transactionsUpdated) debouncedSync();
+};
+
 export const exportAllData = (): AllData => {
     const settings = getSettings();
     // CRITICAL: Never export the raw GitHub token to the Gist as GitHub will revoke it.
@@ -1043,7 +1143,8 @@ export const exportAllData = (): AllData => {
         costCalculations: getCostCalculations(),
         weightCalculations: getWeightCalculations(),
         warehouses: getWarehouses(),
-        costTemplates: getCostTemplates()
+        costTemplates: getCostTemplates(),
+        processedItemCards: getProcessedItemCards()
     };
 };
 
@@ -1113,6 +1214,7 @@ export const importAllData = (data: any): void => {
     if (actualData.weightCalculations) saveToStorage(WEIGHT_CALCULATIONS_KEY, actualData.weightCalculations, false);
     if (actualData.warehouses) saveToStorage(WAREHOUSES_KEY, actualData.warehouses, false);
     if (actualData.costTemplates) saveToStorage(COST_TEMPLATES_KEY, actualData.costTemplates, false);
+    if (actualData.processedItemCards) saveToStorage(PROCESSED_ITEM_CARDS_KEY, actualData.processedItemCards, false);
     
     // Handle users - merge Gist data with local data
     if (actualData.users && Array.isArray(actualData.users)) {
