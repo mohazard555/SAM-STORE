@@ -24,6 +24,7 @@ const BulkTransactionModal: React.FC<BulkTransactionModalProps> = ({ materials, 
     const [warehouseId, setWarehouseId] = useState(warehouses.length > 0 ? warehouses[0].id : '');
     const [toWarehouseId, setToWarehouseId] = useState('');
     const [recipient, setRecipient] = useState('');
+    const [outputType, setOutputType] = useState<'scrap' | 'rulers' | 'waste' | 'none'>('none');
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [items, setItems] = useState<BulkTransactionItem[]>([
         { id: Date.now().toString(), materialId: materials[0]?.id || '', quantity: 1, color: '', itemBarcode: '', notes: '', searchTerm: '' }
@@ -98,6 +99,7 @@ const BulkTransactionModal: React.FC<BulkTransactionModalProps> = ({ materials, 
             warehouseId,
             toWarehouseId: type === 'transfer' ? toWarehouseId : undefined,
             quantity: item.quantity,
+            outputType,
             recipient,
             itemBarcode: item.itemBarcode,
             notes: item.notes,
@@ -169,6 +171,20 @@ const BulkTransactionModal: React.FC<BulkTransactionModalProps> = ({ materials, 
                             <div>
                                 <label className="block mb-1.5 text-sm font-bold text-gray-700 dark:text-gray-300">التاريخ</label>
                                 <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required className="w-full p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm" />
+                            </div>
+
+                            <div>
+                                <label className="block mb-1.5 text-sm font-bold text-gray-700 dark:text-gray-300">نوع الإخراج</label>
+                                <select 
+                                    value={outputType} 
+                                    onChange={(e) => setOutputType(e.target.value as any)} 
+                                    className="w-full p-2.5 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm"
+                                >
+                                    <option value="none">بدون</option>
+                                    <option value="scrap">سقط</option>
+                                    <option value="rulers">مساطر</option>
+                                    <option value="waste">هدر</option>
+                                </select>
                             </div>
                         </div>
 

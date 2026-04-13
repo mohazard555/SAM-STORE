@@ -36,6 +36,7 @@ const TransactionModal: React.FC<{
     const [warehouseId, setWarehouseId] = useState(editTransaction?.warehouseId || (warehouses.length > 0 ? warehouses[0].id : ''));
     const [toWarehouseId, setToWarehouseId] = useState(editTransaction?.toWarehouseId || '');
     const [quantity, setQuantity] = useState(editTransaction?.quantity || 1);
+    const [outputType, setOutputType] = useState<'scrap' | 'rulers' | 'waste' | 'none'>(editTransaction?.outputType || 'none');
     const [recipient, setRecipient] = useState(editTransaction?.recipient || '');
     const [itemBarcode, setItemBarcode] = useState(editTransaction?.itemBarcode || '');
     const [notes, setNotes] = useState(editTransaction?.notes || '');
@@ -77,6 +78,7 @@ const TransactionModal: React.FC<{
             warehouseId,
             toWarehouseId: type === 'transfer' ? toWarehouseId : undefined,
             quantity, 
+            outputType,
             recipient, 
             itemBarcode,
             notes, 
@@ -223,22 +225,34 @@ const TransactionModal: React.FC<{
                             <input type="number" value={quantity} onChange={(e) => setQuantity(parseFloat(e.target.value))} step="0.1" min="0" required className="w-full p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm" />
                         </div>
                         <div>
-                            <label className="block mb-1.5 text-sm font-bold text-gray-700 dark:text-gray-300">اللون</label>
-                            <input type="text" value={color} onChange={(e) => setColor(e.target.value)} placeholder="اللون..." className="w-full p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm" />
+                            <label className="block mb-1.5 text-sm font-bold text-gray-700 dark:text-gray-300">نوع الإخراج</label>
+                            <select 
+                                value={outputType} 
+                                onChange={(e) => setOutputType(e.target.value as any)} 
+                                className="w-full p-2.5 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm"
+                            >
+                                <option value="none">بدون</option>
+                                <option value="scrap">سقط</option>
+                                <option value="rulers">مساطر</option>
+                                <option value="waste">هدر</option>
+                            </select>
                         </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block mb-1.5 text-sm font-bold text-gray-700 dark:text-gray-300">
-                                {type === 'return' ? 'الجهة المرجعة' : type === 'transfer' ? 'سبب التحويل' : 'اسم المستلم / الجهة'}
-                            </label>
-                            <input type="text" value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder="الجهة أو الشخص" required className="w-full p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm" />
+                            <label className="block mb-1.5 text-sm font-bold text-gray-700 dark:text-gray-300">اللون</label>
+                            <input type="text" value={color} onChange={(e) => setColor(e.target.value)} placeholder="اللون..." className="w-full p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm" />
                         </div>
                         <div>
-                            <label className="block mb-1.5 text-sm font-bold text-gray-700 dark:text-gray-300">باركود الصنف / القصة</label>
-                            <input type="text" value={itemBarcode} onChange={(e) => setItemBarcode(e.target.value)} placeholder="باركود الصنف" className="w-full p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm" />
+                            <label className="block mb-1.5 text-sm font-bold text-gray-700 dark:text-gray-300">الجهة أو الشخص</label>
+                            <input type="text" value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder="الجهة أو الشخص" required className="w-full p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm" />
                         </div>
+                    </div>
+
+                    <div className="md:col-span-2">
+                        <label className="block mb-1.5 text-sm font-bold text-gray-700 dark:text-gray-300">باركود الصنف / القصة</label>
+                        <input type="text" value={itemBarcode} onChange={(e) => setItemBarcode(e.target.value)} placeholder="باركود الصنف" className="w-full p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm" />
                     </div>
 
                     <div className="md:col-span-2">
@@ -378,6 +392,7 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, wa
           <div class="detail-item"><span class="detail-label">باركود الصنف/القصة:</span> <span>${t.itemBarcode || '-'}</span></div>
           <div class="detail-item"><span class="detail-label">اللون:</span> <span>${t.color || '-'}</span></div>
           <div class="detail-item"><span class="detail-label">الكمية:</span> <strong>${t.quantity} ${t.unit}</strong></div>
+          <div class="detail-item"><span class="detail-label">نوع الإخراج:</span> <span>${t.outputType === 'scrap' ? 'سقط' : t.outputType === 'rulers' ? 'مساطر' : t.outputType === 'waste' ? 'هدر' : 'بدون'}</span></div>
           <div class="detail-item"><span class="detail-label">${t.type === 'in' ? 'المورد:' : 'المستلم:'}</span> <span>${t.recipient}</span></div>
           <div class="detail-item"><span class="detail-label">ملاحظات:</span> <span>${t.notes || '-'}</span></div>
         </div>
@@ -440,6 +455,7 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, wa
               <th scope="col" className="px-4 py-3">باركود المادة</th>
               <th scope="col" className="px-4 py-3">باركود الصنف</th>
               <th scope="col" className="px-4 py-3">الكمية</th>
+              <th scope="col" className="px-4 py-3">نوع الإخراج</th>
               <th scope="col" className="px-4 py-3">المستلم / المورد</th>
               <th scope="col" className="px-4 py-3">الملاحظات</th>
               <th scope="col" className="px-4 py-3">إجراءات</th>
@@ -488,6 +504,11 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, wa
                 <td className="px-4 py-3 font-mono text-xs text-blue-500 font-bold">{transaction.itemBarcode || '-'}</td>
                 <td className={`px-4 py-3 font-black ${transaction.type === 'in' || transaction.type === 'return' ? 'text-emerald-500' : transaction.type === 'transfer' ? 'text-blue-500' : 'text-red-500'}`}>
                     {transaction.type === 'in' || transaction.type === 'return' ? '+' : transaction.type === 'transfer' ? '' : '-'}{transaction.quantity} {transaction.unit}
+                </td>
+                <td className="px-4 py-3 text-xs">
+                    {transaction.outputType === 'scrap' ? 'سقط' : 
+                     transaction.outputType === 'rulers' ? 'مساطر' : 
+                     transaction.outputType === 'waste' ? 'هدر' : 'بدون'}
                 </td>
                 <td className="px-4 py-3">
                     <div className="font-medium text-gray-700 dark:text-gray-300">{transaction.recipient}</div>

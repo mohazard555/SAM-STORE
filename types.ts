@@ -49,6 +49,7 @@ export interface Transaction {
   warehouseId: string; // Source warehouse (or destination for 'in')
   toWarehouseId?: string; // Destination warehouse for 'transfer'
   recipient: string;
+  outputType?: 'scrap' | 'rulers' | 'waste' | 'none';
   notes?: string;
   date: string;
 }

@@ -24,6 +24,9 @@ import {
   ChevronRight,
   PlusCircle,
   RotateCcw,
+  Trash2,
+  Ruler,
+  FileText,
   User as UserIcon
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -40,7 +43,7 @@ interface ReportsProps {
   user: User;
 }
 
-type ReportType = 'daily' | 'weekly' | 'monthly' | 'byMaterial' | 'byCategory' | 'byColor' | 'byBarcode' | 'byItemBarcode' | 'totalCount' | 'all' | 'bySupplier' | 'mostUsed' | 'inactive' | 'lowStock' | 'inventoryValue' | 'inTransactions' | 'outTransactions' | 'byRecipient' | 'materialLedger' | 'warehouseTransfers' | 'deadStock' | 'fastMoving' | 'slowMoving' | 'warehouseComparison' | 'userPerformance' | 'auditReport' | 'consumptionAnalysis' | 'stockForecast' | 'periodComparison' | 'trendReport' | 'expiryReport' | 'reservedStockReport' | 'modifiedOperationsReport' | 'supplierInventoryValue' | 'supplierReturns' | 'processedItemCards';
+type ReportType = 'daily' | 'weekly' | 'monthly' | 'byMaterial' | 'byCategory' | 'byColor' | 'byBarcode' | 'byItemBarcode' | 'totalCount' | 'all' | 'bySupplier' | 'mostUsed' | 'inactive' | 'lowStock' | 'inventoryValue' | 'inTransactions' | 'outTransactions' | 'byRecipient' | 'materialLedger' | 'warehouseTransfers' | 'deadStock' | 'fastMoving' | 'slowMoving' | 'warehouseComparison' | 'userPerformance' | 'auditReport' | 'consumptionAnalysis' | 'stockForecast' | 'periodComparison' | 'trendReport' | 'expiryReport' | 'reservedStockReport' | 'modifiedOperationsReport' | 'supplierInventoryValue' | 'supplierReturns' | 'processedItemCards' | 'scrapReport' | 'wasteReport' | 'rulersReport' | 'notesSearchReport';
 
 const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, settings, user }) => {
   const { triggerPrint } = usePrint();
@@ -133,7 +136,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
   }
 
   const dateFilteredTransactions = useMemo(() => {
-    const timeSensitiveReports: ReportType[] = ['daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byColor', 'byBarcode', 'byItemBarcode', 'bySupplier', 'mostUsed', 'all', 'inTransactions', 'outTransactions', 'byRecipient'];
+    const timeSensitiveReports: ReportType[] = ['daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byColor', 'byBarcode', 'byItemBarcode', 'bySupplier', 'mostUsed', 'all', 'inTransactions', 'outTransactions', 'byRecipient', 'warehouseTransfers', 'materialLedger', 'scrapReport', 'wasteReport', 'rulersReport', 'notesSearchReport'];
     if (!timeSensitiveReports.includes(filterType)) {
         return transactions;
     }
@@ -391,10 +394,22 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
         return materials.filter(m => !selectedSupplier || m.supplier === selectedSupplier).map(m => ({
             ...m,
             totalValue: m.currentStock * (m.price || 0)
-        }));
+        })).filter(m => m.currentStock > 0);
 
       case 'supplierReturns':
         return dateFilteredTransactions.filter(t => t.type === 'return' && (!selectedSupplier || t.supplier === selectedSupplier));
+
+      case 'scrapReport':
+        return dateFilteredTransactions.filter(t => t.outputType === 'scrap');
+
+      case 'wasteReport':
+        return dateFilteredTransactions.filter(t => t.outputType === 'waste');
+
+      case 'rulersReport':
+        return dateFilteredTransactions.filter(t => t.outputType === 'rulers');
+
+      case 'notesSearchReport':
+        return dateFilteredTransactions.filter(t => t.notes && t.notes.trim() !== '');
 
 
       case 'totalCount':
@@ -534,12 +549,34 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
             fileName = 'supplier_returns';
             sheetName = 'مرتجعات المورد';
             break;
+        case 'scrapReport':
+        case 'wasteReport':
+        case 'rulersReport':
+            dataToExport = (reportData as Transaction[]).map(t => ({
+                'التاريخ والوقت': new Date(t.date).toLocaleString('ar-EG'), 'اسم المادة': t.materialName,
+                'الباركود': t.barcode, 'الكمية': t.quantity, 'وحدة القياس': t.unit,
+                'نوع الإخراج': t.outputType === 'scrap' ? 'سقط' : t.outputType === 'rulers' ? 'مساطر' : t.outputType === 'waste' ? 'هدر' : 'بدون',
+                'المستلم': t.recipient, 'ملاحظات': t.notes || ''
+            }));
+            fileName = `${filterType}_report`;
+            sheetName = filterType === 'scrapReport' ? 'تقرير السقط' : filterType === 'wasteReport' ? 'تقرير الهدر' : 'تقرير المساطر';
+            break;
+        case 'notesSearchReport':
+            dataToExport = (reportData as Transaction[]).map(t => ({
+                'التاريخ والوقت': new Date(t.date).toLocaleString('ar-EG'), 'اسم المادة': t.materialName,
+                'الكمية': t.quantity, 'المستلم': t.recipient, 'الملاحظات': t.notes || ''
+            }));
+            fileName = 'notes_search_report';
+            sheetName = 'بحث الملاحظات';
+            break;
         default: // Transaction reports
             dataToExport = (reportData as Transaction[]).map(t => ({
                 'التاريخ والوقت': new Date(t.date).toLocaleString('ar-EG'), 'اسم المادة': t.materialName,
                 'نوع المادة': t.materialType, 'الفئة': t.category, 'الباركود': t.barcode,
                 'باركود الصنف': t.itemBarcode || '-',
-                'المورد': t.supplier, 'الكمية المسحوبة': `${t.quantity} ${t.unit}`, 'المستلم': t.recipient,
+                'الكمية المسحوبة': `${t.quantity} ${t.unit}`, 
+                'نوع الإخراج': t.outputType === 'scrap' ? 'سقط' : t.outputType === 'rulers' ? 'مساطر' : t.outputType === 'waste' ? 'هدر' : 'بدون',
+                'المستلم': t.recipient,
                 'ملاحظات': t.notes || '',
             }));
             fileName = 'transactions_report';
@@ -605,10 +642,22 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
             tableHeaders = `<th>التاريخ</th><th>اسم المادة</th><th>الكمية</th><th>وحدة القياس</th><th>المستلم</th><th>ملاحظات</th>`;
             tableContent = (reportData as Transaction[]).map(t => `<tr><td>${new Date(t.date).toLocaleDateString('ar-EG')}</td><td>${t.materialName}</td><td>${t.quantity}</td><td>${t.unit}</td><td>${t.recipient}</td><td>${t.notes || ''}</td></tr>`).join('');
             break;
+        case 'scrapReport':
+        case 'wasteReport':
+        case 'rulersReport':
+            reportTitle = filterType === 'scrapReport' ? 'تقرير السقط' : filterType === 'wasteReport' ? 'تقرير الهدر' : 'تقرير المساطر';
+            tableHeaders = `<th>التاريخ والوقت</th><th>اسم المادة</th><th>الباركود</th><th>الكمية</th><th>نوع الإخراج</th><th>المستلم</th><th>ملاحظات</th>`;
+            tableContent = (reportData as Transaction[]).map(t => `<tr><td>${new Date(t.date).toLocaleString('ar-EG')}</td><td>${t.materialName}</td><td>${t.barcode}</td><td>${t.quantity} ${t.unit}</td><td>${t.outputType === 'scrap' ? 'سقط' : t.outputType === 'rulers' ? 'مساطر' : t.outputType === 'waste' ? 'هدر' : 'بدون'}</td><td>${t.recipient}</td><td>${t.notes || ''}</td></tr>`).join('');
+            break;
+        case 'notesSearchReport':
+            reportTitle = `تقرير بحث الملاحظات`;
+            tableHeaders = `<th>التاريخ والوقت</th><th>اسم المادة</th><th>الكمية</th><th>المستلم</th><th>الملاحظات</th>`;
+            tableContent = (reportData as Transaction[]).map(t => `<tr><td>${new Date(t.date).toLocaleString('ar-EG')}</td><td>${t.materialName}</td><td>${t.quantity} ${t.unit}</td><td>${t.recipient}</td><td>${t.notes || ''}</td></tr>`).join('');
+            break;
         default: // Transaction reports
             reportTitle = `تقرير حركات`;
-            tableHeaders = `<th>التاريخ والوقت</th><th>اسم المادة</th><th>باركود المادة</th><th>باركود الصنف</th><th>المورد</th><th>الكمية</th><th>المستلم</th><th>ملاحظات</th>`;
-            tableContent = (reportData as Transaction[]).map(t => `<tr><td>${new Date(t.date).toLocaleString('ar-EG')}</td><td>${t.materialName}</td><td>${t.barcode}</td><td>${t.itemBarcode || '-'}</td><td>${t.supplier}</td><td>${t.quantity} ${t.unit}</td><td>${t.recipient}</td><td>${t.notes || ''}</td></tr>`).join('');
+            tableHeaders = `<th>التاريخ والوقت</th><th>اسم المادة</th><th>باركود المادة</th><th>باركود الصنف</th><th>المورد</th><th>الكمية</th><th>نوع الإخراج</th><th>المستلم</th><th>ملاحظات</th>`;
+            tableContent = (reportData as Transaction[]).map(t => `<tr><td>${new Date(t.date).toLocaleString('ar-EG')}</td><td>${t.materialName}</td><td>${t.barcode}</td><td>${t.itemBarcode || '-'}</td><td>${t.supplier}</td><td>${t.quantity} ${t.unit}</td><td>${t.outputType === 'scrap' ? 'سقط' : t.outputType === 'rulers' ? 'مساطر' : t.outputType === 'waste' ? 'هدر' : 'بدون'}</td><td>${t.recipient}</td><td>${t.notes || ''}</td></tr>`).join('');
     }
 
     const html = `
@@ -647,7 +696,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
   };
   
   const canPerformAction = reportData && reportData.length > 0;
-  const showDatePickers = ['all', 'daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byColor', 'byBarcode', 'byItemBarcode', 'bySupplier', 'mostUsed', 'inTransactions', 'outTransactions', 'byRecipient'].includes(filterType);
+  const showDatePickers = ['all', 'daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byColor', 'byBarcode', 'byItemBarcode', 'bySupplier', 'mostUsed', 'inTransactions', 'outTransactions', 'byRecipient', 'warehouseTransfers', 'materialLedger', 'scrapReport', 'wasteReport', 'rulersReport', 'notesSearchReport'].includes(filterType);
 
   const categories = [
     { id: 'inventory', label: 'تقارير المخزون', icon: Package },
@@ -686,6 +735,10 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
     { value: 'byBarcode', category: 'movement', label: 'حسب الباركود', icon: Barcode, color: 'cyan', bgColor: 'bg-cyan-100', textColor: 'text-cyan-600', darkBg: 'dark:bg-cyan-900/30', darkText: 'dark:text-cyan-400', glow: 'bg-cyan-500', description: 'البحث عن حركات مادة عبر الباركود' },
     { value: 'byItemBarcode', category: 'movement', label: 'باركود الصنف', icon: QrCode, color: 'pink', bgColor: 'bg-pink-100', textColor: 'text-pink-600', darkBg: 'dark:bg-pink-900/30', darkText: 'dark:text-pink-400', glow: 'bg-pink-500', description: 'تتبع صنف محدد عبر باركود القصة' },
     { value: 'byRecipient', category: 'movement', label: 'حسب المستلم', icon: UserIcon, color: 'sky', bgColor: 'bg-sky-100', textColor: 'text-sky-600', darkBg: 'dark:bg-sky-900/30', darkText: 'dark:text-sky-400', glow: 'bg-sky-500', description: 'عرض الحركات لشخص مستلم محدد' },
+    { value: 'scrapReport', category: 'movement', label: 'تقرير السقط', icon: Trash2, color: 'red', bgColor: 'bg-red-100', textColor: 'text-red-600', darkBg: 'dark:bg-red-900/30', darkText: 'dark:text-red-400', glow: 'bg-red-500', description: 'عرض حركات السقط (Scrap)' },
+    { value: 'wasteReport', category: 'movement', label: 'تقرير الهدر', icon: Trash2, color: 'orange', bgColor: 'bg-orange-100', textColor: 'text-orange-600', darkBg: 'dark:bg-orange-900/30', darkText: 'dark:text-orange-400', glow: 'bg-orange-500', description: 'عرض حركات الهدر (Waste)' },
+    { value: 'rulersReport', category: 'movement', label: 'تقرير المساطر', icon: Layers, color: 'blue', bgColor: 'bg-blue-100', textColor: 'text-blue-600', darkBg: 'dark:bg-blue-900/30', darkText: 'dark:text-blue-400', glow: 'bg-blue-500', description: 'عرض حركات المساطر (Rulers)' },
+    { value: 'notesSearchReport', category: 'movement', label: 'بحث الملاحظات', icon: Search, color: 'indigo', bgColor: 'bg-indigo-100', textColor: 'text-indigo-600', darkBg: 'dark:bg-indigo-900/30', darkText: 'dark:text-indigo-400', glow: 'bg-indigo-500', description: 'البحث في الملاحظات بين تاريخين' },
 
     // Analysis
     { value: 'mostUsed', category: 'analysis', label: 'الأكثر استخداماً', icon: TrendingUp, color: 'rose', bgColor: 'bg-rose-100', textColor: 'text-rose-600', darkBg: 'dark:bg-rose-900/30', darkText: 'dark:text-rose-400', glow: 'bg-rose-500', description: 'المواد ذات معدل السحب الأعلى' },
@@ -943,7 +996,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
                   </div>
               )}
 
-              {filterType === 'bySupplier' && (
+              {['bySupplier', 'supplierInventoryValue', 'supplierReturns'].includes(filterType) && (
                   <div className="space-y-1">
                       <label className="text-xs font-bold text-gray-400 block mr-1">اختر المورد</label>
                       <div className="flex gap-2">
@@ -1369,10 +1422,12 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
               ))}
             </tbody>
           </table>
-        ) : (filterType === 'inventoryValue') ? (
+        ) : (filterType === 'inventoryValue' || filterType === 'supplierInventoryValue') ? (
             <div className="space-y-4">
                 <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 rounded-xl flex justify-between items-center">
-                    <span className="font-bold text-emerald-800 dark:text-emerald-300">إجمالي قيمة المخزون المفلتر:</span>
+                    <span className="font-bold text-emerald-800 dark:text-emerald-300">
+                        {filterType === 'supplierInventoryValue' ? `إجمالي قيمة بضاعة المورد (${selectedSupplier || 'الكل'}):` : 'إجمالي قيمة المخزون المفلتر:'}
+                    </span>
                     <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
                         {(reportData as any[]).reduce((sum, m) => sum + m.totalValue, 0).toLocaleString('ar-EG')} {settings?.currencySymbol || 'ج.م'}
                     </span>
@@ -1392,7 +1447,9 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
                             <tr key={material.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
                                 <td className="px-6 py-4 font-bold text-gray-900 whitespace-nowrap dark:text-white">{material.name}</td>
                                 <td className="px-6 py-4 font-mono text-xs">{material.barcode}</td>
-                                <td className="px-6 py-4 font-bold">{material.displayStock.toLocaleString('ar-EG')} {material.unit}</td>
+                                <td className="px-6 py-4 font-bold">
+                                    {filterType === 'supplierInventoryValue' ? material.currentStock : material.displayStock} {material.unit}
+                                </td>
                                 <td className="px-6 py-4">{(material.price || 0).toLocaleString('ar-EG')} {settings?.currencySymbol || 'ج.م'}</td>
                                 <td className="px-6 py-4 font-black text-emerald-500">{material.totalValue.toLocaleString('ar-EG')} {settings?.currencySymbol || 'ج.م'}</td>
                             </tr>
@@ -1411,7 +1468,9 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
                     <th scope="col" className="px-6 py-3">الفئة</th>
                     <th scope="col" className="px-6 py-3">المورد</th>
                     <th scope="col" className="px-6 py-3">الكمية</th>
+                    <th scope="col" className="px-6 py-3">نوع الإخراج</th>
                     <th scope="col" className="px-6 py-3">المستلم</th>
+                    <th scope="col" className="px-6 py-3">الملاحظات</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1429,7 +1488,13 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
                         <td className={`px-6 py-4 font-black ${(transaction.type === 'in' || transaction.type === 'return_in') ? 'text-emerald-500' : 'text-red-500'}`}>
                             {(transaction.type === 'in' || transaction.type === 'return_in') ? '+' : '-'}{transaction.quantity.toLocaleString('ar-EG')} {transaction.unit}
                         </td>
+                        <td className="px-6 py-4 text-xs">
+                            {transaction.outputType === 'scrap' ? 'سقط' : 
+                             transaction.outputType === 'rulers' ? 'مساطر' : 
+                             transaction.outputType === 'waste' ? 'هدر' : 'بدون'}
+                        </td>
                         <td className="px-6 py-4 text-sm font-medium">{transaction.recipient}</td>
+                        <td className="px-6 py-4 text-xs text-gray-600 dark:text-gray-300">{transaction.notes || '-'}</td>
                     </tr>
                     ))}
                 </tbody>
