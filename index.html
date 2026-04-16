@@ -77,33 +77,22 @@
 
         _prepareAndOpenJob: function(jobData) {
           const self = this;
-          const baseUrl = window.location.origin;
           
-          fetch(baseUrl + '/api/prepare-job', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(jobData)
-          })
-          .then(response => {
-            if (!response.ok) throw new Error('HTTP error ' + response.status);
-            return response.json();
-          })
-          .then(data => {
-            if (data.id) {
-              const url = baseUrl + '/api/view-job/' + data.id + '?action=' + jobData.action;
-              // Opening in _blank often triggers the system browser in WebViews
-              const newWin = window.open(url, '_blank');
-              if (!newWin || newWin.closed || typeof newWin.closed == 'undefined') {
-                window.location.href = url;
-              }
-            } else {
-              throw new Error('No job ID returned');
+          let url;
+          if (jobData.action === 'print' && jobData.html) {
+             const htmlBase64 = btoa(unescape(encodeURIComponent(jobData.html)));
+             url = 'data:text/html;base64,' + htmlBase64;
+          } else if (jobData.base64) {
+             url = 'data:' + (jobData.mimeType || 'application/octet-stream') + ';base64,' + jobData.base64;
+          }
+
+          if (url) {
+            // Opening in _blank triggers the system browser in WebViews for data URLs
+            const newWin = window.open(url, '_blank');
+            if (!newWin || newWin.closed || typeof newWin.closed == 'undefined') {
+              window.location.href = url;
             }
-          })
-          .catch(err => {
-            console.error('Job preparation error:', err);
-            alert('عذراً، حدث خطأ أثناء تجهيز الملف: ' + err.message);
-          });
+          }
         }
       };
 
