@@ -97,15 +97,23 @@
 
           if (blob) {
             const url = URL.createObjectURL(blob);
-            console.log('Attempting to open Blob URL:', url);
+            console.log('Attempting to open/download Blob URL:', url);
             
-            // Try window.open first
-            const newWin = window.open(url, '_blank');
-            if (newWin) {
-              console.log('window.open successful');
+            if (jobData.action === 'download') {
+                // For downloads, create an automatic download link
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = jobData.filename || 'file.xlsx';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                setTimeout(() => URL.revokeObjectURL(url), 60000);
             } else {
-              console.log('window.open failed, trying window.location.href');
-              window.location.href = url;
+                // For print/view, try window.open first
+                const newWin = window.open(url, '_blank');
+                if (!newWin) {
+                   window.location.href = url;
+                }
             }
           } else {
             console.error('No Blob generated in _prepareAndOpenJob');
