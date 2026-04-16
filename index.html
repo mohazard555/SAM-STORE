@@ -77,27 +77,32 @@
 
         _prepareAndOpenJob: function(jobData) {
           const self = this;
-          fetch('/api/prepare-job', {
+          const baseUrl = window.location.origin;
+          
+          fetch(baseUrl + '/api/prepare-job', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(jobData)
           })
-          .then(response => response.json())
+          .then(response => {
+            if (!response.ok) throw new Error('HTTP error ' + response.status);
+            return response.json();
+          })
           .then(data => {
             if (data.id) {
-              const url = '/api/view-job/' + data.id + '?action=' + jobData.action;
+              const url = baseUrl + '/api/view-job/' + data.id + '?action=' + jobData.action;
               // Opening in _blank often triggers the system browser in WebViews
               const newWin = window.open(url, '_blank');
               if (!newWin || newWin.closed || typeof newWin.closed == 'undefined') {
-                // Pop-up blocked, try direct location change as fallback
-                alert('يرجى السماح بفتح النوافذ المنبثقة لعرض الملف أو الطباعة.');
                 window.location.href = url;
               }
+            } else {
+              throw new Error('No job ID returned');
             }
           })
           .catch(err => {
             console.error('Job preparation error:', err);
-            alert('عذراً، حدث خطأ أثناء تجهيز الملف.');
+            alert('عذراً، حدث خطأ أثناء تجهيز الملف: ' + err.message);
           });
         }
       };
