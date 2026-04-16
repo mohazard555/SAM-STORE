@@ -27,25 +27,18 @@
           const env = this.getEnvironment();
           console.log('Printing in environment:', env);
           
-          // Ensure the print section is ready
+          // Get the actual HTML content to print
           const printSection = document.getElementById('print-section');
-          
+          const content = htmlContent || (printSection ? printSection.innerHTML : '');
+
           if (env === 'android-webview' || env === 'appcreator24') {
             // WebViews often struggle with window.print()
-            try {
-              if (window.print) {
-                window.print();
-                // Secondary attempt for some WebViews
-                setTimeout(() => {
-                  try { window.print(); } catch(e) {}
-                }, 500);
-              } else {
-                alert('الطباعة غير مدعومة مباشرة في هذا التطبيق. يرجى استخدام خيار "مشاركة" أو فتح الموقع في متصفح خارجي.');
-              }
-            } catch (e) {
-              console.error('Print error:', e);
-              alert('عذراً، حدث خطأ أثناء محاولة الطباعة. حاول تصدير الملف كـ Excel بدلاً من ذلك.');
-            }
+            // We'll prepare a job and open it in a new tab (which usually triggers the external browser)
+            this._prepareAndOpenJob({
+              html: content,
+              filename: 'تقرير_طباعة.html',
+              action: 'print'
+            });
           } else {
             window.print();
           }
@@ -56,20 +49,20 @@
           console.log('Downloading in environment:', env, filename);
 
           if (env === 'android-webview' || env === 'appcreator24') {
-            // If it's data (base64 or blob URL), use the server proxy to force a real download
             if (urlOrData.startsWith('data:') || urlOrData.startsWith('blob:')) {
-              // We need the raw data. For blob URLs, this is hard, 
-              // so we prefer passing base64 directly from the source.
-              // If it's already a data URL, extract base64.
               if (urlOrData.startsWith('data:')) {
                 const base64 = urlOrData.split('base64,')[1];
-                this._triggerProxyDownload(base64, filename, mimeType);
+                this._prepareAndOpenJob({
+                  base64: base64,
+                  filename: filename,
+                  mimeType: mimeType,
+                  action: 'download'
+                });
                 return;
               }
               // Fallback for blob URLs
               window.open(urlOrData, '_blank');
             } else {
-              // It's a real URL
               window.open(urlOrData, '_blank');
             }
           } else {
@@ -82,29 +75,30 @@
           }
         },
 
-        _triggerProxyDownload: function(base64, filename, mimeType) {
-          const form = document.createElement('form');
-          form.method = 'POST';
-          form.action = '/api/download';
-          form.style.display = 'none';
-
-          const data = {
-            base64: base64,
-            filename: filename,
-            mimeType: mimeType || 'application/octet-stream'
-          };
-
-          for (const key in data) {
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = key;
-            input.value = data[key];
-            form.appendChild(input);
-          }
-
-          document.body.appendChild(form);
-          form.submit();
-          setTimeout(() => document.body.removeChild(form), 1000);
+        _prepareAndOpenJob: function(jobData) {
+          const self = this;
+          fetch('/api/prepare-job', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(jobData)
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.id) {
+              const url = '/api/view-job/' + data.id + '?action=' + jobData.action;
+              // Opening in _blank often triggers the system browser in WebViews
+              const newWin = window.open(url, '_blank');
+              if (!newWin || newWin.closed || typeof newWin.closed == 'undefined') {
+                // Pop-up blocked, try direct location change as fallback
+                alert('يرجى السماح بفتح النوافذ المنبثقة لعرض الملف أو الطباعة.');
+                window.location.href = url;
+              }
+            }
+          })
+          .catch(err => {
+            console.error('Job preparation error:', err);
+            alert('عذراً، حدث خطأ أثناء تجهيز الملف.');
+          });
         }
       };
 
