@@ -64,12 +64,22 @@ export const exportToExcel = async (data: any[], fileName: string, sheetName: st
 
   // Fallback to standard browser download
   if ((window as any).AppCompatibility) {
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url = URL.createObjectURL(blob);
-    (window as any).AppCompatibility.safeDownload(url, fullFileName);
-    // Cleanup URL after some time
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    const mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    const env = (window as any).AppCompatibility.getEnvironment();
+    
+    if (env === 'android-webview' || env === 'appcreator24') {
+      // For WebViews, pass base64 data to use the server-side proxy
+      const excelBase64 = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
+      (window as any).AppCompatibility.safeDownload(`data:${mimeType};base64,${excelBase64}`, fullFileName, mimeType);
+    } else {
+      // For standard browsers, use Blob URL
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      (window as any).AppCompatibility.safeDownload(url, fullFileName, mimeType);
+      // Cleanup URL after some time
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    }
   } else {
     XLSX.writeFile(workbook, fullFileName);
   }

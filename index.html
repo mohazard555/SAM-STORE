@@ -27,37 +27,84 @@
           const env = this.getEnvironment();
           console.log('Printing in environment:', env);
           
+          // Ensure the print section is ready
+          const printSection = document.getElementById('print-section');
+          
           if (env === 'android-webview' || env === 'appcreator24') {
             // WebViews often struggle with window.print()
-            // Try standard print first, then fallback
             try {
               if (window.print) {
                 window.print();
+                // Secondary attempt for some WebViews
+                setTimeout(() => {
+                  try { window.print(); } catch(e) {}
+                }, 500);
               } else {
-                alert('الطباعة غير مدعومة مباشرة في هذا التطبيق. يرجى استخدام متصفح خارجي.');
+                alert('الطباعة غير مدعومة مباشرة في هذا التطبيق. يرجى استخدام خيار "مشاركة" أو فتح الموقع في متصفح خارجي.');
               }
             } catch (e) {
-              alert('عذراً، حدث خطأ أثناء محاولة الطباعة.');
+              console.error('Print error:', e);
+              alert('عذراً، حدث خطأ أثناء محاولة الطباعة. حاول تصدير الملف كـ Excel بدلاً من ذلك.');
             }
           } else {
             window.print();
           }
         },
 
-        safeDownload: function(url, filename) {
+        safeDownload: function(urlOrData, filename, mimeType) {
           const env = this.getEnvironment();
+          console.log('Downloading in environment:', env, filename);
+
           if (env === 'android-webview' || env === 'appcreator24') {
-            // In many WebViews, direct downloads are blocked. 
-            // Opening in a new tab often triggers the system browser.
-            window.open(url, '_blank');
+            // If it's data (base64 or blob URL), use the server proxy to force a real download
+            if (urlOrData.startsWith('data:') || urlOrData.startsWith('blob:')) {
+              // We need the raw data. For blob URLs, this is hard, 
+              // so we prefer passing base64 directly from the source.
+              // If it's already a data URL, extract base64.
+              if (urlOrData.startsWith('data:')) {
+                const base64 = urlOrData.split('base64,')[1];
+                this._triggerProxyDownload(base64, filename, mimeType);
+                return;
+              }
+              // Fallback for blob URLs
+              window.open(urlOrData, '_blank');
+            } else {
+              // It's a real URL
+              window.open(urlOrData, '_blank');
+            }
           } else {
             const link = document.createElement('a');
-            link.href = url;
+            link.href = urlOrData;
             link.download = filename || 'download';
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
           }
+        },
+
+        _triggerProxyDownload: function(base64, filename, mimeType) {
+          const form = document.createElement('form');
+          form.method = 'POST';
+          form.action = '/api/download';
+          form.style.display = 'none';
+
+          const data = {
+            base64: base64,
+            filename: filename,
+            mimeType: mimeType || 'application/octet-stream'
+          };
+
+          for (const key in data) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = key;
+            input.value = data[key];
+            form.appendChild(input);
+          }
+
+          document.body.appendChild(form);
+          form.submit();
+          setTimeout(() => document.body.removeChild(form), 1000);
         }
       };
 
