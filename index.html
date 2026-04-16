@@ -3,8 +3,70 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTIxIDExLjVMMTIgNkwzIDExLjVWMTlIMjFWMS41WiIgc3Ryb2tlPSIjM2JjM2Y0IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8cGF0aCBkPSJNMjIgMTAuNUwxMiA1TDIgMTAuNSIgc3Ryb2tlPSIjM2JjM2Y0IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8cGF0aCBkPSJNOSAxOFE5IDE1IDEyIDE1QzE1IDE1IDE1IDE4IDE1IDE4VjIySDlWMThaIiBzdHJva2U9IiMwMmFkZTYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtaW5lam9pbj0icm91bmQiLz4KPC9zdmc+Cg==" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>أمين المستودع</title>
+    <script>
+      /**
+       * App Compatibility Layer
+       * Detects environment and provides safe fallbacks for Print, Download, and Navigation.
+       */
+      window.AppCompatibility = {
+        getEnvironment: function() {
+          const ua = navigator.userAgent.toLowerCase();
+          if (window.__TAURI__) return 'tauri';
+          if (ua.includes('appcreator24')) return 'appcreator24';
+          if (ua.includes('wv') || ua.includes('webview') || (ua.includes('android') && ua.includes('version/'))) return 'android-webview';
+          return 'browser';
+        },
+        
+        isMobile: function() {
+          return /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(navigator.userAgent.toLowerCase());
+        },
+
+        safePrint: function(htmlContent) {
+          const env = this.getEnvironment();
+          console.log('Printing in environment:', env);
+          
+          if (env === 'android-webview' || env === 'appcreator24') {
+            // WebViews often struggle with window.print()
+            // Try standard print first, then fallback
+            try {
+              if (window.print) {
+                window.print();
+              } else {
+                alert('الطباعة غير مدعومة مباشرة في هذا التطبيق. يرجى استخدام متصفح خارجي.');
+              }
+            } catch (e) {
+              alert('عذراً، حدث خطأ أثناء محاولة الطباعة.');
+            }
+          } else {
+            window.print();
+          }
+        },
+
+        safeDownload: function(url, filename) {
+          const env = this.getEnvironment();
+          if (env === 'android-webview' || env === 'appcreator24') {
+            // In many WebViews, direct downloads are blocked. 
+            // Opening in a new tab often triggers the system browser.
+            window.open(url, '_blank');
+          } else {
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename || 'download';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          }
+        }
+      };
+
+      // Global error handling to prevent JS crashes in older WebViews
+      window.onerror = function(msg, url, line, col, error) {
+        console.error('Global Error:', msg, 'at', url, ':', line);
+        return false; // Let it propagate to console
+      };
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

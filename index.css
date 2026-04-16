@@ -87,6 +87,52 @@ html, body, #root {
   --primary-hover: #0284c7; /* sky-600 */
   --primary-light: #e0f2fe; /* sky-100 */
   --primary-dark: #0c4a6e; /* sky-900 */
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Mobile & WebView Optimizations */
+@media (max-width: 768px) {
+  html, body {
+    position: fixed;
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #root {
+    padding-top: var(--safe-area-inset-top);
+    padding-bottom: var(--safe-area-inset-bottom);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Prevent text selection in UI elements for a more native feel */
+  button, nav, .no-select {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Optimize scrolling for mobile */
+  .scroll-container {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    flex: 1;
+  }
+
+  /* Hide scrollbars for a cleaner look in WebViews */
+  ::-webkit-scrollbar {
+    width: 0px;
+    background: transparent;
+  }
+}
+
+/* Ensure full width and no horizontal scroll */
+* {
+  box-sizing: border-box;
+  max-width: 100vw;
 }
 
 [data-theme='emerald'] {

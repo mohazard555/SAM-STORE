@@ -63,5 +63,14 @@ export const exportToExcel = async (data: any[], fileName: string, sheetName: st
   }
 
   // Fallback to standard browser download
-  XLSX.writeFile(workbook, fullFileName);
+  if ((window as any).AppCompatibility) {
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    (window as any).AppCompatibility.safeDownload(url, fullFileName);
+    // Cleanup URL after some time
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } else {
+    XLSX.writeFile(workbook, fullFileName);
+  }
 };
