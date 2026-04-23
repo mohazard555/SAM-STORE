@@ -21,6 +21,8 @@
         
         isMobile: function() {
           return /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(navigator.userAgent.toLowerCase());
+        },
+
         safePrint: function() {
           const env = this.getEnvironment();
           
@@ -49,8 +51,6 @@
         _prepareAndOpenJob: function(jobData) {
           // This method is deprecated with the new simplified approach
           console.warn('Deprecated: _prepareAndOpenJob');
-        }�طباعة أو التصدير.');
-          }
         }
       };
 
