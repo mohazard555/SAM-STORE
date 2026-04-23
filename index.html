@@ -21,50 +21,21 @@
         
         isMobile: function() {
           return /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(navigator.userAgent.toLowerCase());
-        },
-
-        safePrint: function(htmlContent) {
+        safePrint: function() {
           const env = this.getEnvironment();
-          console.log('Printing in environment:', env);
           
-          // Get the actual HTML content to print
-          const printSection = document.getElementById('print-section');
-          const content = htmlContent || (printSection ? printSection.innerHTML : '');
-
           if (env === 'android-webview' || env === 'appcreator24') {
-            // WebViews often struggle with window.print()
-            // We'll prepare a job and open it in a new tab (which usually triggers the external browser)
-            this._prepareAndOpenJob({
-              html: content,
-              filename: 'تقرير_طباعة.html',
-              action: 'print'
-            });
+             window.open(window.location.href, '_blank');
           } else {
-            window.print();
+             window.print();
           }
         },
 
         safeDownload: function(urlOrData, filename, mimeType) {
           const env = this.getEnvironment();
-          console.log('Downloading in environment:', env, filename);
 
           if (env === 'android-webview' || env === 'appcreator24') {
-            if (urlOrData.startsWith('data:') || urlOrData.startsWith('blob:')) {
-              if (urlOrData.startsWith('data:')) {
-                const base64 = urlOrData.split('base64,')[1];
-                this._prepareAndOpenJob({
-                  base64: base64,
-                  filename: filename,
-                  mimeType: mimeType,
-                  action: 'download'
-                });
-                return;
-              }
-              // Fallback for blob URLs
-              window.open(urlOrData, '_blank');
-            } else {
-              window.open(urlOrData, '_blank');
-            }
+             window.open(urlOrData, '_blank');
           } else {
             const link = document.createElement('a');
             link.href = urlOrData;
@@ -76,48 +47,9 @@
         },
 
         _prepareAndOpenJob: function(jobData) {
-          const self = this;
-          console.log('_prepareAndOpenJob (Blob) called with:', jobData);
-          
-          let blob;
-          if (jobData.action === 'print' && jobData.html) {
-             console.log('Preparing print blob...');
-             blob = new Blob([jobData.html], { type: 'text/html' });
-          } else if (jobData.base64) {
-             console.log('Preparing download blob...');
-             // Convert base64 to byte array
-             const byteCharacters = atob(jobData.base64);
-             const byteNumbers = new Array(byteCharacters.length);
-             for (let i = 0; i < byteCharacters.length; i++) {
-                 byteNumbers[i] = byteCharacters.charCodeAt(i);
-             }
-             const byteArray = new Uint8Array(byteNumbers);
-             blob = new Blob([byteArray], { type: jobData.mimeType || 'application/octet-stream' });
-          }
-
-          if (blob) {
-            const url = URL.createObjectURL(blob);
-            console.log('Attempting to open/download Blob URL:', url);
-            
-            if (jobData.action === 'download') {
-                // For downloads, create an automatic download link
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = jobData.filename || 'file.xlsx';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                setTimeout(() => URL.revokeObjectURL(url), 60000);
-            } else {
-                // For print/view, try window.open first
-                const newWin = window.open(url, '_blank');
-                if (!newWin) {
-                   window.location.href = url;
-                }
-            }
-          } else {
-            console.error('No Blob generated in _prepareAndOpenJob');
-            alert('عذراً، فشل تجهيز الملف للطباعة أو التصدير.');
+          // This method is deprecated with the new simplified approach
+          console.warn('Deprecated: _prepareAndOpenJob');
+        }�طباعة أو التصدير.');
           }
         }
       };
