@@ -124,10 +124,11 @@ const StockInModal: React.FC<{
 const MaterialModal: React.FC<{ 
     material: Partial<Material> | null; 
     warehouses: Warehouse[];
+    existingSuppliers: string[];
     settings: SettingsData | null;
     onClose: () => void; 
     onSave: (material: Omit<Material, 'id' | 'isNew'> | Material) => void; 
-}> = ({ material, warehouses, settings, onClose, onSave }) => {
+}> = ({ material, warehouses, existingSuppliers, settings, onClose, onSave }) => {
     const [formData, setFormData] = useState<{
         name: string;
         materialType: string;
@@ -185,7 +186,7 @@ const MaterialModal: React.FC<{
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const totalStock = Object.values(formData.stocks).reduce((sum, val) => sum + val, 0);
+        const totalStock = Math.round(Object.values(formData.stocks).reduce((sum, val) => sum + val, 0) * 1000) / 1000;
         const dataToSave = { ...formData, currentStock: totalStock, createdAt: new Date(formData.createdAt).toISOString() };
         onSave(isEditing ? { ...dataToSave, id: material.id!, isNew: material.isNew! } : dataToSave);
     };
@@ -201,7 +202,21 @@ const MaterialModal: React.FC<{
                     <input type="text" name="category" value={formData.category} onChange={handleChange} placeholder="الفئة" required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                    <input type="text" name="supplier" value={formData.supplier} onChange={handleChange} placeholder="المورد" required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+                    <div className="relative">
+                        <input 
+                            list="suppliers-list"
+                            type="text" 
+                            name="supplier" 
+                            value={formData.supplier} 
+                            onChange={handleChange} 
+                            placeholder="المورد" 
+                            required 
+                            className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" 
+                        />
+                        <datalist id="suppliers-list">
+                            {existingSuppliers.map(s => <option key={s} value={s} />)}
+                        </datalist>
+                    </div>
                     <input type="text" name="barcode" value={formData.barcode} onChange={handleChange} placeholder="الباركود" required className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                 </div>
                 <input type="text" name="color" value={formData.color} onChange={handleChange} placeholder="اللون (اختياري)" className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
@@ -338,6 +353,10 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
   const canExport = user.role === 'admin' || user.permissions?.canExport;
   const isAdmin = user.role === 'admin';
 
+  const allSuppliers = useMemo(() => {
+    return Array.from(new Set(materials.map(m => m.supplier))).filter(Boolean);
+  }, [materials]);
+
   const supplierSummary = useMemo(() => {
     const summary: Record<string, { total: number; count: number; unit: string }> = {};
     materials.forEach(m => {
@@ -468,16 +487,16 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
           if (!name) return;
 
           const materialData: Omit<Material, 'id' | 'isNew'> = {
-            name: String(name),
-            materialType: String(row["نوع المادة"] || row["النوع"] || row["materialType"] || "غير محدد"),
-            category: String(row["الفئة"] || row["category"] || "عام"),
-            specifications: String(row["المواصفات"] || row["specifications"] || "-"),
-            supplier: String(row["المورد"] || row["supplier"] || "-"),
-            barcode: String(row["الباركود"] || row["barcode"] || `BC-${Date.now()}-${Math.floor(Math.random() * 1000)}`),
-            unit: String(row["الوحدة"] || row["unit"] || "حبة"),
+            name: String(name).trim(),
+            materialType: String(row["نوع المادة"] || row["النوع"] || row["materialType"] || "غير محدد").trim(),
+            category: String(row["الفئة"] || row["category"] || "عام").trim(),
+            specifications: String(row["المواصفات"] || row["specifications"] || "-").trim(),
+            supplier: String(row["المورد"] || row["supplier"] || "-").trim(),
+            barcode: String(row["الباركود"] || row["barcode"] || `BC-${Date.now()}-${Math.floor(Math.random() * 1000)}`).trim(),
+            unit: String(row["الوحدة"] || row["unit"] || "حبة").trim(),
             minStock: Number(row["الحد الأدنى"] || row["minStock"] || 0),
             currentStock: Number(row["الكمية الحالية"] || row["الكمية"] || row["currentStock"] || 0),
-            color: String(row["اللون"] || row["color"] || ""),
+            color: String(row["اللون"] || row["color"] || "").trim(),
             price: Number(row["السعر"] || row["price"] || 0),
             createdAt: row["تاريخ الإضافة"] || row["التاريخ"] || row["createdAt"] || new Date().toISOString(),
             stocks: warehouses.length > 0 ? { [warehouses[0].id]: Number(row["الكمية الحالية"] || row["الكمية"] || row["currentStock"] || 0) } : {}
@@ -744,7 +763,16 @@ const Materials: React.FC<MaterialsProps> = ({ materials, warehouses, onDataChan
           </div>
       )}
 
-      {isModalOpen && <MaterialModal material={selectedMaterial} warehouses={warehouses} settings={settings} onClose={() => setIsModalOpen(false)} onSave={handleSave} />}
+      {isModalOpen && (
+        <MaterialModal 
+          material={selectedMaterial} 
+          warehouses={warehouses} 
+          existingSuppliers={allSuppliers}
+          settings={settings} 
+          onClose={() => { setIsModalOpen(false); setSelectedMaterial(null); }} 
+          onSave={handleSave} 
+        />
+      )}
       {isStockInModalOpen && selectedMaterial && (
           <StockInModal 
             material={selectedMaterial} 

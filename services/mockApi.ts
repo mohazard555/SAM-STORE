@@ -2,6 +2,10 @@
 import { User, Material, Transaction, SettingsData, AllData, UserPermissions, Page, CostCalculation, WeightCalculation, Warehouse, CostTemplate, SyncStatus, SyncState, AppNotification, ProcessedItemCard } from '@/types';
 
 // --- UTILS ---
+const roundTo = (num: number, decimals: number = 3): number => {
+    return Math.round((num + Number.EPSILON) * Math.pow(10, decimals)) / Math.pow(10, decimals);
+};
+
 const normalizeArabicNumerals = (str: string): string => {
     const arabicNumerals = [/٠/g, /١/g, /٢/g, /٣/g, /٤/g, /٥/g, /٦/g, /٧/g, /٨/g, /٩/g];
     return str.replace(/[٠-٩]/g, (d) => {
@@ -29,6 +33,21 @@ const parseDateSafely = (dateStr: string): string => {
                 date = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
             }
         }
+    }
+    
+    // Fix for the "3:00:00 AM" issue: 
+    // If the date string is exactly YYYY-MM-DD (length 10) and it represents today, 
+    // use the current full timestamp to preserve the exact time.
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    if (normalized === todayStr) {
+        return now.toISOString();
+    } else if (normalized.length === 10 && /^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+        // If it's a specific date but today, we keep it as is (midnight UTC), 
+        // which will likely show as 3AM in local time, but at least it's the correct day.
+        // For better UX, we could set it to noon or current time if we want.
+        // Let's set it to current hour/min/sec but on that specific date.
+        date.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
     }
     
     return isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
@@ -577,9 +596,19 @@ export const addMaterial = (materialData: Omit<Material, 'id' | 'isNew'>): Mater
     const initialStocks = materialData.stocks || {};
     const createdAt = parseDateSafely((materialData as any).createdAt);
     
+    // Normalize strings to prevent duplicate suppliers/names due to extra spaces
+    const normalizedData = {
+        ...materialData,
+        name: materialData.name.trim(),
+        supplier: materialData.supplier.trim(),
+        materialType: materialData.materialType.trim(),
+        category: materialData.category.trim(),
+        barcode: materialData.barcode.trim(),
+    };
+
     // Create material with 0 stock initially to avoid double counting when adding transactions
     const newMaterial: Material = { 
-        ...materialData, 
+        ...normalizedData, 
         id: `m${Date.now()}`, 
         isNew: true,
         createdAt,
@@ -651,12 +680,12 @@ export const updateMaterial = (updatedMaterial: Material, isCorrection: boolean 
     // Update other fields from updatedMaterial
     const finalMaterial = {
         ...materialToSave,
-        name: updatedMaterial.name,
-        materialType: updatedMaterial.materialType,
-        category: updatedMaterial.category,
+        name: updatedMaterial.name.trim(),
+        materialType: updatedMaterial.materialType.trim(),
+        category: updatedMaterial.category.trim(),
         specifications: updatedMaterial.specifications,
-        supplier: updatedMaterial.supplier,
-        barcode: updatedMaterial.barcode,
+        supplier: updatedMaterial.supplier.trim(),
+        barcode: updatedMaterial.barcode.trim(),
         color: updatedMaterial.color,
         unit: updatedMaterial.unit,
         price: updatedMaterial.price,
@@ -667,12 +696,41 @@ export const updateMaterial = (updatedMaterial: Material, isCorrection: boolean 
         reservedStock: updatedMaterial.reservedStock,
         reservationReason: updatedMaterial.reservationReason,
         reservedBy: updatedMaterial.reservedBy,
-        currentStock: Object.values(updatedMaterial.stocks || {}).reduce((a, b) => a + b, 0),
+        currentStock: roundTo(Object.values(updatedMaterial.stocks || {}).reduce((a, b) => a + b, 0)),
         stocks: updatedMaterial.stocks
     };
 
     const finalMaterialsList = getMaterials().map(m => m.id === finalMaterial.id ? finalMaterial : m);
     saveToStorage(MATERIALS_KEY, finalMaterialsList);
+
+    // Update denormalized transaction data if material name/type/supplier/category/barcode/unit changed
+    const allTransactions = getTransactions();
+    const materialHasChanged = oldMaterial && (
+        oldMaterial.name !== finalMaterial.name ||
+        oldMaterial.materialType !== finalMaterial.materialType ||
+        oldMaterial.supplier !== finalMaterial.supplier ||
+        oldMaterial.category !== finalMaterial.category ||
+        oldMaterial.barcode !== finalMaterial.barcode ||
+        oldMaterial.unit !== finalMaterial.unit
+    );
+
+    if (materialHasChanged) {
+        const updatedTransactions = allTransactions.map(t => {
+            if (t.materialId === finalMaterial.id) {
+                return {
+                    ...t,
+                    materialName: finalMaterial.name,
+                    materialType: finalMaterial.materialType,
+                    supplier: finalMaterial.supplier,
+                    category: finalMaterial.category,
+                    barcode: finalMaterial.barcode,
+                    unit: finalMaterial.unit
+                };
+            }
+            return t;
+        });
+        saveToStorage(TRANSACTIONS_KEY, updatedTransactions);
+    }
     
     addNotification({
         type: 'material',
@@ -813,23 +871,23 @@ export const addTransaction = (transactionData: Omit<Transaction, 'id' | 'materi
     // Calculate new stock based on type
     const updatedMaterial = { ...material, stocks: { ...material.stocks } };
 
-    if (transactionData.type === 'in' || transactionData.type === 'return_in') {
-        updatedMaterial.stocks[warehouseId] = currentWarehouseStock + transactionData.quantity;
+    if (transactionData.type === 'transfer' && transactionData.toWarehouseId) {
+        updatedMaterial.stocks[warehouseId] = roundTo((currentWarehouseStock || 0) - transactionData.quantity);
+        updatedMaterial.stocks[transactionData.toWarehouseId] = roundTo((updatedMaterial.stocks[transactionData.toWarehouseId] || 0) + transactionData.quantity);
+    } else if (transactionData.type === 'in' || transactionData.type === 'return_in') {
+        updatedMaterial.stocks[warehouseId] = roundTo((currentWarehouseStock || 0) + transactionData.quantity);
     } else if (transactionData.type === 'out' || transactionData.type === 'return') {
-        updatedMaterial.stocks[warehouseId] = currentWarehouseStock - transactionData.quantity;
+        updatedMaterial.stocks[warehouseId] = roundTo((currentWarehouseStock || 0) - transactionData.quantity);
         if (transactionData.type === 'out' && transactionData.recipient === material.reservedBy && material.reservedStock && material.reservedStock > 0) {
-            updatedMaterial.reservedStock = Math.max(0, material.reservedStock - transactionData.quantity);
+            updatedMaterial.reservedStock = roundTo(Math.max(0, material.reservedStock - transactionData.quantity));
             if (updatedMaterial.reservedStock === 0) {
                 updatedMaterial.reservedBy = '';
                 updatedMaterial.reservationReason = '';
             }
         }
-    } else if (transactionData.type === 'transfer' && transactionData.toWarehouseId) {
-        updatedMaterial.stocks[warehouseId] = currentWarehouseStock - transactionData.quantity;
-        updatedMaterial.stocks[transactionData.toWarehouseId] = (updatedMaterial.stocks[transactionData.toWarehouseId] || 0) + transactionData.quantity;
     }
 
-    updatedMaterial.currentStock = Object.values(updatedMaterial.stocks).reduce((sum, val) => sum + val, 0);
+    updatedMaterial.currentStock = roundTo(Object.values(updatedMaterial.stocks).reduce((sum, val) => sum + val, 0));
 
     materials = materials.map(m => m.id === updatedMaterial.id ? updatedMaterial : m);
     
@@ -860,15 +918,15 @@ export const deleteTransaction = (transactionId: string): void => {
         const updatedMaterial = { ...material, stocks: { ...material.stocks } };
 
         if (transaction.type === 'in') {
-            updatedMaterial.stocks[warehouseId] = currentWarehouseStock - transaction.quantity;
+            updatedMaterial.stocks[warehouseId] = roundTo(currentWarehouseStock - transaction.quantity);
         } else if (transaction.type === 'out' || transaction.type === 'return') {
-            updatedMaterial.stocks[warehouseId] = currentWarehouseStock + transaction.quantity;
+            updatedMaterial.stocks[warehouseId] = roundTo(currentWarehouseStock + transaction.quantity);
         } else if (transaction.type === 'transfer' && transaction.toWarehouseId) {
-            updatedMaterial.stocks[warehouseId] = currentWarehouseStock + transaction.quantity;
-            updatedMaterial.stocks[transaction.toWarehouseId] = (updatedMaterial.stocks[transaction.toWarehouseId] || 0) - transaction.quantity;
+            updatedMaterial.stocks[warehouseId] = roundTo(currentWarehouseStock + transaction.quantity);
+            updatedMaterial.stocks[transaction.toWarehouseId] = roundTo((updatedMaterial.stocks[transaction.toWarehouseId] || 0) - transaction.quantity);
         }
 
-        updatedMaterial.currentStock = Object.values(updatedMaterial.stocks).reduce((sum, val) => sum + val, 0);
+        updatedMaterial.currentStock = roundTo(Object.values(updatedMaterial.stocks).reduce((sum, val) => sum + val, 0));
         materials = materials.map(m => m.id === updatedMaterial.id ? updatedMaterial : m);
         saveToStorage(MATERIALS_KEY, materials);
     }
@@ -897,23 +955,23 @@ export const updateTransaction = (updatedTransaction: Transaction & { affectInve
         // 1. Reverse old stock change
         const oldWarehouseId = oldTransaction.warehouseId;
         if (oldTransaction.type === 'in') {
-            updatedMaterial.stocks[oldWarehouseId] = (updatedMaterial.stocks[oldWarehouseId] || 0) - oldTransaction.quantity;
+            updatedMaterial.stocks[oldWarehouseId] = roundTo((updatedMaterial.stocks[oldWarehouseId] || 0) - oldTransaction.quantity);
         } else if (oldTransaction.type === 'out' || oldTransaction.type === 'return') {
-            updatedMaterial.stocks[oldWarehouseId] = (updatedMaterial.stocks[oldWarehouseId] || 0) + oldTransaction.quantity;
+            updatedMaterial.stocks[oldWarehouseId] = roundTo((updatedMaterial.stocks[oldWarehouseId] || 0) + oldTransaction.quantity);
         } else if (oldTransaction.type === 'transfer' && oldTransaction.toWarehouseId) {
-            updatedMaterial.stocks[oldWarehouseId] = (updatedMaterial.stocks[oldWarehouseId] || 0) + oldTransaction.quantity;
-            updatedMaterial.stocks[oldTransaction.toWarehouseId] = (updatedMaterial.stocks[oldTransaction.toWarehouseId] || 0) - oldTransaction.quantity;
+            updatedMaterial.stocks[oldWarehouseId] = roundTo((updatedMaterial.stocks[oldWarehouseId] || 0) + oldTransaction.quantity);
+            updatedMaterial.stocks[oldTransaction.toWarehouseId] = roundTo((updatedMaterial.stocks[oldTransaction.toWarehouseId] || 0) - oldTransaction.quantity);
         }
 
         // 2. Apply new stock change
         const newWarehouseId = updatedTransaction.warehouseId;
         if (updatedTransaction.type === 'in') {
-            updatedMaterial.stocks[newWarehouseId] = (updatedMaterial.stocks[newWarehouseId] || 0) + updatedTransaction.quantity;
+            updatedMaterial.stocks[newWarehouseId] = roundTo((updatedMaterial.stocks[newWarehouseId] || 0) + updatedTransaction.quantity);
         } else if (updatedTransaction.type === 'out' || updatedTransaction.type === 'return') {
-            updatedMaterial.stocks[newWarehouseId] = (updatedMaterial.stocks[newWarehouseId] || 0) - updatedTransaction.quantity;
+            updatedMaterial.stocks[newWarehouseId] = roundTo((updatedMaterial.stocks[newWarehouseId] || 0) - updatedTransaction.quantity);
         } else if (updatedTransaction.type === 'transfer' && updatedTransaction.toWarehouseId) {
-            updatedMaterial.stocks[newWarehouseId] = (updatedMaterial.stocks[newWarehouseId] || 0) - updatedTransaction.quantity;
-            updatedMaterial.stocks[updatedTransaction.toWarehouseId] = (updatedMaterial.stocks[updatedTransaction.toWarehouseId] || 0) + updatedTransaction.quantity;
+            updatedMaterial.stocks[newWarehouseId] = roundTo((updatedMaterial.stocks[newWarehouseId] || 0) - updatedTransaction.quantity);
+            updatedMaterial.stocks[updatedTransaction.toWarehouseId] = roundTo((updatedMaterial.stocks[updatedTransaction.toWarehouseId] || 0) + updatedTransaction.quantity);
         }
 
         // Check for negative stocks
@@ -921,7 +979,7 @@ export const updateTransaction = (updatedTransaction: Transaction & { affectInve
             throw new Error('تعديل الحركة سيؤدي لنتائج سالبة في المخزون.');
         }
 
-        updatedMaterial.currentStock = Object.values(updatedMaterial.stocks).reduce((sum, val) => sum + val, 0);
+        updatedMaterial.currentStock = roundTo(Object.values(updatedMaterial.stocks).reduce((sum, val) => sum + val, 0));
 
         materials = materials.map(m => m.id === updatedMaterial.id ? updatedMaterial : m);
         saveToStorage(MATERIALS_KEY, materials);
