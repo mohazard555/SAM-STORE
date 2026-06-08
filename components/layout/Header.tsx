@@ -65,7 +65,9 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, toggleSidebar, onSearch
     if (syncStatus.state === 'error') return syncStatus.error || 'فشل المزامنة';
     if (syncStatus.lastSync) {
       const date = new Date(syncStatus.lastSync);
-      return `آخر مزامنة: ${date.toLocaleTimeString('ar-EG')}`;
+      const dateStr = date.toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' });
+      const timeStr = date.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      return `آخر مزامنة: ${dateStr} ${timeStr}`;
     }
     return 'المزامنة جاهزة';
   };
