@@ -153,13 +153,16 @@ const saveToStorage = <T>(key: string, value: T, markUnsynced = true) => {
     localStorage.setItem(key, item);
     if (markUnsynced) {
       localStorage.setItem(UNSYNCED_CHANGES_KEY, 'true');
+      if (typeof debouncedSync === 'function') {
+        debouncedSync();
+      }
     }
   } catch (error) {
     console.error(`Error writing to localStorage key “${key}”:`, error);
   }
 };
 
-const hasUnsyncedChanges = () => localStorage.getItem(UNSYNCED_CHANGES_KEY) === 'true';
+export const hasUnsyncedChanges = () => localStorage.getItem(UNSYNCED_CHANGES_KEY) === 'true';
 
 // --- Notifications ---
 export const getNotifications = (): AppNotification[] => {
@@ -231,6 +234,7 @@ const initializeData = () => {
 initializeData();
 
 let isSyncing = false;
+let syncQueued = false;
 let syncTimeout: NodeJS.Timeout | null = null;
 
 export const syncDataToGist = async (): Promise<boolean> => {
@@ -249,7 +253,8 @@ export const syncDataToGist = async (): Promise<boolean> => {
     const gistId = match[1];
     
     if (isSyncing) {
-        // If already syncing, the debouncedSync will trigger again after 2s anyway
+        syncQueued = true;
+        console.log("[مزامنة Gist] هناك عملية مزامنة أخرى جارية حالياً، تم وضع الطلب الحالي في طابور الانتظار لضمان عدم ضياع أي تحديثات.");
         return false;
     }
     
@@ -297,7 +302,8 @@ export const syncDataToGist = async (): Promise<boolean> => {
             headers: { 
                 'Authorization': `Bearer ${token}`, 
                 'Accept': 'application/vnd.github.v3+json', 
-                'Content-Type': 'application/json' 
+                'Content-Type': 'application/json',
+                'keepalive': 'true'
             },
             body: JSON.stringify({ 
                 files: { 
@@ -312,7 +318,6 @@ export const syncDataToGist = async (): Promise<boolean> => {
             localStorage.setItem(UNSYNCED_CHANGES_KEY, 'false');
             const now = new Date().toISOString();
             updateSyncStatus({ state: 'success', lastSync: now, error: undefined });
-            isSyncing = false;
             return true;
         } else {
             const errData = await response.json().catch(() => ({}));
@@ -326,16 +331,24 @@ export const syncDataToGist = async (): Promise<boolean> => {
             errorMsg = 'فشل الاتصال بخوادم GitHub. يرجى التأكد من اتصالك بالإنترنت أو التحقق من صحة التوكن (قد يسبب التوكن الخاطئ مشكلة CORS).';
         }
         updateSyncStatus({ state: 'error', error: errorMsg });
-        isSyncing = false;
         return false;
+    } finally {
+        isSyncing = false;
+        if (syncQueued) {
+            syncQueued = false;
+            console.log("[مزامنة Gist] جاري تنفيذ المزامنة المؤجلة من طابور الانتظار للتحقق من حفظ التعديلات الأخيرة.");
+            setTimeout(() => {
+                syncDataToGist();
+            }, 1000);
+        }
     }
 };
 
-const debouncedSync = () => {
+export const debouncedSync = () => {
     if (syncTimeout) clearTimeout(syncTimeout);
     syncTimeout = setTimeout(() => {
         syncDataToGist();
-    }, 2000); // Reduced to 2 seconds for better responsiveness
+    }, 4000); // 4 seconds delay acts as a safe buffer/time-window to completely avoid errors or Gist API rate limits
 };
 
 // Attempt sync before closing
@@ -346,6 +359,48 @@ if (typeof window !== 'undefined') {
         }
     });
 }
+
+// Helpers for comparing and parsing Gist data
+const isDataDifferent = (cloudData: any): boolean => {
+    if (!cloudData || typeof cloudData !== 'object') return false;
+    
+    // Extract actual parsed data if wrapped in files (as from Gist)
+    let actualCloud = cloudData;
+    if (cloudData.files) {
+        const firstFile = Object.values(cloudData.files)[0] as any;
+        if (firstFile && firstFile.content) {
+            try {
+                actualCloud = JSON.parse(firstFile.content);
+            } catch (e) {
+                // Ignore
+            }
+        }
+    }
+
+    const localObj = exportAllData();
+    const keysToCompare: string[] = [
+        'materials', 'transactions', 'users', 'costCalculations', 
+        'weightCalculations', 'warehouses', 'costTemplates', 'processedItemCards'
+    ];
+    
+    for (const key of keysToCompare) {
+        const localList = (localObj as any)[key] || [];
+        const cloudList = actualCloud[key] || [];
+        
+        if (!Array.isArray(localList) || !Array.isArray(cloudList)) continue;
+        if (localList.length !== cloudList.length) {
+            return true;
+        }
+        
+        const localStr = JSON.stringify(localList);
+        const cloudStr = JSON.stringify(cloudList);
+        if (localStr !== cloudStr) {
+            return true;
+        }
+    }
+    
+    return false;
+};
 
 export const initializeDataSource = async (overrideUrl?: string): Promise<{ success: boolean; message?: string }> => {
     const settings = getSettings();
@@ -444,8 +499,24 @@ export const initializeDataSource = async (overrideUrl?: string): Promise<{ succ
         
         try {
             const data = JSON.parse(dataText);
-            importAllData(data);
-            return { success: true, message: 'Data loaded from Gist.' };
+            
+            // Extract actual inner data if wrapped in Gist files structure
+            let actualData = data;
+            if (data.files) {
+                const firstFile = Object.values(data.files)[0] as any;
+                if (firstFile && firstFile.content) {
+                    try {
+                        actualData = JSON.parse(firstFile.content);
+                    } catch (e) {}
+                }
+            }
+
+            if (isDataDifferent(actualData)) {
+                importAllData(actualData);
+                return { success: true, message: 'تم تحميل وتحديث البيانات بنجاح من Gist ⚡' };
+            } else {
+                return { success: true, message: 'البيانات المحلية مطابقة للسحابة ولا تحتاج لتحديث.' };
+            }
         } catch (e) {
             throw new Error('Gist content is not valid JSON.');
         }
