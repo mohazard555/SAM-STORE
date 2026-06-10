@@ -1342,7 +1342,7 @@ export const resetAllData = (): void => {
     debouncedSync();
 };
 
-export const importAllData = (data: any): void => {
+export const importAllData = (data: any, markUnsynced = false): void => {
     if (!data || typeof data !== 'object') return;
     
     // Handle case where data might be wrapped in a 'files' object (GitHub Gist API response)
@@ -1378,15 +1378,15 @@ export const importAllData = (data: any): void => {
         // Clean up the internal sync key from storage
         delete (mergedSettings as any)._sync_key;
         
-        saveToStorage(SETTINGS_KEY, mergedSettings, false);
+        saveToStorage(SETTINGS_KEY, mergedSettings, markUnsynced);
     }
-    if (actualData.materials) saveToStorage(MATERIALS_KEY, actualData.materials, false);
-    if (actualData.transactions) saveToStorage(TRANSACTIONS_KEY, actualData.transactions, false);
-    if (actualData.costCalculations) saveToStorage(COST_CALCULATIONS_KEY, actualData.costCalculations, false);
-    if (actualData.weightCalculations) saveToStorage(WEIGHT_CALCULATIONS_KEY, actualData.weightCalculations, false);
-    if (actualData.warehouses) saveToStorage(WAREHOUSES_KEY, actualData.warehouses, false);
-    if (actualData.costTemplates) saveToStorage(COST_TEMPLATES_KEY, actualData.costTemplates, false);
-    if (actualData.processedItemCards) saveToStorage(PROCESSED_ITEM_CARDS_KEY, actualData.processedItemCards, false);
+    if (actualData.materials) saveToStorage(MATERIALS_KEY, actualData.materials, markUnsynced);
+    if (actualData.transactions) saveToStorage(TRANSACTIONS_KEY, actualData.transactions, markUnsynced);
+    if (actualData.costCalculations) saveToStorage(COST_CALCULATIONS_KEY, actualData.costCalculations, markUnsynced);
+    if (actualData.weightCalculations) saveToStorage(WEIGHT_CALCULATIONS_KEY, actualData.weightCalculations, markUnsynced);
+    if (actualData.warehouses) saveToStorage(WAREHOUSES_KEY, actualData.warehouses, markUnsynced);
+    if (actualData.costTemplates) saveToStorage(COST_TEMPLATES_KEY, actualData.costTemplates, markUnsynced);
+    if (actualData.processedItemCards) saveToStorage(PROCESSED_ITEM_CARDS_KEY, actualData.processedItemCards, markUnsynced);
     
     // Handle users - merge Gist data with local data
     if (actualData.users && Array.isArray(actualData.users)) {
@@ -1410,6 +1410,13 @@ export const importAllData = (data: any): void => {
             }
         });
         
-        saveToStorage(USERS_KEY, mergedUsers, false);
+        saveToStorage(USERS_KEY, mergedUsers, markUnsynced);
+    }
+
+    if (markUnsynced) {
+        localStorage.setItem(UNSYNCED_CHANGES_KEY, 'true');
+        setTimeout(() => {
+            syncDataToGist();
+        }, 1000);
     }
 };

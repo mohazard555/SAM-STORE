@@ -159,7 +159,7 @@ const Settings: React.FC<SettingsProps> = ({ onDataChange, user }) => {
             reader.onload = (event) => {
                 try {
                     const data = JSON.parse(event.target?.result as string) as AllData;
-                    importAllData(data);
+                    importAllData(data, true);
                     onDataChange(); // Refresh data across the app
                     setSettings(data.settings);
                     setMessage('تم استيراد البيانات بنجاح!');

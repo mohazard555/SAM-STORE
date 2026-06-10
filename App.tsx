@@ -18,7 +18,7 @@ function App() {
       (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
   });
 
-  // Background sync and pull mechanism (triggers every 30 seconds for near-real-time bidirectional sync)
+  // Background sync and pull mechanism (triggers every 30 seconds; Admin strictly pushes, Viewers pull)
   useEffect(() => {
     const intervalTime = 30 * 1000; // 30 seconds (30,000 ms)
     
@@ -28,11 +28,17 @@ function App() {
 
       try {
         const token = settings.githubToken ? settings.githubToken.trim() : '';
-        if (hasUnsyncedChanges() && token) {
-          console.log("[مزامنة دورية] جاري مزامنة التعديلات المحلية إلى Gist...");
-          await syncDataToGist();
+        const isAdmin = user?.role === 'admin';
+
+        if (isAdmin && token) {
+          // Admin: Strictly PUSH local changes to the cloud. Do NOT pull or overwrite local data automatically.
+          if (hasUnsyncedChanges()) {
+            console.log("[مزامنة دورية] جاري رفع التعديلات المحلية الحديثة إلى السحابة...");
+            await syncDataToGist();
+          }
         } else {
-          console.log("[مزامنة دورية] جاري فحص وجود تحديثات جديدة من Gist...");
+          // Viewers: Periodic PULL to get the latest updates from the Admin's Gist
+          console.log("[مزامنة دورية] جاري جلب وقراءة آخر التحديثات من السحابة...");
           const res = await initializeDataSource();
           if (res.success && res.message && res.message.includes('تم تحميل وتحديث البيانات')) {
             console.log("[مزامنة دورية] تم جلب بيانات جديدة ومحدثة من Gist! إعادة التحميل لتطبيق التغيير.");
@@ -49,7 +55,7 @@ function App() {
 
     const intervalId = setInterval(runSyncCycle, intervalTime);
     return () => clearInterval(intervalId);
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     const initApp = async () => {
