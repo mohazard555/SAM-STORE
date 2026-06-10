@@ -18,16 +18,17 @@ function App() {
       (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
   });
 
-  // Background sync and pull mechanism (triggers every 2 minutes for bidirectional sync)
+  // Background sync and pull mechanism (triggers every 30 seconds for near-real-time bidirectional sync)
   useEffect(() => {
-    const intervalTime = 2 * 60 * 1000; // 2 minutes (120,000 ms)
+    const intervalTime = 30 * 1000; // 30 seconds (30,000 ms)
     
     const runSyncCycle = async () => {
       const settings = getSettings();
-      if (!settings?.gistUrl || !settings?.githubToken) return;
+      if (!settings?.gistUrl) return;
 
       try {
-        if (hasUnsyncedChanges()) {
+        const token = settings.githubToken ? settings.githubToken.trim() : '';
+        if (hasUnsyncedChanges() && token) {
           console.log("[مزامنة دورية] جاري مزامنة التعديلات المحلية إلى Gist...");
           await syncDataToGist();
         } else {

@@ -153,6 +153,9 @@ const saveToStorage = <T>(key: string, value: T, markUnsynced = true) => {
     localStorage.setItem(key, item);
     if (markUnsynced) {
       localStorage.setItem(UNSYNCED_CHANGES_KEY, 'true');
+      if (typeof debouncedSync === 'function') {
+        debouncedSync();
+      }
     }
   } catch (error) {
     console.error(`Error writing to localStorage key “${key}”:`, error);
@@ -231,6 +234,7 @@ const initializeData = () => {
 initializeData();
 
 let isSyncing = false;
+let syncQueued = false;
 let syncTimeout: NodeJS.Timeout | null = null;
 
 export const syncDataToGist = async (): Promise<boolean> => {
@@ -249,7 +253,8 @@ export const syncDataToGist = async (): Promise<boolean> => {
     const gistId = match[1];
     
     if (isSyncing) {
-        // If already syncing, the debouncedSync will trigger again after 2s anyway
+        syncQueued = true;
+        console.log("[مزامنة Gist] هناك عملية مزامنة أخرى جارية حالياً، تم وضع الطلب الحالي في طابور الانتظار لضمان عدم ضياع أي تحديثات.");
         return false;
     }
     
@@ -294,6 +299,7 @@ export const syncDataToGist = async (): Promise<boolean> => {
         // 2. Perform the update
         const response = await fetch(`https://api.github.com/gists/${gistId}`, {
             method: 'PATCH',
+            keepalive: true,
             headers: { 
                 'Authorization': `Bearer ${token}`, 
                 'Accept': 'application/vnd.github.v3+json', 
@@ -312,7 +318,6 @@ export const syncDataToGist = async (): Promise<boolean> => {
             localStorage.setItem(UNSYNCED_CHANGES_KEY, 'false');
             const now = new Date().toISOString();
             updateSyncStatus({ state: 'success', lastSync: now, error: undefined });
-            isSyncing = false;
             return true;
         } else {
             const errData = await response.json().catch(() => ({}));
@@ -326,12 +331,20 @@ export const syncDataToGist = async (): Promise<boolean> => {
             errorMsg = 'فشل الاتصال بخوادم GitHub. يرجى التأكد من اتصالك بالإنترنت أو التحقق من صحة التوكن (قد يسبب التوكن الخاطئ مشكلة CORS).';
         }
         updateSyncStatus({ state: 'error', error: errorMsg });
-        isSyncing = false;
         return false;
+    } finally {
+        isSyncing = false;
+        if (syncQueued) {
+            syncQueued = false;
+            console.log("[مزامنة Gist] جاري تنفيذ المزامنة المؤجلة من طابور الانتظار للتحقق من حفظ التعديلات الأخيرة.");
+            setTimeout(() => {
+                syncDataToGist();
+            }, 1000);
+        }
     }
 };
 
-const debouncedSync = () => {
+export const debouncedSync = () => {
     if (syncTimeout) clearTimeout(syncTimeout);
     syncTimeout = setTimeout(() => {
         syncDataToGist();
@@ -454,14 +467,10 @@ export const initializeDataSource = async (overrideUrl?: string): Promise<{ succ
                         if ((file as any).truncated || !(file as any).content) {
                             if ((file as any).raw_url) {
                                 console.log(`[Gist API] File content is truncated. Fetching manually from: ${(file as any).raw_url}`);
-                                const rawHeaders: Record<string, string> = {};
-                                if (token) {
-                                    rawHeaders['Authorization'] = `Bearer ${token}`;
-                                }
+                                // IMPORTANT: Do NOT send Authorization headers to gist.githubusercontent.com as it returns 404
                                 const rawResponse = await fetch((file as any).raw_url, {
                                     cache: 'no-store',
-                                    signal: controller.signal,
-                                    headers: rawHeaders
+                                    signal: controller.signal
                                 });
                                 if (rawResponse.ok) {
                                     dataText = await rawResponse.text();
@@ -504,21 +513,13 @@ export const initializeDataSource = async (overrideUrl?: string): Promise<{ succ
             
             try {
                 console.log(`[Gist Direct] Crawling raw file content from: ${rawUrl}`);
-                const rawHeaders: Record<string, string> = {};
-                if (token) {
-                    rawHeaders['Authorization'] = `Bearer ${token}`;
-                }
-                const response = await fetch(rawUrl, { cache: 'no-store', signal: controller.signal, headers: rawHeaders });
+                // IMPORTANT: Do NOT send Authorization headers to raw URLs
+                const response = await fetch(rawUrl, { cache: 'no-store', signal: controller.signal });
                 if (response.ok) {
                      dataText = await response.text();
                 } else {
-                     console.warn(`[Gist Direct] Fetch with auth failed (Status: ${response.status}). Retrying without auth header...`);
-                     const retryResponse = await fetch(rawUrl, { cache: 'no-store', signal: controller.signal });
-                     if (retryResponse.ok) {
-                         dataText = await retryResponse.text();
-                     } else {
-                         throw new Error(`Failed to fetch raw URL (Status: ${retryResponse.status})`);
-                     }
+                     console.warn(`[Gist Direct] Direct fetch failed (Status: ${response.status}).`);
+                     throw new Error(`Failed to fetch raw URL (Status: ${response.status})`);
                 }
             } catch (rawErr: any) {
                 if (rawErr.name === 'AbortError') {
