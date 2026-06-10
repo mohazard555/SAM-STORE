@@ -1,58 +1,12 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import fetch from "node-fetch";
-import fs from "fs";
-import path from "path";
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
   app.use(express.json({ limit: '50mb' }));
-
-  const GIST_CONFIG_PATH = path.join(process.cwd(), "gist-config.json");
-
-  // Pre-initialize gist-config.json if it doesn't exist
-  if (!fs.existsSync(GIST_CONFIG_PATH)) {
-    try {
-      const defaultConfig = {
-        gistUrl: "https://gist.githubusercontent.com/mohazard555/6da370385392ac7cd27e034efe4b7d7c/raw/amenstor.json",
-        githubToken: ""
-      };
-      fs.writeFileSync(GIST_CONFIG_PATH, JSON.stringify(defaultConfig, null, 2), "utf8");
-    } catch (e) {
-      console.error("Failed to initialize gist-config.json:", e);
-    }
-  }
-
-  // Get shared sync configuration
-  app.get("/api/sync-config", (req, res) => {
-    try {
-      if (fs.existsSync(GIST_CONFIG_PATH)) {
-        const data = fs.readFileSync(GIST_CONFIG_PATH, "utf8");
-        return res.json(JSON.parse(data));
-      }
-    } catch (e) {
-      console.error("Error reading gist-config.json:", e);
-    }
-    res.json({
-      gistUrl: "https://gist.githubusercontent.com/mohazard555/6da370385392ac7cd27e034efe4b7d7c/raw/amenstor.json",
-      githubToken: ""
-    });
-  });
-
-  // Save shared sync configuration
-  app.post("/api/sync-config", (req, res) => {
-    try {
-      const { gistUrl, githubToken } = req.body;
-      const config = { gistUrl: gistUrl || "", githubToken: githubToken || "" };
-      fs.writeFileSync(GIST_CONFIG_PATH, JSON.stringify(config, null, 2), "utf8");
-      return res.json({ success: true });
-    } catch (e: any) {
-      console.error("Error writing gist-config.json:", e);
-      return res.status(500).json({ success: false, error: e.message });
-    }
-  });
 
   // Temporary storage for print/download jobs
   const jobs = new Map<string, { base64?: string, html?: string, filename: string, mimeType: string }>();

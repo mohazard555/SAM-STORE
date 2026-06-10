@@ -348,32 +348,6 @@ if (typeof window !== 'undefined') {
 }
 
 export const initializeDataSource = async (overrideUrl?: string): Promise<{ success: boolean; message?: string }> => {
-    // 1. Fetch shared sync settings from server first to stay synchronized across devices
-    try {
-        const response = await fetch('/api/sync-config');
-        if (response.ok) {
-            const sharedConfig = await response.json();
-            const settings = getSettings();
-            let changed = false;
-            
-            // Safe merge: only update local settings if server has non-empty values that differ
-            if (sharedConfig.gistUrl && sharedConfig.gistUrl !== settings.gistUrl) {
-                settings.gistUrl = sharedConfig.gistUrl;
-                changed = true;
-            }
-            if (sharedConfig.githubToken && sharedConfig.githubToken !== settings.githubToken) {
-                settings.githubToken = sharedConfig.githubToken;
-                changed = true;
-            }
-            
-            if (changed) {
-                saveToStorage(SETTINGS_KEY, settings, false); // Don't trigger recursive sync
-            }
-        }
-    } catch (err) {
-        console.warn("Failed to synchronize Gist settings from server:", err);
-    }
-
     const settings = getSettings();
     const fetchUrl = overrideUrl || settings.gistUrl;
     
@@ -419,31 +393,8 @@ export const initializeDataSource = async (overrideUrl?: string): Promise<{ succ
                                  Object.keys(gistData.files).find(f => f.endsWith('.json')) || 
                                  Object.values(gistData.files)[0];
                     
-                    if (file) {
-                        if ((file as any).truncated && (file as any).raw_url) {
-                            try {
-                                const rawResponse = await fetch((file as any).raw_url, {
-                                    cache: 'no-store',
-                                    signal: controller.signal,
-                                    headers: settings.githubToken ? { 'Authorization': `token ${settings.githubToken}` } : {}
-                                });
-                                if (rawResponse.ok) {
-                                    dataText = await rawResponse.text();
-                                } else {
-                                    console.warn("Failed to fetch truncated content from raw_url, status:", rawResponse.status);
-                                    if ((file as any).content) {
-                                        dataText = (file as any).content;
-                                    }
-                                }
-                            } catch (rawErr) {
-                                console.warn("Error fetching truncated content from raw_url:", rawErr);
-                                if ((file as any).content) {
-                                    dataText = (file as any).content;
-                                }
-                            }
-                        } else if ((file as any).content) {
-                            dataText = (file as any).content;
-                        }
+                    if (file && (file as any).content) {
+                        dataText = (file as any).content;
                     }
                 }
             } catch (apiErr: any) {
@@ -494,15 +445,9 @@ export const initializeDataSource = async (overrideUrl?: string): Promise<{ succ
         try {
             const data = JSON.parse(dataText);
             importAllData(data);
-            return { success: true, message: 'تم تحميل البيانات بنجاح من Gist.' };
+            return { success: true, message: 'Data loaded from Gist.' };
         } catch (e) {
-            console.error("Gist content parse failed. First 200 chars of data text:", dataText.substring(0, 200));
-            if (dataText.includes('<!DOCTYPE') || dataText.includes('<html')) {
-                throw new Error('المحتوى المسترجع من Gist هو صفحة ويب (HTML) وليس ملف بيانات JSON. يرجى التأكد من إدخال رابط RAW الصحيح لملف البيانات في الإعدادات.');
-            } else if (dataText.includes('404') || dataText.includes('Not Found')) {
-                throw new Error('الملف أو التوكن غير صحيح أو Gist غير موجود (خطأ 404). يرجى التحقق من الرابط والتوكن في الإعدادات.');
-            }
-            throw new Error(`محتوى Gist المسترجع ليس بتنسيق JSON صالح. تفاصيل الخطأ: ${(e as Error).message}`);
+            throw new Error('Gist content is not valid JSON.');
         }
     } catch (error) { 
         console.error("Initialize data source error:", error);
@@ -1073,14 +1018,6 @@ export const getSettings = (): SettingsData => {
 };
 export const saveSettings = (settings: SettingsData): void => { 
     saveToStorage(SETTINGS_KEY, settings); 
-    
-    // Sync settings with the backend server so other devices can automatically retrieve them
-    fetch('/api/sync-config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gistUrl: settings.gistUrl, githubToken: settings.githubToken })
-    }).catch(err => console.error("Failed to forward settings to server:", err));
-
     addNotification({
         type: 'settings',
         action: 'update',
