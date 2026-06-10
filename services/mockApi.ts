@@ -149,17 +149,24 @@ const getFromStorage = <T>(key: string, defaultValue: T): T => {
 
 const saveToStorage = <T>(key: string, value: T, markUnsynced = true) => {
   try {
+    if (value === undefined || value === null) {
+      console.warn(`[مزامنة / Debug] محاولة حفظ قيمة غير صالحة (null/undefined) للمفتاح "${key}". تم الإلغاء لحماية البيانات من التلف.`);
+      return;
+    }
     const item = JSON.stringify(value);
     localStorage.setItem(key, item);
     if (markUnsynced) {
       localStorage.setItem(UNSYNCED_CHANGES_KEY, 'true');
+      localStorage.setItem('warehouse_last_changed', new Date().toISOString());
+      console.log(`[مزامنة / Debug] تم تعديل البيانات محلياً للمفتاح: "${key}". تمت جدولة المزامنة التلقائية لـ Gist خلال نافذة زمنية آمنة للحد من طلبات API.`);
+      debouncedSync();
     }
   } catch (error) {
     console.error(`Error writing to localStorage key “${key}”:`, error);
   }
 };
 
-const hasUnsyncedChanges = () => localStorage.getItem(UNSYNCED_CHANGES_KEY) === 'true';
+export const hasUnsyncedChanges = () => localStorage.getItem(UNSYNCED_CHANGES_KEY) === 'true';
 
 // --- Notifications ---
 export const getNotifications = (): AppNotification[] => {
@@ -233,30 +240,41 @@ initializeData();
 let isSyncing = false;
 let syncTimeout: NodeJS.Timeout | null = null;
 
-export const syncDataToGist = async (): Promise<boolean> => {
+export async function syncDataToGist(): Promise<boolean> {
     const settings = getSettings();
     const token = settings.githubToken ? settings.githubToken.trim() : '';
     if (!settings.gistUrl || !token) {
+        console.warn("[مزامنة / خطأ] إعدادات Gist غير مكتملة (الرابط أو التوكن مفقود).");
         updateSyncStatus({ state: 'error', error: 'إعدادات Gist غير مكتملة (الرابط أو التوكن مفقود).' });
         return false;
     }
 
     const match = settings.gistUrl.match(/gist\.github(?:usercontent)?\.com\/[^\/]+\/([a-f0-9]+)/);
     if (!match) {
+        console.warn("[مزامنة / خطأ] رابط Gist غير صالح.");
         updateSyncStatus({ state: 'error', error: 'رابط Gist غير صالح.' });
         return false;
     }
     const gistId = match[1];
     
     if (isSyncing) {
-        // If already syncing, the debouncedSync will trigger again after 2s anyway
+        console.log("[مزامنة / Debug] هناك عملية مزامنة قيد التنفيذ حالياً، تم تجاوز الطلب لحين الانتهاء.");
         return false;
     }
     
     isSyncing = true;
     updateSyncStatus({ state: 'syncing', error: undefined });
+    console.log("[مزامنة / Debug] بدء عملية الرفع إلى Gist...");
     
     const allData = exportAllData();
+    
+    // Prevent syncing empty or corrupted data structure
+    if (!allData || !allData.materials || allData.materials.length === 0) {
+        console.error("[مزامنة / خطأ] محاولة حفظ بيانات فارغة أو تالفة. تم إلغاء المزامنة تلقائياً لحماية البيانات السحابية.");
+        updateSyncStatus({ state: 'error', error: 'تنبيه: تم منع رفع بيانات فارغة لـ Gist.' });
+        isSyncing = false;
+        return false;
+    }
     
     try {
         // 1. Get Gist info to find the correct filename
@@ -279,17 +297,20 @@ export const syncDataToGist = async (): Promise<boolean> => {
         if (getResponse.ok) {
             const gistInfo = await getResponse.json();
             // If the URL filename isn't in the gist, pick the first JSON file or any file
-            if (!gistInfo.files[filename]) {
-                const jsonFile = Object.keys(gistInfo.files).find(f => f.endsWith('.json'));
-                filename = jsonFile || Object.keys(gistInfo.files)[0] || filename;
+            if (gistInfo.files) {
+                if (!gistInfo.files[filename]) {
+                    const jsonFile = Object.keys(gistInfo.files).find(f => f.endsWith('.json'));
+                    filename = jsonFile || Object.keys(gistInfo.files)[0] || filename;
+                }
             }
         } else if (getResponse.status !== 404) {
             // If it's not a 404, it's a real error (like 401 Unauthorized)
             const errData = await getResponse.json().catch(() => ({}));
-            const errorMsg = `GitHub Error (${getResponse.status}): ${errData.message || getResponse.statusText}`;
+            const errorMsg = `GitHub API Error (${getResponse.status}): ${errData.message || getResponse.statusText}`;
             throw new Error(errorMsg);
         }
-        // If 404, we assume it's a new Gist or we'll try to create/patch anyway (though PATCH needs existing)
+
+        console.log(`[مزامنة / Debug] جاري حفظ البيانات على الملف: ${filename}`);
 
         // 2. Perform the update
         const response = await fetch(`https://api.github.com/gists/${gistId}`, {
@@ -311,32 +332,44 @@ export const syncDataToGist = async (): Promise<boolean> => {
         if (response.ok) {
             localStorage.setItem(UNSYNCED_CHANGES_KEY, 'false');
             const now = new Date().toISOString();
+            // Record this as our last successful synced state
+            const lastSavedTime = (allData as any)._lastSaved || now;
+            localStorage.setItem('warehouse_last_saved_downloaded', lastSavedTime);
+            localStorage.setItem('warehouse_last_changed', lastSavedTime);
+            
             updateSyncStatus({ state: 'success', lastSync: now, error: undefined });
+            console.log("[مزامنة / Debug] تم رفع وحفظ البيانات بنجاح في السحابة على GitHub Gist ⚡");
             isSyncing = false;
             return true;
         } else {
             const errData = await response.json().catch(() => ({}));
-            const errorMsg = `GitHub Error (${response.status}): ${errData.message || response.statusText}`;
+            const errorMsg = `GitHub Patch Error (${response.status}): ${errData.message || response.statusText}`;
             throw new Error(errorMsg);
         }
     } catch (error: any) { 
-        console.error("Gist sync error:", error); 
+        console.error("[مزامنة / خطأ] فشلت مزامنة Gist:", error); 
         let errorMsg = error.message || 'حدث خطأ أثناء المزامنة.';
         if (errorMsg.includes('NetworkError') || errorMsg.includes('Failed to fetch')) {
-            errorMsg = 'فشل الاتصال بخوادم GitHub. يرجى التأكد من اتصالك بالإنترنت أو التحقق من صحة التوكن (قد يسبب التوكن الخاطئ مشكلة CORS).';
+            errorMsg = 'فشل الاتصال بخوادم GitHub. يرجى التأكد من اتصالك بالإنترنت أو التحقق من توكن الصلاحية وكود CORS.';
         }
         updateSyncStatus({ state: 'error', error: errorMsg });
         isSyncing = false;
         return false;
     }
-};
+}
 
-const debouncedSync = () => {
+export function debouncedSync() {
     if (syncTimeout) clearTimeout(syncTimeout);
-    syncTimeout = setTimeout(() => {
-        syncDataToGist();
-    }, 2000); // Reduced to 2 seconds for better responsiveness
-};
+    syncTimeout = setTimeout(async () => {
+        console.log("[مزامنة / Debug] جاري بدء المزامنة المجدولة تلقائياً...");
+        const success = await syncDataToGist();
+        if (!success && hasUnsyncedChanges()) {
+            console.warn("[مزامنة / Debug] فشل رفع التغييرات. جاري جدولة إعادة المحاولة بعد 20 ثانية تلقائياً...");
+            if (syncTimeout) clearTimeout(syncTimeout);
+            syncTimeout = setTimeout(debouncedSync, 20000);
+        }
+    }, 4000); // 4 seconds delay acts as a safe buffer/time-window to completely avoid errors or Gist API rate limits
+}
 
 // Attempt sync before closing
 if (typeof window !== 'undefined') {
@@ -347,26 +380,32 @@ if (typeof window !== 'undefined') {
     });
 }
 
-export const initializeDataSource = async (overrideUrl?: string): Promise<{ success: boolean; message?: string }> => {
+export async function initializeDataSource(overrideUrl?: string): Promise<{ success: boolean; message?: string }> {
     const settings = getSettings();
     const fetchUrl = overrideUrl || settings.gistUrl;
     
-    if (!fetchUrl) return { success: true, message: 'Using local data.' };
+    if (!fetchUrl) {
+        console.log("[مزامنة / Debug] لا يوجد رابط مستودع Gist مهيأ. يتم استخدام المستودع المحلي.");
+        return { success: true, message: 'Using local data.' };
+    }
     
     const gistIdMatch = fetchUrl.match(/gist\.github(?:usercontent)?\.com\/[^\/]+\/([a-f0-9]+)/);
     const gistId = gistIdMatch ? gistIdMatch[1] : null;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000); // Increased to 20 seconds timeout
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 seconds timeout
 
     try {
+        // If there are unsynced changes and we have a token, push them first
         if (hasUnsyncedChanges() && settings.githubToken) {
+            console.log("[مزامنة / Debug] تم اكتشاف تعديلات محلية معلّقة. جاري رفعها أولاً لـ Gist لضمان سلامة التعديلات...");
             const success = await syncDataToGist();
             if (success) {
+                clearTimeout(timeoutId);
                 return { success: true, message: 'تم اكتشاف تغييرات محلية ومزامنتها بنجاح.' };
             } else {
-                // If sync failed, we still proceed but warn the user
-                return { success: true, message: 'توجد تغييرات محلية لم يتمكن النظام من مزامنتها حالياً.' };
+                clearTimeout(timeoutId);
+                return { success: true, message: 'توجد تغييرات محلية لم يتمكن النظام من مزامنتها حالياً. يتم استخدام النسخة المحلية مؤقتاً.' };
             }
         }
 
@@ -374,11 +413,13 @@ export const initializeDataSource = async (overrideUrl?: string): Promise<{ succ
         
         if (gistId) {
             try {
+                console.log(`[مزامنة / Debug] جاري محاولة الفحص عبر API لـ Gist: ${gistId}`);
                 const apiResponse = await fetch(`https://api.github.com/gists/${gistId}`, { 
                     cache: 'no-store',
                     signal: controller.signal,
-                    headers: settings.githubToken ? { 'Authorization': `token ${settings.githubToken}` } : {}
+                    headers: settings.githubToken ? { 'Authorization': `Bearer ${settings.githubToken}` } : {}
                 });
+                
                 if (apiResponse.ok) {
                     const gistData = await apiResponse.json();
                     
@@ -389,26 +430,45 @@ export const initializeDataSource = async (overrideUrl?: string): Promise<{ succ
                         filename = lastPart.split('?')[0];
                     }
 
-                    const file = gistData.files[filename] || 
+                    const file = gistData.files && (gistData.files[filename] || 
                                  Object.keys(gistData.files).find(f => f.endsWith('.json')) || 
-                                 Object.values(gistData.files)[0];
+                                 Object.values(gistData.files)[0]);
                     
-                    if (file && (file as any).content) {
-                        dataText = (file as any).content;
+                    if (file) {
+                        if (file.truncated || !file.content) {
+                            if (file.raw_url) {
+                                console.log(`[مزامنة / Debug] محتوى Gist مقطوع. جاري جلب كامل البيانات من الرابط السحابي: ${file.raw_url}`);
+                                const rawResponse = await fetch(file.raw_url, { cache: 'no-store', signal: controller.signal });
+                                if (rawResponse.ok) {
+                                    dataText = await rawResponse.text();
+                                }
+                            }
+                        } else {
+                            dataText = file.content;
+                        }
                     }
+                } else {
+                    console.warn(`[مزامنة / Debug] فشل جلب API: ${apiResponse.status}. جاري الانتقال للجلب المباشر من الرابط الخام.`);
                 }
             } catch (apiErr: any) {
                 if (apiErr.name === 'AbortError') {
-                    console.warn("Gist API fetch timed out.");
+                    console.warn("[مزامنة / Debug] انتهى وقت محاولة الاتصال بـ Gist API.");
                 } else {
-                    console.warn("Gist API fetch failed:", apiErr);
+                    console.warn("[مزامنة / Debug] فشل الاتصال بالـ REST API:", apiErr);
                 }
             }
         }
 
+        // Fallback to fetch raw text directly
         if (!dataText && !controller.signal.aborted) {
             let rawUrl = fetchUrl;
-            if (rawUrl.includes('/raw/') && rawUrl.split('/raw/')[1]?.includes('/')) {
+            
+            // Transform normal Gist webpage link (e.g. gist.github.com/.../id) 
+            // to direct raw link: gist.githubusercontent.com/raw/id to avoid HTML page parsing errors
+            if (gistId && !rawUrl.includes('gist.githubusercontent.com') && !rawUrl.includes('/raw')) {
+                rawUrl = `https://gist.githubusercontent.com/raw/${gistId}`;
+                console.log(`[مزامنة / Debug] جاري تحويل الرابط إلى الصيغة الخام المباشرة: ${rawUrl}`);
+            } else if (rawUrl.includes('/raw/') && rawUrl.split('/raw/')[1]?.includes('/')) {
                 const parts = rawUrl.split('/raw/');
                 const pathParts = parts[1].split('/');
                 if (pathParts.length > 1) {
@@ -417,43 +477,109 @@ export const initializeDataSource = async (overrideUrl?: string): Promise<{ succ
             }
             
             try {
+                console.log(`[مزامنة / Debug] محاولة جلب مباشرة من الرابط: ${rawUrl}`);
                 const response = await fetch(rawUrl, { cache: 'no-store', signal: controller.signal });
-                if (!response.ok) throw new Error(`Failed to fetch data from Gist (Status: ${response.status}).`);
-                dataText = await response.text();
-            } catch (rawErr: any) {
-                if (rawErr.name === 'AbortError') {
-                    console.warn("Raw Gist fetch timed out.");
+                if (response.ok) {
+                    dataText = await response.text();
                 } else {
-                    throw rawErr;
+                    throw new Error(`تعذر جلب الرابط المباشر (Status: ${response.status})`);
                 }
+            } catch (rawErr: any) {
+                console.error("[مزامنة / خطأ] فشل الجلب الخام الاحتياطي:", rawErr);
+                if (rawErr.name !== 'AbortError') throw rawErr;
             }
         }
         
         clearTimeout(timeoutId);
 
         if (controller.signal.aborted) {
+            console.warn("[مزامنة / Debug] انتهت مهلة طلب البيانات من السحابة. يتم استخدام النسخة المحلية حالياً.");
             return { success: true, message: 'الاتصال ضعيف، يتم استخدام البيانات المحلية حالياً.' };
         }
-        if (!dataText || dataText.trim() === '' || dataText.trim() === '{}' || dataText.trim() === '[]') {
+
+        if (!dataText || dataText.trim() === '') {
             if (settings.githubToken) {
+                console.log("[مزامنة / Debug] المستند في Gist فارغ تماماً. تم جدولة رفع النسخة المحلية.");
                 syncDataToGist();
-                return { success: true, message: 'Gist was empty. Local data has been queued for sync.' };
+                return { success: true, message: 'تمت جدولة حفظ البيانات المحلية على Gist لكونها فارغة حالياً.' };
             }
-            return { success: true, message: 'Gist is empty. Sync will start on next change.' };
+            return { success: true, message: 'رابط Gist لا يحتوي على بيانات حالياً.' };
         }
         
+        const trimmed = dataText.trim();
+        if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html') || trimmed.startsWith('<div')) {
+            console.error("[مزامنة / خطأ] تم استلام صفحة HTML بدلاً من ملف JSON صالح. يرجى مراجعة الرابط.");
+            throw new Error('المحتوى السحابي المسترجع هو صفحة ويب (HTML) وليس ملف بيانات JSON صالح. يرجى التأكد من إدخال رابط Gist صحيح ومثبّت.');
+        }
+
         try {
-            const data = JSON.parse(dataText);
-            importAllData(data);
-            return { success: true, message: 'Data loaded from Gist.' };
-        } catch (e) {
-            throw new Error('Gist content is not valid JSON.');
+            const parsedData = JSON.parse(dataText);
+            
+            // Extract actual inner data if wrapped in Gist files structure
+            let actualData = parsedData;
+            if (parsedData.files) {
+                const firstFile = Object.values(parsedData.files)[0] as any;
+                if (firstFile && firstFile.content) {
+                    try {
+                        actualData = JSON.parse(firstFile.content);
+                    } catch (e) {}
+                }
+            }
+
+            if (!actualData || typeof actualData !== 'object') {
+                throw new Error('الـ JSON المسترد غير صالح للهيكل المطلوب.');
+            }
+
+            if (!actualData.settings && !actualData.materials && !actualData.transactions) {
+                throw new Error('الملف لا يحتوي على حقول البيانات الأساسية للتطبيق.');
+            }
+
+            // Compare Gist timestamp with local timestamp
+            const cloudLastSaved = actualData._lastSaved;
+            const localLastChanged = localStorage.getItem('warehouse_last_changed');
+            const localLastDownloaded = localStorage.getItem('warehouse_last_saved_downloaded');
+
+            let shouldImport = false;
+
+            if (cloudLastSaved) {
+                const cloudTime = new Date(cloudLastSaved).getTime();
+                const localTime = localLastChanged ? new Date(localLastChanged).getTime() : 0;
+                const downloadedTime = localLastDownloaded ? new Date(localLastDownloaded).getTime() : 0;
+
+                console.log(`[مزامنة / Debug] فحص إصدار السحابة: (${cloudLastSaved}) vs محلي: (${localLastChanged || 'بلا'}) vs تنزيل سابق: (${localLastDownloaded || 'بلا'})`);
+
+                // We load the cloud version if it is newer than what we have locally (local edits & previous downloads)
+                if (cloudTime > Math.max(localTime, downloadedTime)) {
+                    shouldImport = true;
+                    console.log("[مزامنة / Debug] النسخة السحابية أحدث بكثير من البيانات المحلية! جاري استيراد وتحديث المخزن.");
+                } else {
+                    console.log("[مزامنة / Debug] البيانات المحلية الحالية أحدث أو مطابقة للأصدار السحابي. لن يتم الاستيراد.");
+                }
+            } else {
+                console.log("[مزامنة / Debug] لا يتوفر ختم زمني في الملف السحابي. جاري التحميل احتياطياً لضمان التطابق.");
+                shouldImport = true;
+            }
+
+            if (shouldImport) {
+                importAllData(actualData);
+                if (cloudLastSaved) {
+                    localStorage.setItem('warehouse_last_saved_downloaded', cloudLastSaved);
+                    localStorage.setItem('warehouse_last_changed', cloudLastSaved);
+                }
+                return { success: true, message: 'تم تحميل وتحديث البيانات بنجاح من Gist ⚡' };
+            } else {
+                return { success: true, message: 'البيانات المحلية مطابقة للسحابة ولا تحتاج لتحديث.' };
+            }
+
+        } catch (e: any) {
+            console.error("[مزامنة / خطأ] فشل تحليل الـ JSON المسترجع:", e);
+            throw new Error(`محتوى Gist غير متوافق أو تالف: ${e.message}`);
         }
     } catch (error) { 
-        console.error("Initialize data source error:", error);
+        console.error("[مزامنة / خطأ] خطأ أثناء إعداد مصدر البيانات:", error);
         return { success: false, message: (error as Error).message }; 
     }
-};
+}
 
 export const authenticateUser = (username: string, password: string): User | null => {
     const users = getFromStorage<User[]>(USERS_KEY, []);
@@ -1183,7 +1309,7 @@ export const updateProcessedItemCardQuantities = (itemBarcode: string, updatedMa
     if (materialsUpdated || transactionsUpdated) debouncedSync();
 };
 
-export const exportAllData = (): AllData => {
+export function exportAllData(): AllData & { _lastSaved?: string } {
     const settings = getSettings();
     // CRITICAL: Never export the raw GitHub token to the Gist as GitHub will revoke it.
     // We use a simple obfuscation to allow persistence across devices while avoiding automated revocation.
@@ -1193,7 +1319,10 @@ export const exportAllData = (): AllData => {
         _sync_key: obfuscate(settings.githubToken || '') 
     };
     
+    const lastChanged = localStorage.getItem('warehouse_last_changed') || new Date().toISOString();
+    
     return { 
+        _lastSaved: lastChanged,
         settings: safeSettings, 
         materials: getMaterials(), 
         transactions: getTransactions(), 
@@ -1204,7 +1333,7 @@ export const exportAllData = (): AllData => {
         costTemplates: getCostTemplates(),
         processedItemCards: getProcessedItemCards()
     };
-};
+}
 
 export const resetAllData = (): void => {
     const users = getUsers();

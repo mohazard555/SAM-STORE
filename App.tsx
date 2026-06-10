@@ -45,6 +45,27 @@ function App() {
     initApp();
   }, []);
 
+  // Background sync every 10 minutes (automatically resolves cloud vs local using stable timestamps)
+  useEffect(() => {
+    const intervalTime = 10 * 60 * 1000; // 10 minutes in milliseconds
+    
+    const runSyncCycle = async () => {
+      try {
+        console.log("[مزامنة خلفية] بدء دورة الفحص والمزامنة التلقائية المبرمجة...");
+        const res = await initializeDataSource();
+        if (res.success && res.message) {
+          setSuccessMessage(res.message);
+          setTimeout(() => setSuccessMessage(null), 5000);
+        }
+      } catch (err) {
+        console.warn("[مزامنة خلفية] حدث خطأ أثناء دورة الفحص الخلفي المبرمج:", err);
+      }
+    };
+
+    const intervalId = setInterval(runSyncCycle, intervalTime);
+    return () => clearInterval(intervalId);
+  }, []);
+
   useEffect(() => {
     const settings = getSettings();
     if (settings?.theme) {
