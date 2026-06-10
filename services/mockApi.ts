@@ -159,7 +159,7 @@ const saveToStorage = <T>(key: string, value: T, markUnsynced = true) => {
   }
 };
 
-const hasUnsyncedChanges = () => localStorage.getItem(UNSYNCED_CHANGES_KEY) === 'true';
+export const hasUnsyncedChanges = () => localStorage.getItem(UNSYNCED_CHANGES_KEY) === 'true';
 
 // --- Notifications ---
 export const getNotifications = (): AppNotification[] => {
@@ -347,25 +347,73 @@ if (typeof window !== 'undefined') {
     });
 }
 
+// Helpers for comparing and parsing Gist data
+const getActualData = (data: any): any => {
+    if (!data || typeof data !== 'object') return data;
+    if (data.files) {
+        const firstFile = Object.values(data.files)[0] as any;
+        if (firstFile && firstFile.content) {
+            try {
+                return JSON.parse(firstFile.content);
+            } catch (e) {
+                // Return fallback
+            }
+        }
+    }
+    return data;
+};
+
+const isDataDifferent = (cloudData: any): boolean => {
+    if (!cloudData || typeof cloudData !== 'object') return false;
+    
+    const local = exportAllData();
+    const keysToCompare: (keyof AllData)[] = [
+        'materials', 'transactions', 'users', 'costCalculations', 
+        'weightCalculations', 'warehouses', 'costTemplates', 'processedItemCards'
+    ];
+    
+    for (const key of keysToCompare) {
+        const localList = local[key] || [];
+        const cloudList = cloudData[key] || [];
+        
+        if (!Array.isArray(localList) || !Array.isArray(cloudList)) continue;
+        if (localList.length !== cloudList.length) {
+            console.log(`[Sync Diff] Difference found in ${key}: lengths differ (local: ${localList.length}, cloud: ${cloudList.length})`);
+            return true;
+        }
+        
+        const localStr = JSON.stringify(localList);
+        const cloudStr = JSON.stringify(cloudList);
+        if (localStr !== cloudStr) {
+            console.log(`[Sync Diff] Difference found in ${key}: contents differ`);
+            return true;
+        }
+    }
+    
+    return false;
+};
+
 export const initializeDataSource = async (overrideUrl?: string): Promise<{ success: boolean; message?: string }> => {
     const settings = getSettings();
-    const fetchUrl = overrideUrl || settings.gistUrl;
+    const fetchUrl = (overrideUrl || settings.gistUrl || '').trim();
     
     if (!fetchUrl) return { success: true, message: 'Using local data.' };
     
-    const gistIdMatch = fetchUrl.match(/gist\.github(?:usercontent)?\.com\/[^\/]+\/([a-f0-9]+)/);
+    const token = (settings.githubToken || '').trim();
+    const gistIdMatch = fetchUrl.match(/gist\.github(?:usercontent)?\.com\/[^\/]+\/([a-f0-9]+)/i);
     const gistId = gistIdMatch ? gistIdMatch[1] : null;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000); // Increased to 20 seconds timeout
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 seconds timeout
 
     try {
-        if (hasUnsyncedChanges() && settings.githubToken) {
+        if (hasUnsyncedChanges() && token) {
             const success = await syncDataToGist();
             if (success) {
+                clearTimeout(timeoutId);
                 return { success: true, message: 'تم اكتشاف تغييرات محلية ومزامنتها بنجاح.' };
             } else {
-                // If sync failed, we still proceed but warn the user
+                clearTimeout(timeoutId);
                 return { success: true, message: 'توجد تغييرات محلية لم يتمكن النظام من مزامنتها حالياً.' };
             }
         }
@@ -374,11 +422,20 @@ export const initializeDataSource = async (overrideUrl?: string): Promise<{ succ
         
         if (gistId) {
             try {
+                console.log(`[Gist API] Fetching gist ID: ${gistId}`);
+                const apiHeaders: Record<string, string> = {
+                    'Accept': 'application/vnd.github.v3+json'
+                };
+                if (token) {
+                    apiHeaders['Authorization'] = `Bearer ${token}`;
+                }
+
                 const apiResponse = await fetch(`https://api.github.com/gists/${gistId}`, { 
                     cache: 'no-store',
                     signal: controller.signal,
-                    headers: settings.githubToken ? { 'Authorization': `token ${settings.githubToken}` } : {}
+                    headers: apiHeaders
                 });
+                
                 if (apiResponse.ok) {
                     const gistData = await apiResponse.json();
                     
@@ -393,22 +450,51 @@ export const initializeDataSource = async (overrideUrl?: string): Promise<{ succ
                                  Object.keys(gistData.files).find(f => f.endsWith('.json')) || 
                                  Object.values(gistData.files)[0];
                     
-                    if (file && (file as any).content) {
-                        dataText = (file as any).content;
+                    if (file) {
+                        if ((file as any).truncated || !(file as any).content) {
+                            if ((file as any).raw_url) {
+                                console.log(`[Gist API] File content is truncated. Fetching manually from: ${(file as any).raw_url}`);
+                                const rawHeaders: Record<string, string> = {};
+                                if (token) {
+                                    rawHeaders['Authorization'] = `Bearer ${token}`;
+                                }
+                                const rawResponse = await fetch((file as any).raw_url, {
+                                    cache: 'no-store',
+                                    signal: controller.signal,
+                                    headers: rawHeaders
+                                });
+                                if (rawResponse.ok) {
+                                    dataText = await rawResponse.text();
+                                } else {
+                                    console.warn(`[Gist API] Raw URL fetch failed with status ${rawResponse.status}.`);
+                                    if ((file as any).content) dataText = (file as any).content;
+                                }
+                            } else if ((file as any).content) {
+                                dataText = (file as any).content;
+                            }
+                        } else if ((file as any).content) {
+                            dataText = (file as any).content;
+                        }
                     }
+                } else {
+                    console.warn(`[Gist API] GitHub Gists API returned non-OK status: ${apiResponse.status}`);
                 }
             } catch (apiErr: any) {
                 if (apiErr.name === 'AbortError') {
-                    console.warn("Gist API fetch timed out.");
+                    console.warn("[Gist API] Fetch timed out.");
                 } else {
-                    console.warn("Gist API fetch failed:", apiErr);
+                    console.warn("[Gist API] Request error:", apiErr);
                 }
             }
         }
 
         if (!dataText && !controller.signal.aborted) {
             let rawUrl = fetchUrl;
-            if (rawUrl.includes('/raw/') && rawUrl.split('/raw/')[1]?.includes('/')) {
+            
+            // If the URL is a standard Gist page, steer it directly to a raw proxy to prevent fetching HTML
+            if (gistId && !rawUrl.includes('gist.githubusercontent.com') && !rawUrl.includes('/raw')) {
+                rawUrl = `https://gist.githubusercontent.com/raw/${gistId}`;
+            } else if (rawUrl.includes('/raw/') && rawUrl.split('/raw/')[1]?.includes('/')) {
                 const parts = rawUrl.split('/raw/');
                 const pathParts = parts[1].split('/');
                 if (pathParts.length > 1) {
@@ -417,14 +503,28 @@ export const initializeDataSource = async (overrideUrl?: string): Promise<{ succ
             }
             
             try {
-                const response = await fetch(rawUrl, { cache: 'no-store', signal: controller.signal });
-                if (!response.ok) throw new Error(`Failed to fetch data from Gist (Status: ${response.status}).`);
-                dataText = await response.text();
+                console.log(`[Gist Direct] Crawling raw file content from: ${rawUrl}`);
+                const rawHeaders: Record<string, string> = {};
+                if (token) {
+                    rawHeaders['Authorization'] = `Bearer ${token}`;
+                }
+                const response = await fetch(rawUrl, { cache: 'no-store', signal: controller.signal, headers: rawHeaders });
+                if (response.ok) {
+                     dataText = await response.text();
+                } else {
+                     console.warn(`[Gist Direct] Fetch with auth failed (Status: ${response.status}). Retrying without auth header...`);
+                     const retryResponse = await fetch(rawUrl, { cache: 'no-store', signal: controller.signal });
+                     if (retryResponse.ok) {
+                         dataText = await retryResponse.text();
+                     } else {
+                         throw new Error(`Failed to fetch raw URL (Status: ${retryResponse.status})`);
+                     }
+                }
             } catch (rawErr: any) {
                 if (rawErr.name === 'AbortError') {
-                    console.warn("Raw Gist fetch timed out.");
+                    console.warn("[Gist Direct] Raw Gist fetch timed out.");
                 } else {
-                    throw rawErr;
+                    console.error("[Gist Direct] Failed to fetch data directly:", rawErr);
                 }
             }
         }
@@ -442,10 +542,23 @@ export const initializeDataSource = async (overrideUrl?: string): Promise<{ succ
             return { success: true, message: 'Gist is empty. Sync will start on next change.' };
         }
         
+        // Check if data returned is actually an HTML page
+        const trimmedData = dataText.trim();
+        if (trimmedData.startsWith('<!DOCTYPE') || trimmedData.startsWith('<html') || trimmedData.startsWith('<div')) {
+            console.error("[Gist Validation] Fetched content is an HTML body, not JSON. URL might be incorrect.");
+            throw new Error('المحتوى المسترجع من Gist هو صفحة ويب (HTML) وليس ملف بيانات JSON. يرجى التأكد من إدخال الرابط الصحيح.');
+        }
+
         try {
-            const data = JSON.parse(dataText);
-            importAllData(data);
-            return { success: true, message: 'Data loaded from Gist.' };
+            const parsed = JSON.parse(dataText);
+            const actualData = getActualData(parsed);
+            
+            if (isDataDifferent(actualData)) {
+                importAllData(actualData);
+                return { success: true, message: 'تم تحميل وتحديث البيانات بنجاح من Gist ⚡' };
+            } else {
+                return { success: true, message: 'البيانات المحلية مطابقة للسحابة ولا تحتاج لتحديث.' };
+            }
         } catch (e) {
             throw new Error('Gist content is not valid JSON.');
         }

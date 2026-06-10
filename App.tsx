@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Login from '@/pages/Login';
 import MainLayout from '@/components/layout/MainLayout';
-import { getCurrentUser, initializeDataSource, getSettings, repairInitialTransactions } from '@/services/mockApi';
+import { getCurrentUser, initializeDataSource, getSettings, repairInitialTransactions, hasUnsyncedChanges, syncDataToGist } from '@/services/mockApi';
 import { usePrint } from '@/services/PrintContext';
 import { User } from '@/types';
 
@@ -17,6 +17,38 @@ function App() {
     return localStorage.getItem('theme') === 'dark' || 
       (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
   });
+
+  // Background sync and pull mechanism (triggers every 2 minutes for bidirectional sync)
+  useEffect(() => {
+    const intervalTime = 2 * 60 * 1000; // 2 minutes (120,000 ms)
+    
+    const runSyncCycle = async () => {
+      const settings = getSettings();
+      if (!settings?.gistUrl || !settings?.githubToken) return;
+
+      try {
+        if (hasUnsyncedChanges()) {
+          console.log("[مزامنة دورية] جاري مزامنة التعديلات المحلية إلى Gist...");
+          await syncDataToGist();
+        } else {
+          console.log("[مزامنة دورية] جاري فحص وجود تحديثات جديدة من Gist...");
+          const res = await initializeDataSource();
+          if (res.success && res.message && res.message.includes('تم تحميل وتحديث البيانات')) {
+            console.log("[مزامنة دورية] تم جلب بيانات جديدة ومحدثة من Gist! إعادة التحميل لتطبيق التغيير.");
+            setSuccessMessage("تمت مزامنة وجلب أحدث البيانات من السحابة بنجاح ⚡");
+            setTimeout(() => {
+              window.location.reload();
+            }, 1500);
+          }
+        }
+      } catch (err) {
+        console.error("خطأ أثناء المزامنة الدورية الخلفية:", err);
+      }
+    };
+
+    const intervalId = setInterval(runSyncCycle, intervalTime);
+    return () => clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     const initApp = async () => {
