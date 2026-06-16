@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Transaction, Material, SettingsData, User, Warehouse } from '@/types';
 import { usePrint } from '@/services/PrintContext';
 import { ProcessedItemCards } from '@/components/ProcessedItemCards';
@@ -27,13 +27,297 @@ import {
   Trash2,
   Ruler,
   FileText,
-  User as UserIcon
+  User as UserIcon,
+  Calculator,
+  X,
+  CornerRightDown,
+  CornerUpLeft
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { motion, AnimatePresence } from 'motion/react';
 import { exportToExcel } from '@/utils/excelExport';
 
-import { getNotifications } from '@/services/mockApi';
+import { getNotifications, getOpeningStockAdjustments } from '@/services/mockApi';
+
+interface MultiSelectDropdownProps {
+  label: string;
+  placeholder: string;
+  options: string[];
+  selectedValues: string[];
+  onChange: (values: string[]) => void;
+  allOptionLabel: string;
+}
+
+const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
+  label,
+  placeholder,
+  options,
+  selectedValues,
+  onChange,
+  allOptionLabel
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filteredOptions = useMemo(() => {
+    return options.filter(opt => opt.toLowerCase().includes(search.toLowerCase()));
+  }, [options, search]);
+
+  const handleToggleOption = (val: string) => {
+    if (selectedValues.includes(val)) {
+      onChange(selectedValues.filter(v => v !== val));
+    } else {
+      onChange([...selectedValues, val]);
+    }
+  };
+
+  const handleSelectAll = () => {
+    onChange(options);
+  };
+
+  const handleClear = () => {
+    onChange([]);
+  };
+
+  return (
+    <div className="relative mb-2 w-full" ref={dropdownRef}>
+      <label className="block mb-1 text-sm font-medium text-gray-600 dark:text-gray-300">{label}</label>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full text-right p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm text-gray-800 dark:text-gray-100 flex justify-between items-center bg-white shadow-sm hover:border-gray-300 dark:hover:border-gray-500 transition-all cursor-pointer"
+      >
+        <span className="truncate">
+          {selectedValues.length === 0
+            ? allOptionLabel
+            : selectedValues.length === 1
+            ? selectedValues[0]
+            : `تم اختيار ${selectedValues.length} من البنود`}
+        </span>
+        <span className="text-gray-400 text-xs text-left select-none mr-2">▼</span>
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 top-full mt-1.5 z-50 w-full min-w-[260px] bg-white dark:bg-gray-800 border border-gray-150 dark:border-gray-700 rounded-lg shadow-xl p-3 flex flex-col gap-2">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder={placeholder}
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full px-2.5 py-1 text-xs border rounded dark:bg-gray-750 dark:border-gray-650 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              autoFocus
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              >
+                مسح
+              </button>
+            )}
+          </div>
+
+          <div className="flex justify-between gap-2 text-[10px] pb-1 border-b border-gray-100 dark:border-gray-700">
+            <button
+              type="button"
+              onClick={handleSelectAll}
+              className="text-indigo-600 dark:text-indigo-400 hover:underline font-bold"
+            >
+              تحديد الكل
+            </button>
+            <button
+              type="button"
+              onClick={handleClear}
+              className="text-red-500 hover:underline font-bold"
+            >
+              إلغاء التحديد
+            </button>
+          </div>
+
+          <div className="overflow-y-auto max-h-48 divide-y divide-gray-50 dark:divide-gray-750/30">
+            {filteredOptions.length === 0 ? (
+              <div className="p-3 text-center text-xs text-gray-400">لا توجد خيارات مطابقة.</div>
+            ) : (
+              filteredOptions.map(opt => {
+                const isSelected = selectedValues.includes(opt);
+                return (
+                  <label
+                    key={opt}
+                    className="flex items-center gap-2 py-1.5 px-1 hover:bg-gray-50 dark:hover:bg-gray-750/50 rounded cursor-pointer text-xs text-gray-700 dark:text-gray-300 select-none"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => handleToggleOption(opt)}
+                      className="rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-600 dark:bg-gray-700"
+                    />
+                    <span className="truncate">{opt}</span>
+                  </label>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+interface MultiSelectMaterialDropdownProps {
+  label: string;
+  placeholder: string;
+  options: Material[];
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+  allOptionLabel: string;
+}
+
+const MultiSelectMaterialDropdown: React.FC<MultiSelectMaterialDropdownProps> = ({
+  label,
+  placeholder,
+  options,
+  selectedIds,
+  onChange,
+  allOptionLabel
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filteredOptions = useMemo(() => {
+    return options.filter(opt => opt.name.toLowerCase().includes(search.toLowerCase()) || opt.barcode.toLowerCase().includes(search.toLowerCase()));
+  }, [options, search]);
+
+  const handleToggleOption = (id: string) => {
+    if (selectedIds.includes(id)) {
+      onChange(selectedIds.filter(v => v !== id));
+    } else {
+      onChange([...selectedIds, id]);
+    }
+  };
+
+  const handleSelectAll = () => {
+    onChange(options.map(o => o.id));
+  };
+
+  const handleClear = () => {
+    onChange([]);
+  };
+
+  const selectedNamesSummary = useMemo(() => {
+    if (selectedIds.length === 0) return allOptionLabel;
+    if (selectedIds.length === 1) {
+      const match = options.find(o => o.id === selectedIds[0]);
+      return match ? match.name : allOptionLabel;
+    }
+    return `تم اختيار ${selectedIds.length} من المواد`;
+  }, [selectedIds, options, allOptionLabel]);
+
+  return (
+    <div className="relative mb-2 w-full" ref={dropdownRef}>
+      <label className="block mb-1 text-sm font-medium text-gray-600 dark:text-gray-300">{label}</label>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full text-right p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm text-gray-800 dark:text-gray-100 flex justify-between items-center bg-white shadow-sm hover:border-gray-300 dark:hover:border-gray-500 transition-all cursor-pointer"
+      >
+        <span className="truncate">{selectedNamesSummary}</span>
+        <span className="text-gray-400 text-xs text-left select-none mr-2">▼</span>
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 top-full mt-1.5 z-50 w-full min-w-[260px] bg-white dark:bg-gray-800 border border-gray-150 dark:border-gray-700 rounded-lg shadow-xl p-3 flex flex-col gap-2">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder={placeholder}
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full px-2.5 py-1 text-xs border rounded dark:bg-gray-750 dark:border-gray-655 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              autoFocus
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              >
+                مسح
+              </button>
+            )}
+          </div>
+
+          <div className="flex justify-between gap-2 text-[10px] pb-1 border-b border-gray-100 dark:border-gray-700">
+            <button
+              type="button"
+              onClick={handleSelectAll}
+              className="text-indigo-600 dark:text-indigo-400 hover:underline font-bold"
+            >
+              تحديد الكل
+            </button>
+            <button
+              type="button"
+              onClick={handleClear}
+              className="text-red-500 hover:underline font-bold"
+            >
+              إلغاء التحديد
+            </button>
+          </div>
+
+          <div className="overflow-y-auto max-h-48 divide-y divide-gray-50 dark:divide-gray-750/30">
+            {filteredOptions.length === 0 ? (
+              <div className="p-3 text-center text-xs text-gray-400">لا توجد مواد مطابقة.</div>
+            ) : (
+              filteredOptions.map(opt => {
+                const isSelected = selectedIds.includes(opt.id);
+                return (
+                  <label
+                    key={opt.id}
+                    className="flex items-center gap-2 py-1.5 px-1 hover:bg-gray-50 dark:hover:bg-gray-750/50 rounded cursor-pointer text-xs text-gray-700 dark:text-gray-300 select-none"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => handleToggleOption(opt.id)}
+                      className="rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-600 dark:bg-gray-700"
+                    />
+                    <div className="truncate flex flex-col leading-tight">
+                      <span className="font-bold">{opt.name}</span>
+                      <span className="text-[10px] text-gray-400 font-mono">{opt.barcode}</span>
+                    </div>
+                  </label>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 interface ReportsProps {
   transactions: Transaction[];
@@ -43,7 +327,7 @@ interface ReportsProps {
   user: User;
 }
 
-type ReportType = 'daily' | 'weekly' | 'monthly' | 'byMaterial' | 'byCategory' | 'byColor' | 'byBarcode' | 'byItemBarcode' | 'totalCount' | 'all' | 'bySupplier' | 'mostUsed' | 'inactive' | 'lowStock' | 'inventoryValue' | 'inTransactions' | 'outTransactions' | 'byRecipient' | 'materialLedger' | 'warehouseTransfers' | 'deadStock' | 'fastMoving' | 'slowMoving' | 'warehouseComparison' | 'userPerformance' | 'auditReport' | 'consumptionAnalysis' | 'stockForecast' | 'periodComparison' | 'trendReport' | 'expiryReport' | 'reservedStockReport' | 'modifiedOperationsReport' | 'supplierInventoryValue' | 'supplierReturns' | 'processedItemCards' | 'scrapReport' | 'wasteReport' | 'rulersReport' | 'notesSearchReport' | 'openingStockReport' | 'closingStockReport';
+type ReportType = 'daily' | 'weekly' | 'monthly' | 'byMaterial' | 'byCategory' | 'byColor' | 'byBarcode' | 'byItemBarcode' | 'totalCount' | 'all' | 'bySupplier' | 'mostUsed' | 'inactive' | 'lowStock' | 'inventoryValue' | 'inTransactions' | 'outTransactions' | 'byRecipient' | 'materialLedger' | 'warehouseTransfers' | 'deadStock' | 'fastMoving' | 'slowMoving' | 'warehouseComparison' | 'userPerformance' | 'auditReport' | 'consumptionAnalysis' | 'stockForecast' | 'periodComparison' | 'trendReport' | 'expiryReport' | 'reservedStockReport' | 'modifiedOperationsReport' | 'supplierInventoryValue' | 'supplierReturns' | 'processedItemCards' | 'scrapReport' | 'wasteReport' | 'rulersReport' | 'notesSearchReport' | 'openingStockReport' | 'closingStockReport' | 'fastSearchStats' | 'openingStockAdjustments';
 
 const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, settings, user }) => {
   const { triggerPrint } = usePrint();
@@ -89,6 +373,12 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
   const [searchItemBarcode, setSearchItemBarcode] = useState('');
   const [reportSearchQuery, setReportSearchQuery] = useState('');
 
+  // States for Quick Cumulative Search Engine
+  const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
+  const [quickSearchQuery, setQuickSearchQuery] = useState('');
+
   const uniqueCategories = useMemo(() => {
     const categories = materials.map(m => m.category);
     return [...new Set(categories)].filter(Boolean);
@@ -119,6 +409,132 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
     return [...new Set(recipients)].filter(Boolean);
   }, [transactions]);
 
+  // Derived options and stats for Quick Cumulative Search Engine
+  const fastSearchCategoriesOptions = useMemo(() => {
+    if (selectedSuppliers.length === 0) {
+      return uniqueCategories;
+    }
+    const filteredMats = materials.filter(m => m.supplier && selectedSuppliers.includes(m.supplier));
+    return Array.from(new Set(filteredMats.map(m => m.category))).filter(Boolean);
+  }, [materials, selectedSuppliers, uniqueCategories]);
+
+  const fastSearchMaterialsOptions = useMemo(() => {
+    let filtered = materials;
+    if (selectedSuppliers.length > 0) {
+      filtered = filtered.filter(m => m.supplier && selectedSuppliers.includes(m.supplier));
+    }
+    if (selectedCategories.length > 0) {
+      filtered = filtered.filter(m => m.category && selectedCategories.includes(m.category));
+    }
+    return filtered;
+  }, [materials, selectedSuppliers, selectedCategories]);
+
+  const fastSearchStats = useMemo(() => {
+    let filteredMaterials = materials;
+    if (selectedSuppliers.length > 0) {
+      filteredMaterials = filteredMaterials.filter(m => m.supplier && selectedSuppliers.includes(m.supplier));
+    }
+    if (selectedCategories.length > 0) {
+      filteredMaterials = filteredMaterials.filter(m => m.category && selectedCategories.includes(m.category));
+    }
+    if (selectedMaterialIds.length > 0) {
+      filteredMaterials = filteredMaterials.filter(m => selectedMaterialIds.includes(m.id));
+    }
+
+    if (quickSearchQuery) {
+      const query = quickSearchQuery.toLowerCase();
+      filteredMaterials = filteredMaterials.filter(m => 
+        m.name.toLowerCase().includes(query) ||
+        m.barcode.toLowerCase().includes(query) ||
+        (m.category && m.category.toLowerCase().includes(query)) ||
+        (m.supplier && m.supplier.toLowerCase().includes(query))
+      );
+    }
+
+    let totalReceived = 0;
+    let totalUsed = 0;
+    let totalRemaining = 0;
+
+    filteredMaterials.forEach(m => {
+      let subsequentIn = 0;
+      let subsequentOut = 0;
+      let used = 0;
+      
+      transactions.forEach(t => {
+        if (t.materialId === m.id) {
+          const isOpeningStock = 
+            t.recipient === 'رصيد افتتاحي' || 
+            t.recipient === 'رصيد افتتاحي (إصلاح تلقائي)' || 
+            t.recipient === 'رصيد افتتاحي معدّل' || 
+            t.recipient === 'تمت الإضافة كحركة افتتاحية معدلة' ||
+            t.recipient === 'تعديل رصيد افتتاحي';
+
+          if (t.type === 'in' || t.type === 'return_in') {
+            if (!isOpeningStock) {
+              subsequentIn += t.quantity;
+            }
+          } else if (t.type === 'out' || t.type === 'return') {
+            if (!isOpeningStock) {
+              subsequentOut += t.quantity;
+              used += t.quantity;
+            }
+          }
+        }
+      });
+
+      const entered = m.currentStock + subsequentOut;
+      totalReceived += entered;
+      totalUsed += used;
+      totalRemaining += m.currentStock;
+    });
+
+    return {
+      totalReceived: Math.round(totalReceived * 1000) / 1000,
+      totalUsed: Math.round(totalUsed * 1000) / 1000,
+      totalRemaining: Math.round(totalRemaining * 1000) / 1000,
+      matchedMaterials: filteredMaterials
+    };
+  }, [materials, transactions, selectedSuppliers, selectedCategories, selectedMaterialIds, quickSearchQuery]);
+
+  const materialsWithStats = useMemo(() => {
+    return fastSearchStats.matchedMaterials.map(m => {
+      let subsequentIn = 0;
+      let subsequentOut = 0;
+      let used = 0;
+      
+      transactions.forEach(t => {
+        if (t.materialId === m.id) {
+          const isOpeningStock = 
+            t.recipient === 'رصيد افتتاحي' || 
+            t.recipient === 'رصيد افتتاحي (إصلاح تلقائي)' || 
+            t.recipient === 'رصيد افتتاحي معدّل' || 
+            t.recipient === 'تمت الإضافة كحركة افتتاحية معدلة' ||
+            t.recipient === 'تعديل رصيد افتتاحي';
+
+          if (t.type === 'in' || t.type === 'return_in') {
+            if (!isOpeningStock) {
+              subsequentIn += t.quantity;
+            }
+          } else if (t.type === 'out' || t.type === 'return') {
+            if (!isOpeningStock) {
+              subsequentOut += t.quantity;
+              used += t.quantity;
+            }
+          }
+        }
+      });
+
+      const entered = m.currentStock + subsequentOut;
+
+      return {
+        ...m,
+        entered: Math.round(entered * 1000) / 1000,
+        used: Math.round(used * 1000) / 1000,
+        remaining: Math.round(m.currentStock * 1000) / 1000,
+      };
+    });
+  }, [fastSearchStats.matchedMaterials, transactions]);
+
   const handleFilterChange = (type: ReportType) => {
     setFilterType(type);
     const today = new Date();
@@ -137,7 +553,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
   }
 
   const dateFilteredTransactions = useMemo(() => {
-    const timeSensitiveReports: ReportType[] = ['daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byColor', 'byBarcode', 'byItemBarcode', 'bySupplier', 'mostUsed', 'all', 'inTransactions', 'outTransactions', 'byRecipient', 'warehouseTransfers', 'materialLedger', 'scrapReport', 'wasteReport', 'rulersReport', 'notesSearchReport', 'openingStockReport', 'closingStockReport'];
+    const timeSensitiveReports: ReportType[] = ['daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byColor', 'byBarcode', 'byItemBarcode', 'bySupplier', 'mostUsed', 'all', 'inTransactions', 'outTransactions', 'byRecipient', 'warehouseTransfers', 'materialLedger', 'scrapReport', 'wasteReport', 'rulersReport', 'notesSearchReport', 'openingStockReport', 'closingStockReport', 'openingStockAdjustments'];
     if (!timeSensitiveReports.includes(filterType)) {
         return transactions;
     }
@@ -197,6 +613,20 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
 
       case 'warehouseTransfers':
         return dateFilteredTransactions.filter(t => t.type === 'transfer');
+
+      case 'openingStockAdjustments': {
+        const adjustments = getOpeningStockAdjustments();
+        const start = new Date(startDate);
+        start.setUTCHours(0, 0, 0, 0);
+        const end = new Date(endDate);
+        end.setUTCHours(23, 59, 59, 999);
+        
+        return adjustments.filter(adj => {
+          if (!adj.date) return false;
+          const adjDate = new Date(adj.date);
+          return adjDate >= start && adjDate <= end;
+        });
+      }
 
       case 'deadStock': {
         const now = new Date();
@@ -413,32 +843,52 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
         return dateFilteredTransactions.filter(t => t.notes && t.notes.trim() !== '');
 
       case 'openingStockReport': {
-        const start = new Date(startDate).getTime();
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        const startTime = start.getTime();
+
         return materials.map(m => {
-          const qtyBefore = transactions
-            .filter(t => t.materialId === m.id && new Date(t.date).getTime() < start)
-            .reduce((sum, t) => {
-                if (t.type === 'in' || t.type === 'return_in') return sum + t.quantity;
-                if (t.type === 'out' || t.type === 'return') return sum - t.quantity;
-                return sum;
-            }, 0);
-          return { ...m, openingStock: qtyBefore };
+          let runningStock = m.currentStock;
+          
+          transactions
+            .filter(t => t.materialId === m.id)
+            .forEach(t => {
+              const tDate = new Date(t.date);
+              if (tDate.getTime() >= startTime) {
+                if (t.type === 'in' || t.type === 'return_in') {
+                  runningStock -= t.quantity;
+                } else if (t.type === 'out' || t.type === 'return') {
+                  runningStock += t.quantity;
+                }
+              }
+            });
+            
+          return { ...m, openingStock: Math.max(0, Math.round(runningStock * 1000) / 1000) };
         }).filter(m => m.openingStock !== 0);
       }
 
       case 'closingStockReport': {
         const end = new Date(endDate);
-        end.setUTCHours(23, 59, 59, 999);
+        end.setHours(23, 59, 59, 999);
         const endTime = end.getTime();
+
         return materials.map(m => {
-          const qtyAtEnd = transactions
-            .filter(t => t.materialId === m.id && new Date(t.date).getTime() <= endTime)
-            .reduce((sum, t) => {
-                if (t.type === 'in' || t.type === 'return_in') return sum + t.quantity;
-                if (t.type === 'out' || t.type === 'return') return sum - t.quantity;
-                return sum;
-            }, 0);
-          return { ...m, closingStock: qtyAtEnd };
+          let runningStock = m.currentStock;
+          
+          transactions
+            .filter(t => t.materialId === m.id)
+            .forEach(t => {
+              const tDate = new Date(t.date);
+              if (tDate.getTime() > endTime) {
+                if (t.type === 'in' || t.type === 'return_in') {
+                  runningStock -= t.quantity;
+                } else if (t.type === 'out' || t.type === 'return') {
+                  runningStock += t.quantity;
+                }
+              }
+            });
+            
+          return { ...m, closingStock: Math.max(0, Math.round(runningStock * 1000) / 1000) };
         }).filter(m => m.closingStock !== 0);
       }
 
@@ -644,6 +1094,21 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
             fileName = `${filterType}_report`;
             sheetName = filterType === 'openingStockReport' ? 'بضاعة أول المدة' : 'بضاعة آخر المدة';
             break;
+        case 'openingStockAdjustments':
+            dataToExport = (finalReportData as any[]).map(adj => ({
+                'التاريخ والوقت': new Date(adj.date).toLocaleString('ar-EG'),
+                'المسؤول عن التعديل': adj.modifiedBy,
+                'اسم المادة': adj.materialName,
+                'الباركود': adj.barcode,
+                'المستودع': adj.warehouseName,
+                'الكمية القديمة': adj.oldQuantity,
+                'الكمية الجديدة': adj.newQuantity,
+                'الفرق': adj.difference,
+                'طريقة التعديل': adj.isCorrection ? 'تصحيح مباشر (Correction)' : 'تعديل رصيد مضاف (Adjustment)'
+            }));
+            fileName = 'opening_stock_adjustments_report';
+            sheetName = 'تعديلات رصيد بضاعة أول المدة';
+            break;
         default: // Transaction reports
             dataToExport = (finalReportData as Transaction[]).map(t => ({
                 'التاريخ والوقت': new Date(t.date).toLocaleString('ar-EG'), 'اسم المادة': t.materialName,
@@ -735,6 +1200,11 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
             tableHeaders = `<th>اسم المادة</th><th>الباركود</th><th>الفئة</th><th>المورد</th><th>${filterType === 'openingStockReport' ? 'رصيد أول المدة' : 'رصيد آخر المدة'}</th>`;
             tableContent = (finalReportData as any[]).map(m => `<tr><td>${m.name}</td><td>${m.barcode}</td><td>${m.category}</td><td>${m.supplier}</td><td>${filterType === 'openingStockReport' ? m.openingStock : m.closingStock} ${m.unit}</td></tr>`).join('');
             break;
+        case 'openingStockAdjustments':
+            reportTitle = `تقرير تعديلات بضاعة أول المدة (سجل الرقابة)`;
+            tableHeaders = `<th>الوقت والتاريخ</th><th>المسؤول</th><th>اسم المادة</th><th>الباركود</th><th>المستودع</th><th>الكمية القديمة</th><th>الكمية الجديدة</th><th>الفرق</th><th>نوع التعديل</th>`;
+            tableContent = (finalReportData as any[]).map(adj => `<tr><td>${new Date(adj.date).toLocaleString('ar-EG')}</td><td>${adj.modifiedBy}</td><td>${adj.materialName}</td><td>${adj.barcode}</td><td>${adj.warehouseName}</td><td>${adj.oldQuantity}</td><td>${adj.newQuantity}</td><td style="color: ${adj.difference > 0 ? 'green' : 'red'}; font-weight: bold;">${adj.difference > 0 ? '+' : ''}${adj.difference}</td><td>${adj.isCorrection ? 'تصحيح مباشر (Correction)' : 'تعديل رصيد مضاف (Adjustment)'}</td></tr>`).join('');
+            break;
         default: // Transaction reports
             reportTitle = `تقرير حركات`;
             tableHeaders = `<th>التاريخ والوقت</th><th>اسم المادة</th><th>باركود المادة</th><th>باركود الصنف</th><th>المورد</th><th>الكمية</th><th>نوع الإخراج</th><th>المستلم</th><th>ملاحظات</th>`;
@@ -775,9 +1245,92 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
     `;
     triggerPrint(html);
   };
+
+  const handlePrintFastSearch = () => {
+    const tableRows = materialsWithStats.map(m => `
+      <tr>
+        <td>${m.name}</td>
+        <td>${m.barcode}</td>
+        <td>${m.category || '-'}</td>
+        <td>${m.supplier || '-'}</td>
+        <td style="color: #059669; font-weight: bold;">${m.entered.toLocaleString('ar-EG')} ${m.unit}</td>
+        <td style="color: #dc2626; font-weight: bold;">${m.used.toLocaleString('ar-EG')} ${m.unit}</td>
+        <td style="font-weight: bold; color: #4f46e5;">${m.currentStock.toLocaleString('ar-EG')} ${m.unit}</td>
+      </tr>
+    `).join('');
+
+    const html = `
+      <div class="print-container">
+        <style>
+          .print-container { font-family: 'Cairo', sans-serif; direction: rtl; padding: 20px; background: white; color: black; }
+          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ccc; padding-bottom: 10px; margin-bottom: 20px; }
+          .header img { max-width: 80px; max-height: 80px; }
+          .company-info { text-align: right; }
+          .report-title { text-align: center; margin-bottom: 10px; font-size: 1.5em; }
+          .summary-boxes { display: flex; justify-content: space-between; gap: 15px; margin-bottom: 25px; margin-top: 15px; }
+          .summary-box { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 8px; text-align: center; background: #f9f9f9; }
+          .summary-box h4 { margin: 0 0 5px 0; color: #555; font-size: 0.9em; }
+          .summary-box p { margin: 0; font-size: 1.3em; font-weight: bold; }
+          table { width: 100%; border-collapse: collapse; font-size: 0.9em; margin-top: 15px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
+          th { background-color: #f2f2f2; }
+          .signatures { margin-top: 50px; display: flex; justify-content: space-around; text-align: center; }
+          .signature-box p { margin: 0; padding: 0; }
+          .signature-box .line { border-bottom: 1px solid #000; margin-top: 40px; width: 120px; }
+        </style>
+        <div class="header">
+          ${settings?.companyLogo ? `<img src="${settings.companyLogo}" alt="Logo">` : '<div></div>'}
+          <div class="company-info">
+            <h2>${settings?.companyName || ''}</h2>
+            <p>${settings?.companyAddress || ''}</p>
+          </div>
+        </div>
+        <h2 class="report-title">تقرير الإحصائيات التراكمية السريع (البحث المتعدد)</h2>
+        <p style="text-align: center; color: #666; margin-bottom: 20px; font-size: 0.9em;">تاريخ الطباعة: ${new Date().toLocaleString('ar-EG')}</p>
+        
+        <div class="summary-boxes">
+          <div class="summary-box">
+            <h4>إجمالي الكميات المدخلة</h4>
+            <p style="color: #059669;">${fastSearchStats.totalReceived.toLocaleString('ar-EG')}</p>
+          </div>
+          <div class="summary-box">
+            <h4>إجمالي الكميات المستخدمة</h4>
+            <p style="color: #dc2626;">${fastSearchStats.totalUsed.toLocaleString('ar-EG')}</p>
+          </div>
+          <div class="summary-box">
+            <h4>إجمالي الرصيد المتبقي</h4>
+            <p style="color: #4f46e5;">${fastSearchStats.totalRemaining.toLocaleString('ar-EG')}</p>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>اسم المادة</th>
+              <th>الباركود</th>
+              <th>الفئة</th>
+              <th>المورد</th>
+              <th>المدخل</th>
+              <th>المستخدم</th>
+              <th>الرصيد الحالي</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows || '<tr><td colspan="7" style="text-align: center; color: #999;">لا توجد عناصر مطابقة</td></tr>'}
+          </tbody>
+        </table>
+        <div class="signatures">
+          <div class="signature-box"><p>${settings?.signatureNames?.keeper}</p><div class="line"></div></div>
+          <div class="signature-box"><p>${settings?.signatureNames?.accountant}</p><div class="line"></div></div>
+          <div class="signature-box"><p>${settings?.signatureNames?.manager}</p><div class="line"></div></div>
+        </div>
+      </div>
+    `;
+    triggerPrint(html);
+  };
   
   const canPerformAction = reportData && reportData.length > 0;
-  const showDatePickers = ['all', 'daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byColor', 'byBarcode', 'byItemBarcode', 'bySupplier', 'mostUsed', 'inTransactions', 'outTransactions', 'byRecipient', 'warehouseTransfers', 'materialLedger', 'scrapReport', 'wasteReport', 'rulersReport', 'notesSearchReport', 'openingStockReport', 'closingStockReport'].includes(filterType);
+  const showDatePickers = ['all', 'daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byColor', 'byBarcode', 'byItemBarcode', 'bySupplier', 'mostUsed', 'inTransactions', 'outTransactions', 'byRecipient', 'warehouseTransfers', 'materialLedger', 'scrapReport', 'wasteReport', 'rulersReport', 'notesSearchReport', 'openingStockReport', 'closingStockReport', 'openingStockAdjustments'].includes(filterType);
 
   const categories = [
     { id: 'inventory', label: 'تقارير المخزون', icon: Package },
@@ -831,6 +1384,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
     { value: 'stockForecast', category: 'analysis', label: 'توقع نفاد المخزون', icon: Clock, color: 'violet', bgColor: 'bg-violet-100', textColor: 'text-violet-600', darkBg: 'dark:bg-violet-900/30', darkText: 'dark:text-violet-400', glow: 'bg-violet-500', description: 'توقع متى سينفد المخزون بناءً على الاستهلاك' },
     { value: 'periodComparison', category: 'analysis', label: 'مقارنة الفترات', icon: CalendarRange, color: 'pink', bgColor: 'bg-pink-100', textColor: 'text-pink-600', darkBg: 'dark:bg-pink-900/30', darkText: 'dark:text-pink-400', glow: 'bg-pink-500', description: 'مقارنة الاستهلاك بين فترتين زمنيتين' },
     { value: 'trendReport', category: 'analysis', label: 'اتجاه الاستخدام', icon: TrendingUp, color: 'cyan', bgColor: 'bg-cyan-100', textColor: 'text-cyan-600', darkBg: 'dark:bg-cyan-900/30', darkText: 'dark:text-cyan-400', glow: 'bg-cyan-500', description: 'اتجاه استخدام المواد خلال 6 أشهر' },
+    { value: 'fastSearchStats', category: 'analysis', label: 'محرك الإحصائيات التراكمية السريع (البحث المتعدد)', icon: Calculator, color: 'indigo', bgColor: 'bg-indigo-100', textColor: 'text-indigo-600', darkBg: 'dark:bg-indigo-900/30', darkText: 'dark:text-indigo-400', glow: 'bg-indigo-500', description: 'بحث ذكي متقدم يدعم تحديد بنود متعددة للموردين والتصنيفات والمواد لحساب الكميات التراكمية للحركات ورصيدها المتبقي فوراً بالجمع التلقائي' },
 
     // Suppliers
     { value: 'bySupplier', category: 'suppliers', label: 'حسب المورد', icon: Truck, color: 'orange', bgColor: 'bg-orange-100', textColor: 'text-orange-600', darkBg: 'dark:bg-orange-900/30', darkText: 'dark:text-orange-400', glow: 'bg-orange-500', description: 'تقارير المواد المرتبطة بمورد محدد' },
@@ -842,6 +1396,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
 
     // System
     { value: 'auditReport', category: 'system', label: 'تقرير العمليات المعدلة', icon: AlertTriangle, color: 'red', bgColor: 'bg-red-100', textColor: 'text-red-600', darkBg: 'dark:bg-red-900/30', darkText: 'dark:text-red-400', glow: 'bg-red-500', description: 'سجل العمليات التي تم تعديلها أو حذفها' },
+    { value: 'openingStockAdjustments', category: 'system', label: 'تعديلات رصيد بضاعة أول المدة (رقابة وتدقيق)', icon: AlertTriangle, color: 'pink', bgColor: 'bg-rose-100', textColor: 'text-rose-600', darkBg: 'dark:bg-rose-900/30', darkText: 'dark:text-rose-400', glow: 'bg-rose-500', description: 'سجل تدقيق وتتبع أي تعديل على رصيد أول المدة مع اسم المسؤول للكشف والتحقق الفوري من التلاعب بالكميات' },
   ] as const;
 
   const filteredOptions = reportOptions.filter(opt => 
@@ -954,6 +1509,211 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
 
       {filterType === 'processedItemCards' ? (
         <ProcessedItemCards transactions={transactions} materials={materials} />
+      ) : filterType === 'fastSearchStats' ? (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-6"
+        >
+          {/* Header Panel with Back Button */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gradient-to-r from-indigo-500 to-indigo-700 dark:from-indigo-600 dark:to-indigo-800 p-6 rounded-2xl shadow-xl text-white gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-white/10 rounded-xl">
+                <Calculator size={28} />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">محرك البحث السريع والإحصائيات التراكمية (المتعدد)</h2>
+                <p className="text-xs text-indigo-150 mt-1">تحديد بنود متعددة للموردين والتصنيفات والمواد وتتبع الإحصائيات التراكمية فوراً</p>
+              </div>
+            </div>
+            
+            <div className="flex gap-2 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={handlePrintFastSearch}
+                className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-lg shadow transition-colors cursor-pointer"
+              >
+                <Printer size={16} className="ml-1.5" />
+                طباعة النتائج
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterType('all')}
+                className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-white/20 hover:bg-white/30 text-white text-xs font-bold rounded-lg shadow transition-colors cursor-pointer"
+              >
+                <X size={16} className="ml-1.5" />
+                العودة للتقارير
+              </button>
+            </div>
+          </div>
+
+          {/* Selection Dropdowns Card */}
+          <div className="p-6 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border dark:border-gray-700 space-y-4">
+            <h3 className="font-bold text-gray-800 dark:text-gray-200 border-b pb-2 dark:border-gray-700 text-sm">أدوات الفلترة والبحث السريع المتعدد</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <MultiSelectDropdown
+                label="الموردين"
+                placeholder="البحث عن مورد..."
+                options={uniqueSuppliers}
+                selectedValues={selectedSuppliers}
+                onChange={setSelectedSuppliers}
+                allOptionLabel="-- كل الموردين --"
+              />
+
+              <MultiSelectDropdown
+                label="التصنيفات"
+                placeholder="البحث عن تصنيف..."
+                options={fastSearchCategoriesOptions}
+                selectedValues={selectedCategories}
+                onChange={setSelectedCategories}
+                allOptionLabel="-- كل التصنيفات --"
+              />
+
+              <MultiSelectMaterialDropdown
+                label="المواد وعناصر المخزون المطابقة"
+                placeholder="البحث عن مادة..."
+                options={fastSearchMaterialsOptions}
+                selectedIds={selectedMaterialIds}
+                onChange={setSelectedMaterialIds}
+                allOptionLabel="-- كل المواد المطابقة --"
+              />
+            </div>
+
+            {/* Dynamic Search & Reset controls */}
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <div className="relative flex-1">
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                <input
+                  type="text"
+                  placeholder="بحث سريع مفلتر باسم المادة أو الباركود أو المورد..."
+                  value={quickSearchQuery}
+                  onChange={e => setQuickSearchQuery(e.target.value)}
+                  className="w-full p-2.5 pr-10 border rounded-xl bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                />
+              </div>
+              {(selectedSuppliers.length > 0 || selectedCategories.length > 0 || selectedMaterialIds.length > 0 || quickSearchQuery) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedSuppliers([]);
+                    setSelectedCategories([]);
+                    setSelectedMaterialIds([]);
+                    setQuickSearchQuery('');
+                  }}
+                  className="px-4 py-2.5 bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-900/30 text-red-650 dark:text-red-400 border border-red-200 dark:border-red-900/50 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <X size={14} />
+                  إعادة تعيين كافة الفلاتر
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Stats Indicators Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="p-6 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/50 rounded-2xl shadow-sm flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300">إجمالي الكميات المدخلة (Lifetime)</span>
+                <p className="text-3xl font-black text-emerald-600 dark:text-emerald-400 mt-2">
+                  {fastSearchStats.totalReceived.toLocaleString('ar-EG')}
+                </p>
+                <div className="text-[10px] text-emerald-500/80 mt-1 flex items-center gap-1 font-bold">
+                  <CornerRightDown size={10} />
+                  جميع الحركات الواردة والمرتجعة
+                </div>
+              </div>
+              <div className="p-4 bg-emerald-500/10 rounded-2xl text-emerald-500">
+                <PlusCircle size={28} />
+              </div>
+            </div>
+
+            <div className="p-6 bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/50 rounded-2xl shadow-sm flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-red-800 dark:text-red-300">إجمالي الكميات المستخدمة (Lifetime)</span>
+                <p className="text-3xl font-black text-red-600 dark:text-red-400 mt-2">
+                  {fastSearchStats.totalUsed.toLocaleString('ar-EG')}
+                </p>
+                <div className="text-[10px] text-red-500/80 mt-1 flex items-center gap-1 font-bold">
+                  <CornerUpLeft size={10} />
+                  عمليات الصرف والتسوية والإخراج
+                </div>
+              </div>
+              <div className="p-4 bg-red-500/10 rounded-2xl text-red-500">
+                <RotateCcw size={28} />
+              </div>
+            </div>
+
+            <div className="p-6 bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/50 rounded-2xl shadow-sm flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-blue-800 dark:text-blue-300">إجمالي الرصيد المتبقي</span>
+                <p className="text-3xl font-black text-blue-600 dark:text-blue-400 mt-2">
+                  {fastSearchStats.totalRemaining.toLocaleString('ar-EG')}
+                </p>
+                <div className="text-[10px] text-blue-500/80 mt-1 flex items-center gap-1 font-bold">
+                  <span>●</span>
+                  مطابق للرصيد الحالي بالمخزن
+                </div>
+              </div>
+              <div className="p-4 bg-blue-500/10 rounded-2xl text-blue-500">
+                <ClipboardList size={28} />
+              </div>
+            </div>
+          </div>
+
+          {/* Matched Items Table Card */}
+          <div className="p-6 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border dark:border-gray-700 space-y-4">
+            <div className="flex justify-between items-center pb-2 border-b dark:border-gray-700">
+              <h3 className="font-bold text-gray-800 dark:text-gray-200 text-sm">العناصر والمواد المطابقة للفلتر ({materialsWithStats.length})</h3>
+              <span className="text-[10px] bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 font-bold px-2.5 py-1 rounded-full">
+                تحديث لحظي تلقائي
+              </span>
+            </div>
+
+            {materialsWithStats.length === 0 ? (
+              <div className="p-10 text-center text-gray-400 dark:text-gray-500 text-sm">
+                لا توجد مواد تطابق خيارات ومحرك الفلترة المتعددة المحددة حالياً.
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border dark:border-gray-700">
+                <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
+                  <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-750 dark:text-gray-300 font-bold">
+                    <tr>
+                      <th scope="col" className="px-6 py-3">اسم المادة</th>
+                      <th scope="col" className="px-6 py-3">الباركود</th>
+                      <th scope="col" className="px-6 py-3">الفئة</th>
+                      <th scope="col" className="px-6 py-3">المورد</th>
+                      <th scope="col" className="px-6 py-3">إجمالي الوارد</th>
+                      <th scope="col" className="px-6 py-3">إجمالي المستخدم</th>
+                      <th scope="col" className="px-6 py-3">الكمية الحالية</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {materialsWithStats.map(m => (
+                      <tr key={m.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-750/50 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                        <td className="px-6 py-4 font-bold text-gray-900 whitespace-nowrap dark:text-white leading-tight">
+                          <div>{m.name}</div>
+                          {m.materialType && <div className="text-[10px] text-gray-400 mt-0.5 font-normal">{m.materialType}</div>}
+                        </td>
+                        <td className="px-6 py-4 font-mono text-xs text-gray-500 dark:text-gray-400">{m.barcode}</td>
+                        <td className="px-6 py-4 text-xs font-medium">{m.category || '-'}</td>
+                        <td className="px-6 py-4 text-xs text-gray-400">{m.supplier || '-'}</td>
+                        <td className="px-6 py-4 text-emerald-600 dark:text-emerald-400 font-bold">
+                          {m.entered.toLocaleString('ar-EG')} / <span className="text-[10px] text-gray-400">{m.unit}</span>
+                        </td>
+                        <td className="px-6 py-4 text-red-600 dark:text-red-400/80 font-bold">
+                          {m.used.toLocaleString('ar-EG')} / <span className="text-[10px] text-gray-400">{m.unit}</span>
+                        </td>
+                        <td className="px-6 py-4 font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50/20 dark:bg-indigo-950/10">
+                          {m.currentStock.toLocaleString('ar-EG')} / <span className="text-xs text-gray-400">{m.unit}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </motion.div>
       ) : (
         <>
           {/* Filters and Actions Section */}
@@ -1427,6 +2187,55 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
                   </td>
                   <td className="px-6 py-4 text-xs">{n.title}</td>
                   <td className="px-6 py-4 text-xs">{n.message}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (filterType === 'openingStockAdjustments') ? (
+          <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
+            <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400 font-bold">
+              <tr>
+                <th scope="col" className="px-6 py-3">الوقت والتاريخ</th>
+                <th scope="col" className="px-6 py-3">المسؤول عن التعديل</th>
+                <th scope="col" className="px-6 py-3">اسم المادة</th>
+                <th scope="col" className="px-6 py-3">الباركود</th>
+                <th scope="col" className="px-6 py-3">المستودع</th>
+                <th scope="col" className="px-6 py-3">الكمية القديمة</th>
+                <th scope="col" className="px-6 py-3">الكمية الجديدة</th>
+                <th scope="col" className="px-6 py-3">فرق الكمية</th>
+                <th scope="col" className="px-6 py-3">طريقة التعديل</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(finalReportData as any[]).map(adj => (
+                <tr key={adj.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                  <td className="px-6 py-4 text-xs font-mono">
+                    {new Date(adj.date).toLocaleString('ar-EG', {
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit',
+                      hour12: true
+                    })}
+                  </td>
+                  <td className="px-6 py-4 font-bold text-gray-900 dark:text-gray-100">{adj.modifiedBy}</td>
+                  <td className="px-6 py-4 font-bold text-blue-600 dark:text-blue-400">{adj.materialName}</td>
+                  <td className="px-6 py-4 font-mono text-xs text-gray-400">{adj.barcode}</td>
+                  <td className="px-6 py-4 text-xs font-medium text-gray-600 dark:text-gray-350">{adj.warehouseName}</td>
+                  <td className="px-6 py-4 font-mono font-medium text-gray-500 dark:text-gray-400">{adj.oldQuantity.toLocaleString('ar-EG')}</td>
+                  <td className="px-6 py-4 font-mono font-black text-gray-950 dark:text-white">{adj.newQuantity.toLocaleString('ar-EG')}</td>
+                  <td className={`px-6 py-4 font-mono font-bold ${adj.difference > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {adj.difference > 0 ? '+' : ''}{adj.difference.toLocaleString('ar-EG')}
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-1 rounded text-[10px] font-bold ${
+                      adj.isCorrection ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' : 'bg-rose-100 text-rose-800 dark:bg-rose-950/20 dark:text-rose-400'
+                    }`}>
+                      {adj.isCorrection ? 'تصحيح مباشر (Correction)' : 'تعديل رصيد مضاف (Adjustment)'}
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>

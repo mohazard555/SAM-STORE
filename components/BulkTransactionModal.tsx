@@ -179,6 +179,12 @@ const BulkTransactionModal: React.FC<BulkTransactionModalProps> = ({ materials, 
             }
         }
 
+        const parts = date.split('-');
+        const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        const now = new Date();
+        d.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+        const finalDate = d.toISOString();
+
         const transactions = items.map(item => ({
             type,
             materialId: item.materialId,
@@ -190,7 +196,7 @@ const BulkTransactionModal: React.FC<BulkTransactionModalProps> = ({ materials, 
             itemBarcode: item.itemBarcode,
             notes: item.notes,
             color: item.color,
-            date: new Date(date).toISOString()
+            date: finalDate
         }));
 
         onSave(transactions);

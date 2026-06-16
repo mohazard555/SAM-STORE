@@ -35,19 +35,29 @@ const parseDateSafely = (dateStr: string): string => {
         }
     }
     
-    // Fix for the "3:00:00 AM" issue: 
-    // If the date string is exactly YYYY-MM-DD (length 10) and it represents today, 
-    // use the current full timestamp to preserve the exact time.
-    const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-    if (normalized === todayStr) {
-        return now.toISOString();
-    } else if (normalized.length === 10 && /^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
-        // If it's a specific date but today, we keep it as is (midnight UTC), 
-        // which will likely show as 3AM in local time, but at least it's the correct day.
-        // For better UX, we could set it to noon or current time if we want.
-        // Let's set it to current hour/min/sec but on that specific date.
-        date.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+    const isMidnight = normalized.endsWith('T00:00:00.000Z') || normalized.endsWith('T00:00:00Z') || (normalized.length === 10 && /^\d{4}-\d{2}-\d{2}$/.test(normalized));
+    
+    if (isMidnight && !isNaN(date.getTime())) {
+        const now = new Date();
+        let localYear = date.getUTCFullYear();
+        let localMonth = date.getUTCMonth();
+        let localDay = date.getUTCDate();
+        
+        // If it's a date-only string like YYYY-MM-DD
+        if (normalized.length === 10 && !normalized.includes('T')) {
+            const parts = normalized.split(/[-/.]/);
+            if (parts.length === 3) {
+                if (parts[0].length === 4) {
+                    localYear = Number(parts[0]);
+                    localMonth = Number(parts[1]) - 1;
+                    localDay = Number(parts[2]);
+                }
+            }
+        }
+        
+        const localDate = new Date(localYear, localMonth, localDay);
+        localDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+        return localDate.toISOString();
     }
     
     return isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
@@ -779,6 +789,44 @@ export const updateMaterial = (updatedMaterial: Material, isCorrection: boolean 
     const materials = getMaterials();
     const oldMaterial = materials.find(m => m.id === updatedMaterial.id);
     
+    if (oldMaterial) {
+        const currentUser = getCurrentUser();
+        const username = currentUser?.username || 'نظام';
+        const warehouses = getWarehouses();
+        
+        Object.entries(updatedMaterial.stocks || {}).forEach(([warehouseId, newQty]) => {
+            const oldQty = oldMaterial.stocks[warehouseId] || 0;
+            if (newQty !== oldQty) {
+                const diff = newQty - oldQty;
+                const whName = warehouses.find(w => w.id === warehouseId)?.name || warehouseId;
+                
+                const adjustments = getFromStorage<any[]>('opening_stock_adjustments', []);
+                const newAdjust = {
+                    id: `adj-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                    materialId: updatedMaterial.id,
+                    materialName: updatedMaterial.name,
+                    barcode: updatedMaterial.barcode,
+                    warehouseId,
+                    warehouseName: whName,
+                    oldQuantity: oldQty,
+                    newQuantity: newQty,
+                    difference: diff,
+                    modifiedBy: username,
+                    date: new Date().toISOString(),
+                    isCorrection
+                };
+                saveToStorage('opening_stock_adjustments', [newAdjust, ...adjustments]);
+                
+                addNotification({
+                    type: 'material',
+                    action: 'update',
+                    title: 'تعديل رصيد افتتاحي',
+                    message: `قام ${username} بتعديل الرصيد الافتتاحي لـ ${updatedMaterial.name} في ${whName}: من ${oldQty} إلى ${newQty} (الفرق: ${diff > 0 ? '+' : ''}${diff})`
+                });
+            }
+        });
+    }
+    
     if (oldMaterial && !isCorrection) {
         // Check for stock changes in the modal (Opening Balance edits)
         Object.entries(updatedMaterial.stocks || {}).forEach(([warehouseId, newQty]) => {
@@ -797,6 +845,64 @@ export const updateMaterial = (updatedMaterial: Material, isCorrection: boolean 
                 });
             }
         });
+    }
+
+    let allTransactions = getTransactions();
+    if (oldMaterial && isCorrection) {
+        let transactionsChanged = false;
+        Object.entries(updatedMaterial.stocks || {}).forEach(([warehouseId, newQty]) => {
+            const idx = allTransactions.findIndex(t => 
+                t.materialId === updatedMaterial.id && 
+                t.warehouseId === warehouseId && 
+                t.type === 'in' && 
+                (t.recipient === 'رصيد افتتاحي' || t.recipient === 'رصيد افتتاحي معدّل' || t.recipient === 'تمت الإضافة كحركة افتتاحية معدلة')
+            );
+
+            if (idx !== -1) {
+                if (newQty > 0) {
+                    allTransactions[idx].quantity = newQty;
+                    allTransactions[idx].date = updatedMaterial.createdAt || oldMaterial.createdAt || allTransactions[idx].date;
+                } else {
+                    allTransactions.splice(idx, 1);
+                }
+                transactionsChanged = true;
+            } else if (newQty > 0) {
+                allTransactions.push({
+                    id: `t${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                    type: 'in',
+                    materialId: updatedMaterial.id,
+                    materialName: updatedMaterial.name,
+                    materialType: updatedMaterial.materialType,
+                    category: updatedMaterial.category,
+                    supplier: updatedMaterial.supplier,
+                    barcode: updatedMaterial.barcode,
+                    quantity: newQty,
+                    unit: updatedMaterial.unit,
+                    warehouseId: warehouseId,
+                    recipient: 'رصيد افتتاحي',
+                    notes: 'تمت الإضافة كحركة افتتاحية معدلة',
+                    date: updatedMaterial.createdAt || oldMaterial.createdAt || new Date().toISOString(),
+                    color: updatedMaterial.color
+                });
+                transactionsChanged = true;
+            }
+        });
+
+        // Clean up any empty opening stock transactions for this material
+        allTransactions = allTransactions.filter(t => {
+            if (t.materialId === updatedMaterial.id && t.type === 'in' && t.recipient === 'رصيد افتتاحي') {
+                const targetWhQty = updatedMaterial.stocks[t.warehouseId];
+                if (targetWhQty === undefined || targetWhQty === 0) {
+                    transactionsChanged = true;
+                    return false;
+                }
+            }
+            return true;
+        });
+
+        if (transactionsChanged) {
+            saveToStorage(TRANSACTIONS_KEY, allTransactions);
+        }
     }
 
     // Recalculate total stock based on current state (after transactions)
@@ -830,7 +936,7 @@ export const updateMaterial = (updatedMaterial: Material, isCorrection: boolean 
     saveToStorage(MATERIALS_KEY, finalMaterialsList);
 
     // Update denormalized transaction data if material name/type/supplier/category/barcode/unit changed
-    const allTransactions = getTransactions();
+    const currentTransactions = getTransactions();
     const materialHasChanged = oldMaterial && (
         oldMaterial.name !== finalMaterial.name ||
         oldMaterial.materialType !== finalMaterial.materialType ||
@@ -841,7 +947,7 @@ export const updateMaterial = (updatedMaterial: Material, isCorrection: boolean 
     );
 
     if (materialHasChanged) {
-        const updatedTransactions = allTransactions.map(t => {
+        const updatedTransactions = currentTransactions.map(t => {
             if (t.materialId === finalMaterial.id) {
                 return {
                     ...t,
@@ -889,6 +995,8 @@ export const deleteMaterial = (materialId: string): void => {
 };
 
 export const getTransactions = (): Transaction[] => getFromStorage<Transaction[]>(TRANSACTIONS_KEY, []);
+
+export const getOpeningStockAdjustments = (): any[] => getFromStorage<any[]>('opening_stock_adjustments', []);
 
 export const repairInitialTransactions = (): void => {
     console.log("Checking for missing initial transactions...");
@@ -1043,7 +1151,7 @@ export const deleteTransaction = (transactionId: string): void => {
         const currentWarehouseStock = material.stocks[warehouseId] || 0;
         const updatedMaterial = { ...material, stocks: { ...material.stocks } };
 
-        if (transaction.type === 'in') {
+        if (transaction.type === 'in' || transaction.type === 'return_in') {
             updatedMaterial.stocks[warehouseId] = roundTo(currentWarehouseStock - transaction.quantity);
         } else if (transaction.type === 'out' || transaction.type === 'return') {
             updatedMaterial.stocks[warehouseId] = roundTo(currentWarehouseStock + transaction.quantity);
@@ -1080,7 +1188,7 @@ export const updateTransaction = (updatedTransaction: Transaction & { affectInve
         
         // 1. Reverse old stock change
         const oldWarehouseId = oldTransaction.warehouseId;
-        if (oldTransaction.type === 'in') {
+        if (oldTransaction.type === 'in' || oldTransaction.type === 'return_in') {
             updatedMaterial.stocks[oldWarehouseId] = roundTo((updatedMaterial.stocks[oldWarehouseId] || 0) - oldTransaction.quantity);
         } else if (oldTransaction.type === 'out' || oldTransaction.type === 'return') {
             updatedMaterial.stocks[oldWarehouseId] = roundTo((updatedMaterial.stocks[oldWarehouseId] || 0) + oldTransaction.quantity);
@@ -1091,7 +1199,7 @@ export const updateTransaction = (updatedTransaction: Transaction & { affectInve
 
         // 2. Apply new stock change
         const newWarehouseId = updatedTransaction.warehouseId;
-        if (updatedTransaction.type === 'in') {
+        if (updatedTransaction.type === 'in' || updatedTransaction.type === 'return_in') {
             updatedMaterial.stocks[newWarehouseId] = roundTo((updatedMaterial.stocks[newWarehouseId] || 0) + updatedTransaction.quantity);
         } else if (updatedTransaction.type === 'out' || updatedTransaction.type === 'return') {
             updatedMaterial.stocks[newWarehouseId] = roundTo((updatedMaterial.stocks[newWarehouseId] || 0) - updatedTransaction.quantity);

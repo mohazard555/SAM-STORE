@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
-import { getSettings, saveSettings, exportAllData, importAllData, updateUser, getCurrentUser, resetAllData, syncDataToGist } from '@/services/mockApi';
-import { SettingsData, AllData, User } from '@/types';
-import { Save, Upload, Download, Image, User as UserIcon, RefreshCcw, RefreshCw, Lock, Unlock } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { getSettings, saveSettings, exportAllData, importAllData, updateUser, getCurrentUser, resetAllData, syncDataToGist, getMaterials, getTransactions } from '@/services/mockApi';
+import { SettingsData, AllData, User, Material, Transaction } from '@/types';
+import { Save, Upload, Download, Image, User as UserIcon, RefreshCcw, RefreshCw, Lock, Unlock, Search, CornerRightDown, CornerUpLeft, Calculator, X } from 'lucide-react';
 
 interface SettingsProps {
     onDataChange: () => void;
@@ -147,6 +147,8 @@ const Settings: React.FC<SettingsProps> = ({ onDataChange, user }) => {
         link.href = jsonString;
         link.download = "warehouse_backup.json";
         link.click();
+        setMessage('تم تصدير النسخة الاحتياطية الى مجلد التنزيلات بنجاح');
+        setTimeout(() => setMessage(''), 4000);
     };
     
     const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -72,6 +72,26 @@ const TransactionModal: React.FC<{
              setError(`الكمية المطلوبة أكبر من المتاح في المستودع المحدد (${currentStock}).`); return; 
         }
         
+        let finalDate = new Date(date).toISOString();
+        if (editTransaction) {
+            const originalDay = new Date(editTransaction.date).toISOString().split('T')[0];
+            if (date === originalDay) {
+                finalDate = editTransaction.date;
+            } else {
+                const parts = date.split('-');
+                const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+                const now = new Date();
+                d.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+                finalDate = d.toISOString();
+            }
+        } else {
+            const parts = date.split('-');
+            const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+            const now = new Date();
+            d.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+            finalDate = d.toISOString();
+        }
+
         const payload = { 
             type: type, 
             materialId, 
@@ -83,7 +103,7 @@ const TransactionModal: React.FC<{
             itemBarcode,
             notes, 
             color,
-            date: new Date(date).toISOString(),
+            date: finalDate,
             affectInventory: editTransaction ? affectInventory : true
         };
 
@@ -464,7 +484,12 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, materials, wa
           <tbody>
             {filteredTransactions.map(transaction => (
               <tr key={transaction.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                <td className="px-4 py-3 text-xs whitespace-nowrap">{new Date(transaction.date).toLocaleDateString('ar-EG')}</td>
+                <td className="px-4 py-3 text-xs whitespace-nowrap">
+                    <div>{new Date(transaction.date).toLocaleDateString('ar-EG')}</div>
+                    <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 font-medium">
+                        {new Date(transaction.date).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    </div>
+                </td>
                 <td className="px-4 py-3">
                     {transaction.type === 'in' ? (
                         <span className="flex items-center text-emerald-600 dark:text-emerald-400 font-bold text-xs bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded">

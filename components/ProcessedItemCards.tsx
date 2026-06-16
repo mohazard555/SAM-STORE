@@ -75,10 +75,11 @@ export const ProcessedItemCards: React.FC<ProcessedItemCardsProps> = ({ transact
     const text = `
 بطاقة صنف: ${cardData.itemBarcode}
 الحالة: ${cardData.status === 'delivered' ? 'تم التسليم' : 'قيد الانتظار'}
+المورد: ${cardData.suppliers?.join('، ') || 'غير محدد'}
 إجمالي الكمية: ${cardData.totalQuantity}
 إجمالي التكلفة: ${cardData.totalCost}
 المواد:
-${cardData.materialsList.map((m: any) => `- ${m.name}: ${m.quantity} (السعر: ${m.price}, الإجمالي: ${m.total})`).join('\n')}
+${cardData.materialsList.map((m: any) => `- ${m.name} (${m.supplier || 'غير محدد'}): ${m.quantity} (السعر: ${m.price}, الإجمالي: ${m.total})`).join('\n')}
     `.trim();
     navigator.clipboard.writeText(text);
     alert('تم نسخ البطاقة بنجاح');
@@ -90,6 +91,7 @@ ${cardData.materialsList.map((m: any) => `- ${m.name}: ${m.quantity} (السعر
         <div style="margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px;">
           <h2>بطاقة صنف: ${cardData.itemBarcode}</h2>
           <p>الحالة: ${cardData.status === 'delivered' ? 'تم التسليم' : 'قيد الانتظار'}</p>
+          <p>المورد: ${cardData.suppliers?.join('، ') || 'غير محدد'}</p>
           <p>إجمالي الكمية: ${cardData.totalQuantity}</p>
           <p>إجمالي التكلفة: ${cardData.totalCost}</p>
         </div>
@@ -97,6 +99,7 @@ ${cardData.materialsList.map((m: any) => `- ${m.name}: ${m.quantity} (السعر
           <thead>
             <tr>
               <th style="border: 1px solid #ddd; padding: 8px; text-align: right; background-color: #f2f2f2;">المادة</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: right; background-color: #f2f2f2;">المورد</th>
               <th style="border: 1px solid #ddd; padding: 8px; text-align: right; background-color: #f2f2f2;">الكمية</th>
               <th style="border: 1px solid #ddd; padding: 8px; text-align: right; background-color: #f2f2f2;">السعر الإفرادي</th>
               <th style="border: 1px solid #ddd; padding: 8px; text-align: right; background-color: #f2f2f2;">الإجمالي</th>
@@ -106,6 +109,7 @@ ${cardData.materialsList.map((m: any) => `- ${m.name}: ${m.quantity} (السعر
             ${cardData.materialsList.map((m: any) => `
               <tr>
                 <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${m.name}</td>
+                <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${m.supplier || 'غير محدد'}</td>
                 <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${m.quantity}</td>
                 <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${m.price}</td>
                 <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${m.total}</td>
@@ -169,16 +173,26 @@ ${cardData.materialsList.map((m: any) => `- ${m.name}: ${m.quantity} (السعر
     // Convert to array and attach status
     let result = Object.values(grouped).map(group => {
       const cardStatus = cards.find(c => c.itemBarcode === group.itemBarcode)?.status || 'pending';
+      const cardSuppliers = [...new Set(group.transactions.map((t: any) => {
+        const mat = materials.find((m: any) => m.id === t.materialId);
+        return t.supplier || mat?.supplier;
+      }).filter(Boolean))] as string[];
+
       return {
         ...group,
         status: cardStatus,
-        materialsList: Object.values(group.materialsMap).map((m: any) => ({
-          materialId: m.materialId,
-          name: m.name,
-          quantity: m.quantity,
-          price: m.price,
-          total: m.cost
-        }))
+        suppliers: cardSuppliers,
+        materialsList: Object.values(group.materialsMap).map((m: any) => {
+          const mat = materials.find((x: any) => x.id === m.materialId);
+          return {
+            materialId: m.materialId,
+            name: m.name,
+            quantity: m.quantity,
+            price: m.price,
+            total: m.cost,
+            supplier: mat?.supplier || 'غير محدد'
+          };
+        })
       };
     });
 
@@ -343,6 +357,12 @@ ${cardData.materialsList.map((m: any) => `- ${m.name}: ${m.quantity} (السعر
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                     {data.transactions.length} حركات صادر
                   </p>
+                  {data.suppliers && data.suppliers.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1.5 text-xs">
+                      <span className="text-gray-400">المورد:</span>
+                      <span className="font-semibold text-amber-600 dark:text-amber-400">{data.suppliers.join('، ')}</span>
+                    </div>
+                  )}
                 </div>
                 
                 {/* Status Toggle */}
@@ -558,7 +578,10 @@ ${cardData.materialsList.map((m: any) => `- ${m.name}: ${m.quantity} (السعر
                         {previewCard.materialsList.map((m: any, idx: number) => (
                           <tr key={idx} className="hover:bg-gray-50/45 dark:hover:bg-gray-700/20 transition-colors">
                             <td className="p-3 font-semibold text-gray-700 dark:text-gray-300 truncate max-w-[200px]" title={m.name}>
-                              {m.name}
+                              <div>{m.name}</div>
+                              <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/25 px-1.5 py-0.5 rounded font-normal mt-1 inline-block">
+                                المورد: {m.supplier || 'غير محدد'}
+                              </span>
                             </td>
                             <td className="p-3 text-center">
                               {editingBarcode === previewCard.itemBarcode ? (
