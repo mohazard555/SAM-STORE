@@ -11,7 +11,7 @@ interface SidebarProps {
   logo?: string;
 }
 
-const NavItem: React.FC<{ icon: React.ReactNode; label: string; isActive: boolean; onClick: () => void; }> = ({ icon, label, isActive, onClick }) => (
+const NavItem: React.FC<{ icon: React.ReactNode; label: string; isActive: boolean; onClick: () => void; badge?: React.ReactNode; }> = ({ icon, label, isActive, onClick, badge }) => (
   <li>
     <a
       href="#"
@@ -23,7 +23,8 @@ const NavItem: React.FC<{ icon: React.ReactNode; label: string; isActive: boolea
       }`}
     >
       {icon}
-      <span className="mr-3">{label}</span>
+      <span className="mr-3 flex-1">{label}</span>
+      {badge}
     </a>
   </li>
 );
@@ -88,7 +89,23 @@ const Sidebar: React.FC<SidebarProps> = ({ user, currentPage, onNavigate, isOpen
               <NavItem icon={<Weight />} label="حاسبة الكلف بالوزن" isActive={currentPage === 'cost-weight'} onClick={() => handleNavigation('cost-weight')} />
             )}
             {(user.role === 'admin' || user.permissions?.allowedPages.includes('reports')) && (
-              <NavItem icon={<FileText />} label="التقارير" isActive={currentPage === 'reports'} onClick={() => handleNavigation('reports')} />
+              <NavItem 
+                icon={<FileText />} 
+                label="التقارير" 
+                isActive={currentPage === 'reports'} 
+                onClick={() => handleNavigation('reports')} 
+                badge={
+                  <div className="flex items-center gap-1.5 mr-auto">
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400">
+                      مجدد
+                    </span>
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                    </span>
+                  </div>
+                }
+              />
             )}
             <hr className="my-2 border-gray-200 dark:border-gray-600" />
             {(user.role === 'admin' || user.permissions?.allowedPages.includes('users')) && (

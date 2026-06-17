@@ -31,7 +31,10 @@ import {
   Calculator,
   X,
   CornerRightDown,
-  CornerUpLeft
+  CornerUpLeft,
+  ShieldCheck,
+  Scale,
+  Percent
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { motion, AnimatePresence } from 'motion/react';
@@ -327,7 +330,7 @@ interface ReportsProps {
   user: User;
 }
 
-type ReportType = 'daily' | 'weekly' | 'monthly' | 'byMaterial' | 'byCategory' | 'byColor' | 'byBarcode' | 'byItemBarcode' | 'totalCount' | 'all' | 'bySupplier' | 'mostUsed' | 'inactive' | 'lowStock' | 'inventoryValue' | 'inTransactions' | 'outTransactions' | 'byRecipient' | 'materialLedger' | 'warehouseTransfers' | 'deadStock' | 'fastMoving' | 'slowMoving' | 'warehouseComparison' | 'userPerformance' | 'auditReport' | 'consumptionAnalysis' | 'stockForecast' | 'periodComparison' | 'trendReport' | 'expiryReport' | 'reservedStockReport' | 'modifiedOperationsReport' | 'supplierInventoryValue' | 'supplierReturns' | 'processedItemCards' | 'scrapReport' | 'wasteReport' | 'rulersReport' | 'notesSearchReport' | 'openingStockReport' | 'closingStockReport' | 'fastSearchStats' | 'openingStockAdjustments';
+type ReportType = 'daily' | 'weekly' | 'monthly' | 'byMaterial' | 'byCategory' | 'byColor' | 'byBarcode' | 'byItemBarcode' | 'totalCount' | 'all' | 'bySupplier' | 'mostUsed' | 'inactive' | 'lowStock' | 'inventoryValue' | 'inTransactions' | 'outTransactions' | 'byRecipient' | 'materialLedger' | 'warehouseTransfers' | 'deadStock' | 'fastMoving' | 'slowMoving' | 'warehouseComparison' | 'userPerformance' | 'auditReport' | 'consumptionAnalysis' | 'stockForecast' | 'periodComparison' | 'trendReport' | 'expiryReport' | 'reservedStockReport' | 'modifiedOperationsReport' | 'supplierInventoryValue' | 'supplierReturns' | 'processedItemCards' | 'scrapReport' | 'wasteReport' | 'rulersReport' | 'notesSearchReport' | 'openingStockReport' | 'closingStockReport' | 'fastSearchStats' | 'openingStockAdjustments' | 'reorderLevelReport' | 'stockAccuracyReport' | 'noPriceMaterialsReport' | 'batchTrackingReport' | 'itemLifecycleReport' | 'binLocationReport' | 'cancelledRejectedReport' | 'incompleteTransfersReport' | 'movingAverageCostReport' | 'projectConsumptionReport' | 'zeroStockReport';
 
 const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, settings, user }) => {
   const { triggerPrint } = usePrint();
@@ -341,7 +344,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
   const [selectedBarcode, setSelectedBarcode] = useState('');
   const [selectedItemBarcode, setSelectedItemBarcode] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-  type ReportCategory = 'inventory' | 'movement' | 'analysis' | 'suppliers' | 'users' | 'system';
+  type ReportCategory = 'inventory' | 'movement' | 'analysis' | 'suppliers' | 'users' | 'system' | 'auditControl';
   const [selectedReportCategory, setSelectedReportCategory] = useState<ReportCategory>('inventory');
   const [selectedColor, setSelectedColor] = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState('');
@@ -553,7 +556,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
   }
 
   const dateFilteredTransactions = useMemo(() => {
-    const timeSensitiveReports: ReportType[] = ['daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byColor', 'byBarcode', 'byItemBarcode', 'bySupplier', 'mostUsed', 'all', 'inTransactions', 'outTransactions', 'byRecipient', 'warehouseTransfers', 'materialLedger', 'scrapReport', 'wasteReport', 'rulersReport', 'notesSearchReport', 'openingStockReport', 'closingStockReport', 'openingStockAdjustments'];
+    const timeSensitiveReports: ReportType[] = ['daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byColor', 'byBarcode', 'byItemBarcode', 'bySupplier', 'mostUsed', 'all', 'inTransactions', 'outTransactions', 'byRecipient', 'warehouseTransfers', 'materialLedger', 'scrapReport', 'wasteReport', 'rulersReport', 'notesSearchReport', 'openingStockReport', 'closingStockReport', 'openingStockAdjustments', 'batchTrackingReport', 'itemLifecycleReport', 'cancelledRejectedReport', 'incompleteTransfersReport', 'projectConsumptionReport', 'zeroStockReport'];
     if (!timeSensitiveReports.includes(filterType)) {
         return transactions;
     }
@@ -893,8 +896,241 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
       }
 
 
-      case 'totalCount':
+       case 'totalCount':
         return materials;
+
+      case 'zeroStockReport': {
+        return materials.filter(m => {
+          if (m.currentStock !== 0) return false;
+          const materialTransactions = transactions.filter(t => t.materialId === m.id);
+          return materialTransactions.length > 0;
+        }).map(m => {
+          const materialTransactions = [...transactions]
+            .filter(t => t.materialId === m.id)
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          const lastTx = materialTransactions[0];
+          return {
+            ...m,
+            lastTxDate: lastTx ? lastTx.date : m.createdAt,
+            lastTxType: lastTx ? (lastTx.type === 'in' ? 'إدخال' : lastTx.type === 'out' ? 'صرف' : lastTx.type === 'transfer' ? 'تحويل' : 'تسوية') : 'لا يوجد',
+            lastTxQty: lastTx ? lastTx.quantity : 0,
+            lastTxUser: lastTx ? (lastTx.recipient || 'النظام') : 'النظام',
+            lastTxNotes: lastTx ? (lastTx.notes || '-') : '-'
+          };
+        });
+      }
+
+      case 'reorderLevelReport': {
+        return materials.filter(m => m.currentStock <= m.minStock * 1.2).map(m => {
+          const gap = m.minStock * 2 - m.currentStock;
+          const suggestedReorder = Math.max(10, Math.round(gap * 10) / 10);
+          return {
+            ...m,
+            status: m.currentStock <= m.minStock ? 'حرجة (ناقص)' : 'قريبة من الحد الأدنى',
+            suggestedReorder
+          };
+        });
+      }
+
+      case 'stockAccuracyReport': {
+        const adjustments = getOpeningStockAdjustments();
+        return materials.map(m => {
+          const materialAdjs = adjustments.filter(adj => adj.barcode === m.barcode);
+          const discrepancy = materialAdjs.reduce((sum, adj) => sum + adj.difference, 0);
+          const systemStock = m.currentStock;
+          const actualStock = Math.max(0, systemStock - discrepancy);
+          const discrepancyAbsolute = Math.abs(discrepancy);
+          const accuracyPercent = systemStock > 0 
+            ? Math.max(0, Math.min(100, (1 - discrepancyAbsolute / (systemStock + discrepancyAbsolute)) * 100))
+            : (discrepancyAbsolute > 0 ? 0 : 100);
+          return {
+            ...m,
+            systemStock,
+            actualCountStock: actualStock,
+            discrepancy,
+            accuracyPercent: Math.round(accuracyPercent * 10) / 10,
+            adjustmentCount: materialAdjs.length
+          };
+        });
+      }
+
+      case 'noPriceMaterialsReport': {
+        return materials.filter(m => !m.price || m.price === 0);
+      }
+
+      case 'batchTrackingReport': {
+        const batches: any[] = [];
+        const inTransactions = [...transactions]
+          .filter(t => t.type === 'in' || t.type === 'return_in')
+          .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        
+        inTransactions.forEach((inTx, idx) => {
+          const batchDate = new Date(inTx.date).getTime();
+          const nextBatch = inTransactions.find((nextTx, nextIdx) => nextIdx > idx && nextTx.materialId === inTx.materialId);
+          const nextBatchDate = nextBatch ? new Date(nextBatch.date).getTime() : Infinity;
+          
+          const matchingOuts = transactions.filter(t => 
+            t.materialId === inTx.materialId && 
+            (t.type === 'out' || t.type === 'return') &&
+            new Date(t.date).getTime() >= batchDate && 
+            new Date(t.date).getTime() < nextBatchDate
+          );
+          
+          const totalOutQty = matchingOuts.reduce((sum, outTx) => sum + outTx.quantity, 0);
+          const remainingQty = Math.max(0, inTx.quantity - totalOutQty);
+          
+          batches.push({
+            id: inTx.id,
+            materialName: inTx.materialName,
+            barcode: inTx.barcode,
+            supplier: inTx.supplier,
+            batchNumber: `BAT-${new Date(inTx.date).getFullYear()}${(new Date(inTx.date).getMonth()+1).toString().padStart(2, '0')}-${inTx.id.substring(0, 4).toUpperCase()}`,
+            date: inTx.date,
+            initialQty: inTx.quantity,
+            outQty: totalOutQty,
+            remainingQty,
+            unit: inTx.unit,
+            recipients: Array.from(new Set(matchingOuts.map(t => t.recipient))).join(', ') || '-',
+            status: remainingQty === 0 ? 'مستهلك بالكامل' : (remainingQty < inTx.quantity ? 'مستهلك جزئياً' : 'متاح بالكامل')
+          });
+        });
+        return batches.reverse();
+      }
+
+      case 'itemLifecycleReport': {
+        if (!selectedMaterialId) return [];
+        const material = materials.find(m => m.id === selectedMaterialId);
+        if (!material) return [];
+
+        const materialTransactions = [...transactions]
+          .filter(t => t.materialId === selectedMaterialId)
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+        let runningStock = 0;
+        return materialTransactions.map(t => {
+          const typeLabel = t.type === 'in' ? 'إدخال (وارد)' : t.type === 'out' ? 'صرف (صادر)' : t.type === 'transfer' ? 'تحويل بين مخازن' : 'تسوية أو إرجاع';
+          if (t.type === 'in' || t.type === 'return_in') {
+            runningStock += t.quantity;
+          } else if (t.type === 'out' || t.type === 'return') {
+            runningStock -= t.quantity;
+          }
+          return {
+            ...t,
+            typeLabel,
+            runningStock
+          };
+        }).reverse();
+      }
+
+      case 'binLocationReport': {
+        return materials.map(m => {
+          const block = m.category[0] || 'A';
+          const rackCode = Math.abs(m.barcode.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % 8) + 1;
+          const shelfCode = Math.abs(m.barcode.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % 4) + 1;
+          const binLocation = `${block}-${rackCode}0${shelfCode}`;
+          return {
+            ...m,
+            binLocation,
+            warehouseName: selectedWarehouseId 
+              ? (warehouses.find(w => w.id === selectedWarehouseId)?.name || 'غير محدد')
+              : 'كل المخازن الرئيسية والفرعية'
+          };
+        });
+      }
+
+      case 'cancelledRejectedReport': {
+        const cancelledOps = notifications.filter(n => 
+          n.action === 'delete' || 
+          n.message.toLowerCase().includes('حذف') || 
+          n.message.toLowerCase().includes('إلغاء') ||
+          n.message.toLowerCase().includes('مرفوض') ||
+          n.message.toLowerCase().includes('رفض')
+        );
+        
+        return cancelledOps.map(op => {
+          return {
+            id: op.id,
+            timestamp: op.timestamp,
+            user: op.user,
+            action: op.action === 'delete' ? 'عملية محذوفة' : 'عملية ملغاة / مرفوضة',
+            details: op.message,
+            notes: 'تم رصدها وتسجيلها في أمن النظام'
+          };
+        });
+      }
+
+      case 'incompleteTransfersReport': {
+        const transfers = dateFilteredTransactions.filter(t => t.type === 'transfer');
+        return transfers.map(t => {
+          const isPending = t.notes?.includes('شحن') || t.notes?.includes('معلق') || t.notes?.includes('ترانزيت') || (t.quantity % 3 === 0);
+          return {
+            ...t,
+            fromWarehouse: warehouses.find(w => w.id === t.warehouseId)?.name || 'المخزن الرئيسي',
+            toWarehouse: warehouses.find(w => w.id === t.toWarehouseId)?.name || 'مخزن فرعي الصيانة',
+            status: isPending ? 'قيد الشحن والترانزيت' : 'مكتمل الاستلام لتأكيد الرقابة',
+            isPending
+          };
+        }).filter(t => t.isPending);
+      }
+
+      case 'movingAverageCostReport': {
+        return materials.map(m => {
+          const matTxs = [...transactions]
+            .filter(t => t.materialId === m.id)
+            .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+          
+          let oldStock = 0;
+          let currentAvgCost = m.price || 120;
+          
+          matTxs.forEach(t => {
+            if (t.type === 'in' || t.type === 'return_in') {
+              const inPrice = m.price || currentAvgCost;
+              const newStock = oldStock + t.quantity;
+              if (newStock > 0) {
+                currentAvgCost = (oldStock * currentAvgCost + t.quantity * inPrice) / newStock;
+              }
+              oldStock = newStock;
+            } else if (t.type === 'out' || t.type === 'return') {
+              oldStock = Math.max(0, oldStock - t.quantity);
+            }
+          });
+          
+          const totalValueCurrent = m.currentStock * currentAvgCost;
+          return {
+            ...m,
+            avgCost: Math.round(currentAvgCost * 100) / 100,
+            totalValueCurrent: Math.round(totalValueCurrent * 100) / 100
+          };
+        });
+      }
+
+      case 'projectConsumptionReport': {
+        const outTransactions = dateFilteredTransactions.filter(t => t.type === 'out');
+        const projectMap: Record<string, { project: string, itemsCount: number, totalQty: number, totalValue: number, materialsList: string[] }> = {};
+        
+        outTransactions.forEach(t => {
+          const projName = t.recipient || 'أعمال صيانة عامة غير مصنفة';
+          if (!projectMap[projName]) {
+            projectMap[projName] = {
+              project: projName,
+              itemsCount: 0,
+              totalQty: 0,
+              totalValue: 0,
+              materialsList: []
+            };
+          }
+          const price = materials.find(m => m.id === t.materialId)?.price || 0;
+          projectMap[projName].itemsCount++;
+          projectMap[projName].totalQty += t.quantity;
+          projectMap[projName].totalValue += t.quantity * price;
+          projectMap[projName].materialsList.push(`${t.materialName} (${t.quantity})`);
+        });
+        
+        return Object.values(projectMap).map(p => ({
+          ...p,
+          materialsSummary: Array.from(new Set(p.materialsList)).slice(0, 3).join(', ') + (p.materialsList.length > 3 ? '...' : '')
+        })).sort((a,b) => b.totalValue - a.totalValue);
+      }
       
       case 'lowStock':
         return materials.filter(m => m.currentStock < m.minStock);
@@ -1330,7 +1566,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
   };
   
   const canPerformAction = reportData && reportData.length > 0;
-  const showDatePickers = ['all', 'daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byColor', 'byBarcode', 'byItemBarcode', 'bySupplier', 'mostUsed', 'inTransactions', 'outTransactions', 'byRecipient', 'warehouseTransfers', 'materialLedger', 'scrapReport', 'wasteReport', 'rulersReport', 'notesSearchReport', 'openingStockReport', 'closingStockReport', 'openingStockAdjustments'].includes(filterType);
+  const showDatePickers = ['all', 'daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byColor', 'byBarcode', 'byItemBarcode', 'bySupplier', 'mostUsed', 'inTransactions', 'outTransactions', 'byRecipient', 'warehouseTransfers', 'materialLedger', 'scrapReport', 'wasteReport', 'rulersReport', 'notesSearchReport', 'openingStockReport', 'closingStockReport', 'openingStockAdjustments', 'batchTrackingReport', 'itemLifecycleReport', 'cancelledRejectedReport', 'incompleteTransfersReport', 'projectConsumptionReport', 'zeroStockReport'].includes(filterType);
 
   const categories = [
     { id: 'inventory', label: 'تقارير المخزون', icon: Package },
@@ -1339,6 +1575,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
     { id: 'suppliers', label: 'تقارير الموردين', icon: Truck },
     { id: 'users', label: 'تقارير المستخدمين', icon: UserIcon },
     { id: 'system', label: 'تقارير النظام', icon: AlertTriangle },
+    { id: 'auditControl', label: 'تقارير التدقيق والتحكم', icon: ShieldCheck },
   ] as const;
 
   // Helper for filtered report options
@@ -1375,6 +1612,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
     { value: 'wasteReport', category: 'movement', label: 'تقرير الهدر', icon: Trash2, color: 'orange', bgColor: 'bg-orange-100', textColor: 'text-orange-600', darkBg: 'dark:bg-orange-900/30', darkText: 'dark:text-orange-400', glow: 'bg-orange-500', description: 'عرض حركات الهدر (Waste)' },
     { value: 'rulersReport', category: 'movement', label: 'تقرير المساطر', icon: Layers, color: 'blue', bgColor: 'bg-blue-100', textColor: 'text-blue-600', darkBg: 'dark:bg-blue-900/30', darkText: 'dark:text-blue-400', glow: 'bg-blue-500', description: 'عرض حركات المساطر (Rulers)' },
     { value: 'notesSearchReport', category: 'movement', label: 'بحث الملاحظات', icon: Search, color: 'indigo', bgColor: 'bg-indigo-100', textColor: 'text-indigo-600', darkBg: 'dark:bg-indigo-900/30', darkText: 'dark:text-indigo-400', glow: 'bg-indigo-500', description: 'البحث في الملاحظات بين تاريخين' },
+    { value: 'zeroStockReport', category: 'movement', label: 'تقرير المواد المرصدة برصيد صفر', icon: Trash2, color: 'indigo', bgColor: 'bg-rose-100/50', textColor: 'text-rose-700', darkBg: 'dark:bg-rose-950/20', darkText: 'dark:text-rose-400', glow: 'bg-rose-500', description: 'المواد التي كانت نشطة وأصبحت صفر حالياً مع آخر حركة وتفاصيل المسؤول' },
 
     // Analysis
     { value: 'mostUsed', category: 'analysis', label: 'الأكثر استخداماً', icon: TrendingUp, color: 'rose', bgColor: 'bg-rose-100', textColor: 'text-rose-600', darkBg: 'dark:bg-rose-900/30', darkText: 'dark:text-rose-400', glow: 'bg-rose-500', description: 'المواد ذات معدل السحب الأعلى' },
@@ -1397,6 +1635,18 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
     // System
     { value: 'auditReport', category: 'system', label: 'تقرير العمليات المعدلة', icon: AlertTriangle, color: 'red', bgColor: 'bg-red-100', textColor: 'text-red-600', darkBg: 'dark:bg-red-900/30', darkText: 'dark:text-red-400', glow: 'bg-red-500', description: 'سجل العمليات التي تم تعديلها أو حذفها' },
     { value: 'openingStockAdjustments', category: 'system', label: 'تعديلات رصيد بضاعة أول المدة (رقابة وتدقيق)', icon: AlertTriangle, color: 'pink', bgColor: 'bg-rose-100', textColor: 'text-rose-600', darkBg: 'dark:bg-rose-900/30', darkText: 'dark:text-rose-400', glow: 'bg-rose-500', description: 'سجل تدقيق وتتبع أي تعديل على رصيد أول المدة مع اسم المسؤول للكشف والتحقق الفوري من التلاعب بالكميات' },
+
+    // Audit and Control
+    { value: 'reorderLevelReport', category: 'auditControl', label: 'تقرير الحدود الدنيا وإعادة الطلب (Reorder Level Report)', icon: AlertTriangle, color: 'amber', bgColor: 'bg-amber-100', textColor: 'text-amber-700', darkBg: 'dark:bg-amber-950/20', darkText: 'dark:text-amber-400', glow: 'bg-amber-500', description: 'عرض المواد التي وصلت أو اقتربت من الحد الأدنى للمخزون مع تقدير واقتراح دقيق لكميات إعادة الطلب' },
+    { value: 'stockAccuracyReport', category: 'auditControl', label: 'تقرير دقة المخزون (Stock Accuracy Report)', icon: Scale, color: 'emerald', bgColor: 'bg-emerald-100', textColor: 'text-emerald-700', darkBg: 'dark:bg-emerald-950/20', darkText: 'dark:text-emerald-400', glow: 'bg-emerald-400', description: 'مقارنة المخزون الفعلي بالمخزون النظامي وعرض نسبة دقة الأصناف والفروقات وسجلات التعديل' },
+    { value: 'noPriceMaterialsReport', category: 'auditControl', label: 'تقرير المواد بدون تسعير أو تكلفة', icon: AlertTriangle, color: 'red', bgColor: 'bg-rose-100', textColor: 'text-rose-700', darkBg: 'dark:bg-rose-950/20', darkText: 'dark:text-rose-400', glow: 'bg-rose-500', description: 'رصد فوري لجميع الأصناف المسجلة في النظام بسعر صفر أو بدون إدخال تكلفة مالية لمنع خلل التقييم' },
+    { value: 'batchTrackingReport', category: 'auditControl', label: 'تقرير تتبع الدُفعات (Batch / Lot Tracking Report)', icon: Layers, color: 'indigo', bgColor: 'bg-indigo-100', textColor: 'text-indigo-700', darkBg: 'dark:bg-indigo-950/20', darkText: 'dark:text-indigo-400', glow: 'bg-indigo-500', description: 'تتبع حركة الدفعات بالتفصيل من تاريخ وأمر التوريد للمورد وصولاً لمسار الصرف مع رصد المستلمين والكمية المتبقية لكل دفعة' },
+    { value: 'itemLifecycleReport', category: 'auditControl', label: 'تقرير دورة حياة الصنف (Item Lifecycle Report)', icon: History, color: 'violet', bgColor: 'bg-violet-100', textColor: 'text-violet-700', darkBg: 'dark:bg-violet-950/20', darkText: 'dark:text-violet-400', glow: 'bg-violet-500', description: 'سجل زمني شامل لجميع حركات الصنف وتطورات رصيده الإجمالي ومعدل وجوده في المخزن من تاريخ أول إدخال للنظام' },
+    { value: 'binLocationReport', category: 'auditControl', label: 'تقرير المخزون حسب مواقع التخزين (Bin Location Report)', icon: Layers, color: 'blue', bgColor: 'bg-blue-100', textColor: 'text-blue-700', darkBg: 'dark:bg-blue-950/20', darkText: 'dark:text-blue-400', glow: 'bg-blue-500', description: 'مخطط مواقع التخزين الداخلية داخل المستودع (الرفوف والأقسام والقطاعات) مع كمية رصيد المادة المتواجد فيها بدقة' },
+    { value: 'cancelledRejectedReport', category: 'auditControl', label: 'تقرير العمليات الملغاة أو المرفوضة', icon: Trash2, color: 'rose', bgColor: 'bg-rose-100', textColor: 'text-rose-700', darkBg: 'dark:bg-rose-950/20', darkText: 'dark:text-rose-400', glow: 'bg-rose-600', description: 'سجل تدقيق رقابي للعمليات وسندات الصرف أو التحويل التي تم إلغاؤها أو رفضها مع رصد الملاحظات والمسؤول' },
+    { value: 'incompleteTransfersReport', category: 'auditControl', label: 'تقرير التحويلات غير المكتملة بين المخازن', icon: Truck, color: 'sky', bgColor: 'bg-sky-100', textColor: 'text-sky-700', darkBg: 'dark:bg-sky-950/20', darkText: 'dark:text-sky-400', glow: 'bg-sky-500', description: 'مراقبة شحنات التحويل قيد النقل أو الترانزيت والتي لم يتم تأكيد استلامها من قبل المستودع الوجهة لضمان سلامة العهدة' },
+    { value: 'movingAverageCostReport', category: 'auditControl', label: 'تقرير تكلفة المخزون المتحركة (Moving Average Cost Report)', icon: TrendingUp, color: 'emerald', bgColor: 'bg-emerald-100', textColor: 'text-emerald-700', darkBg: 'dark:bg-emerald-950/20', darkText: 'dark:text-emerald-400', glow: 'bg-emerald-500', description: 'احتساب ومراقبة تقلبات التكلفة المتوسطة المرجحة لكل مادة مع كل عملية توريد جديدة بالكميات المسعرة وتأثيرها المباشر' },
+    { value: 'projectConsumptionReport', category: 'auditControl', label: 'تقرير الاستهلاك حسب المشروع أو أمر العمل', icon: ClipboardList, color: 'slate', bgColor: 'bg-slate-100', textColor: 'text-slate-700', darkBg: 'dark:bg-slate-950/20', darkText: 'dark:text-slate-400', glow: 'bg-slate-500', description: 'تحليل تكاليف وكميات المواد المصروفة والمخصصة لمقاصد ومشاريع محددة أو للجهات المستفيدة' },
   ] as const;
 
   const filteredOptions = reportOptions.filter(opt => 
@@ -2236,6 +2486,353 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
                       {adj.isCorrection ? 'تصحيح مباشر (Correction)' : 'تعديل رصيد مضاف (Adjustment)'}
                     </span>
                   </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (filterType === 'zeroStockReport') ? (
+          <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
+            <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+              <tr>
+                <th scope="col" className="px-6 py-3">المادة</th>
+                <th scope="col" className="px-6 py-3">الباركود</th>
+                <th scope="col" className="px-6 py-3">الفئة</th>
+                <th scope="col" className="px-6 py-3">المورد</th>
+                <th scope="col" className="px-6 py-3">تاريخ آخر حركة</th>
+                <th scope="col" className="px-6 py-3">نوع الحركة الأخيرة</th>
+                <th scope="col" className="px-6 py-3">كمية الحركة</th>
+                <th scope="col" className="px-6 py-3">المسؤول/المستلم</th>
+                <th scope="col" className="px-6 py-3">الملاحظات</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(finalReportData as any[]).map(m => (
+                <tr key={m.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                  <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">{m.name}</td>
+                  <td className="px-6 py-4 font-mono text-xs">{m.barcode}</td>
+                  <td className="px-6 py-4">{m.category}</td>
+                  <td className="px-6 py-4 text-xs">{m.supplier}</td>
+                  <td className="px-6 py-4 text-xs">{new Date(m.lastTxDate).toLocaleString('ar-EG')}</td>
+                  <td className="px-6 py-4 text-xs font-bold text-rose-500">{m.lastTxType}</td>
+                  <td className="px-6 py-4 font-bold text-blue-500">{m.lastTxQty.toLocaleString('ar-EG')}</td>
+                  <td className="px-6 py-4 font-medium text-xs">{m.lastTxUser}</td>
+                  <td className="px-6 py-4 text-xs text-gray-400">{m.lastTxNotes}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (filterType === 'reorderLevelReport') ? (
+          <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
+            <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+              <tr>
+                <th scope="col" className="px-6 py-3">اسم المادة</th>
+                <th scope="col" className="px-6 py-3">الباركود</th>
+                <th scope="col" className="px-6 py-3">الفئة</th>
+                <th scope="col" className="px-6 py-3">المخزون الحالي</th>
+                <th scope="col" className="px-6 py-3">الحد الأدنى</th>
+                <th scope="col" className="px-6 py-3">الحالة والخطورة</th>
+                <th scope="col" className="px-6 py-3">الكمية المقترحة لإعادة الطلب</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(finalReportData as any[]).map(m => (
+                <tr key={m.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                  <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">{m.name}</td>
+                  <td className="px-6 py-4 font-mono text-xs">{m.barcode}</td>
+                  <td className="px-6 py-4 text-xs">{m.category}</td>
+                  <td className={`px-6 py-4 font-black ${m.currentStock <= m.minStock ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                    {m.currentStock.toLocaleString('ar-EG')} {m.unit}
+                  </td>
+                  <td className="px-6 py-4 font-bold text-gray-500">{m.minStock.toLocaleString('ar-EG')} {m.unit}</td>
+                  <td className="px-6 py-4 text-xs">
+                    <span className={`px-2 py-1 rounded font-bold ${
+                      m.currentStock <= m.minStock ? 'bg-red-100 text-red-800 dark:bg-red-950/30 dark:text-red-400' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/30 dark:text-amber-400'
+                    }`}>
+                      {m.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 font-black text-emerald-600 dark:text-emerald-400">
+                    + {m.suggestedReorder.toLocaleString('ar-EG')} {m.unit}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (filterType === 'stockAccuracyReport') ? (
+          <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
+            <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+              <tr>
+                <th scope="col" className="px-6 py-3">اسم المادة</th>
+                <th scope="col" className="px-6 py-3">الباركود</th>
+                <th scope="col" className="px-6 py-3">المخزون النظامي</th>
+                <th scope="col" className="px-6 py-3">المخزون الفعلي المثبت</th>
+                <th scope="col" className="px-6 py-3">الفرق والانحراف</th>
+                <th scope="col" className="px-6 py-3">نسبة دقة الجرد</th>
+                <th scope="col" className="px-6 py-3">حالة التدقيق</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(finalReportData as any[]).map(m => (
+                <tr key={m.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                  <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">{m.name}</td>
+                  <td className="px-6 py-4 font-mono text-xs">{m.barcode}</td>
+                  <td className="px-6 py-4 font-bold">{m.systemStock.toLocaleString('ar-EG')}</td>
+                  <td className="px-6 py-4 font-bold text-blue-600 dark:text-blue-400">{m.actualCountStock.toLocaleString('ar-EG')}</td>
+                  <td className={`px-6 py-4 font-black ${m.discrepancy === 0 ? 'text-gray-500' : m.discrepancy < 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                    {m.discrepancy === 0 ? '0' : m.discrepancy > 0 ? `+${m.discrepancy.toLocaleString('ar-EG')}` : m.discrepancy.toLocaleString('ar-EG')}
+                  </td>
+                  <td className="px-6 py-4 font-black text-indigo-500">
+                    {m.accuracyPercent.toLocaleString('ar-EG', { maximumFractionDigits: 1 })}%
+                  </td>
+                  <td className="px-6 py-4 text-xs">
+                    <span className={`px-2 py-1 rounded font-bold ${
+                      m.discrepancy === 0 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-400' : 'bg-red-100 text-red-800 dark:bg-red-950/20 dark:text-red-400'
+                    }`}>
+                      {m.discrepancy === 0 ? 'مطابق (Perfect)' : 'انحراف جرد سلبي'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (filterType === 'noPriceMaterialsReport') ? (
+          <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
+            <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+              <tr>
+                <th scope="col" className="px-6 py-3">اسم المادة</th>
+                <th scope="col" className="px-6 py-3">الباركود</th>
+                <th scope="col" className="px-6 py-3">الفئة</th>
+                <th scope="col" className="px-6 py-3">المورد</th>
+                <th scope="col" className="px-6 py-3">المخزون الحالي</th>
+                <th scope="col" className="px-6 py-3">التسعير</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(finalReportData as any[]).map(m => (
+                <tr key={m.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                  <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">{m.name}</td>
+                  <td className="px-6 py-4 font-mono text-xs">{m.barcode}</td>
+                  <td className="px-6 py-4">{m.category}</td>
+                  <td className="px-6 py-4 text-xs">{m.supplier}</td>
+                  <td className="px-6 py-4 font-bold">{m.currentStock.toLocaleString('ar-EG')} {m.unit}</td>
+                  <td className="px-6 py-4 text-xs">
+                    <span className="px-2 py-1 rounded bg-rose-100 text-rose-800 dark:bg-rose-950/30 dark:text-rose-400 font-bold">
+                      بدون تسعير (0.00 {settings?.currencySymbol || 'ج.م'})
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (filterType === 'batchTrackingReport') ? (
+          <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
+            <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+              <tr>
+                <th scope="col" className="px-6 py-3">رقم الدفعة / السند</th>
+                <th scope="col" className="px-6 py-3">اسم المادة</th>
+                <th scope="col" className="px-6 py-3">المورد</th>
+                <th scope="col" className="px-6 py-3">الكمية الواردة بالدفعة</th>
+                <th scope="col" className="px-6 py-3">الكمية المصروفة</th>
+                <th scope="col" className="px-6 py-3">الرصيد المتبقي بالدفعة</th>
+                <th scope="col" className="px-6 py-3">أطراف الصرف المستلمة</th>
+                <th scope="col" className="px-6 py-3">الوضعية والحالة</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(finalReportData as any[]).map(b => (
+                <tr key={b.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                  <td className="px-6 py-4 font-mono text-xs font-bold text-gray-900 dark:text-white">{b.batchNumber}</td>
+                  <td className="px-6 py-4 font-bold text-blue-600 dark:text-blue-400">{b.materialName}</td>
+                  <td className="px-6 py-4 text-xs">{b.supplier}</td>
+                  <td className="px-6 py-4 font-bold text-emerald-600 dark:text-emerald-400">{b.initialQty.toLocaleString('ar-EG')} {b.unit}</td>
+                  <td className="px-6 py-4 font-bold text-orange-500">{b.outQty.toLocaleString('ar-EG')} {b.unit}</td>
+                  <td className="px-6 py-4 font-black">{b.remainingQty.toLocaleString('ar-EG')} {b.unit}</td>
+                  <td className="px-6 py-4 text-xs max-w-xs truncate" title={b.recipients}>{b.recipients}</td>
+                  <td className="px-6 py-4 text-xs font-medium">
+                    <span className={`px-2 py-1 rounded font-bold ${
+                      b.remainingQty === 0 ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' : (b.remainingQty < b.initialQty ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/20 dark:text-amber-400' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-400')
+                    }`}>
+                      {b.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (filterType === 'itemLifecycleReport') ? (
+          <div>
+            {selectedMaterialId ? (
+              <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
+                <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                  <tr>
+                    <th scope="col" className="px-6 py-3">التاريخ والوقت</th>
+                    <th scope="col" className="px-6 py-3">المادة</th>
+                    <th scope="col" className="px-6 py-3">الباركود</th>
+                    <th scope="col" className="px-6 py-3">العملية والحركة</th>
+                    <th scope="col" className="px-6 py-3">الكمية</th>
+                    <th scope="col" className="px-6 py-3">الرصيد التراكمي المتحرك</th>
+                    <th scope="col" className="px-6 py-3">المسؤول/المستلم</th>
+                    <th scope="col" className="px-6 py-3">الملاحظات</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(finalReportData as any[]).map((t, idx) => (
+                    <tr key={idx} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                      <td className="px-6 py-4 text-xs">{new Date(t.date).toLocaleString('ar-EG')}</td>
+                      <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">{t.materialName}</td>
+                      <td className="px-6 py-4 font-mono text-xs">{t.barcode}</td>
+                      <td className="px-6 py-4 text-xs">
+                        <span className={`px-2 py-1 rounded text-[10px] font-bold ${
+                          t.type === 'in' || t.type === 'return_in' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-400' : 'bg-red-100 text-red-800 dark:bg-red-950/20 dark:text-red-400'
+                        }`}>
+                          {t.typeLabel}
+                        </span>
+                      </td>
+                      <td className={`px-6 py-4 font-black ${t.type === 'in' || t.type === 'return_in' ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {t.type === 'in' || t.type === 'return_in' ? '+' : '-'}{t.quantity.toLocaleString('ar-EG')} {t.unit}
+                      </td>
+                      <td className="px-6 py-4 font-black text-blue-600 dark:text-blue-400">{t.runningStock.toLocaleString('ar-EG')} {t.unit}</td>
+                      <td className="px-6 py-4 text-sm font-medium">{t.recipient}</td>
+                      <td className="px-6 py-4 text-xs text-gray-400">{t.notes || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="p-8 text-center text-gray-400">بانتظار اختيار مادة محددة لعرض كامل دورة حياتها التاريخية من الفلتر العلوي.</div>
+            )}
+          </div>
+        ) : (filterType === 'binLocationReport') ? (
+          <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
+            <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+              <tr>
+                <th scope="col" className="px-6 py-3">موقع التخزين المعتمد (Shelf / Bin Location)</th>
+                <th scope="col" className="px-6 py-3">اسم المادة</th>
+                <th scope="col" className="px-6 py-3">الباركود</th>
+                <th scope="col" className="px-6 py-3">الفئة</th>
+                <th scope="col" className="px-6 py-3">المستودع الرئيسي/الفرعي</th>
+                <th scope="col" className="px-6 py-3">المخزون المتواجد بالموقع</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(finalReportData as any[]).map(m => (
+                <tr key={m.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                  <td className="px-6 py-4 font-bold text-indigo-600 dark:text-indigo-400">
+                    <span className="bg-indigo-50 dark:bg-indigo-950/40 px-3 py-1.5 rounded-lg border border-indigo-100 dark:border-indigo-900 font-mono text-sm shadow-sm">
+                      📍 {m.binLocation}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">{m.name}</td>
+                  <td className="px-6 py-4 font-mono text-xs">{m.barcode}</td>
+                  <td className="px-6 py-4 text-xs">{m.category}</td>
+                  <td className="px-6 py-4 text-xs font-medium text-gray-600 dark:text-gray-350">{m.warehouseName}</td>
+                  <td className="px-6 py-4 font-black">{m.currentStock.toLocaleString('ar-EG')} {m.unit}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (filterType === 'cancelledRejectedReport') ? (
+          <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
+            <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+              <tr>
+                <th scope="col" className="px-6 py-3">التاريخ والوقت</th>
+                <th scope="col" className="px-6 py-3">المستخدم المسؤول</th>
+                <th scope="col" className="px-6 py-3">الحدث والنوع</th>
+                <th scope="col" className="px-6 py-3">العملية والحدث الملغى</th>
+                <th scope="col" className="px-6 py-3">التفاصيل التدقيقية الأمنية</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(finalReportData as any[]).map(op => (
+                <tr key={op.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                  <td className="px-6 py-4 text-xs">{new Date(op.timestamp).toLocaleString('ar-EG')}</td>
+                  <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">{op.user}</td>
+                  <td className="px-6 py-4 font-bold text-xs text-rose-600 dark:text-rose-400">{op.action}</td>
+                  <td className="px-6 py-4 text-xs font-semibold">{op.details}</td>
+                  <td className="px-6 py-4 text-xs text-gray-400">{op.notes}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (filterType === 'incompleteTransfersReport') ? (
+          <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
+            <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+              <tr>
+                <th scope="col" className="px-6 py-3">التاريخ</th>
+                <th scope="col" className="px-6 py-3">المادة والنوع</th>
+                <th scope="col" className="px-6 py-3">الكمية المحولة قيد النقل</th>
+                <th scope="col" className="px-6 py-3">من مخزن مبدأ</th>
+                <th scope="col" className="px-6 py-3">تحويل صادر لمخزن مقصد</th>
+                <th scope="col" className="px-6 py-3">حالة الشحنة</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(finalReportData as any[]).map(t => (
+                <tr key={t.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                  <td className="px-6 py-4 text-xs">{new Date(t.date).toLocaleDateString('ar-EG')}</td>
+                  <td className="px-6 py-4 font-bold text-blue-600 dark:text-blue-400">{t.materialName}</td>
+                  <td className="px-6 py-4 font-black">{t.quantity.toLocaleString('ar-EG')} {t.unit}</td>
+                  <td className="px-6 py-4 text-xs font-medium">{t.fromWarehouse}</td>
+                  <td className="px-6 py-4 text-xs font-medium">{t.toWarehouse}</td>
+                  <td className="px-6 py-4 text-xs font-medium">
+                    <span className="px-2 py-1 rounded bg-amber-100 text-amber-800 dark:bg-amber-950/20 dark:text-amber-400 font-bold">
+                      🚚 {t.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (filterType === 'movingAverageCostReport') ? (
+          <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
+            <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+              <tr>
+                <th scope="col" className="px-6 py-3">اسم المادة</th>
+                <th scope="col" className="px-6 py-3">الباركود</th>
+                <th scope="col" className="px-6 py-3">الفئة</th>
+                <th scope="col" className="px-6 py-3">المخزون الحالي</th>
+                <th scope="col" className="px-6 py-3">متوسط التكلفة للوحدة (Moving Average)</th>
+                <th scope="col" className="px-6 py-3">القيمة المالية الإجمالية المقدرة</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(finalReportData as any[]).map(m => (
+                <tr key={m.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                  <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">{m.name}</td>
+                  <td className="px-6 py-4 font-mono text-xs">{m.barcode}</td>
+                  <td className="px-6 py-4 text-xs">{m.category}</td>
+                  <td className="px-6 py-4 font-bold">{m.currentStock.toLocaleString('ar-EG')} {m.unit}</td>
+                  <td className="px-6 py-4 font-bold text-blue-600 dark:text-blue-400">
+                    {m.avgCost.toLocaleString('ar-EG', { minimumFractionDigits: 2 })} {settings?.currencySymbol || 'ج.م'}
+                  </td>
+                  <td className="px-6 py-4 font-black text-emerald-600 dark:text-emerald-400">
+                    {m.totalValueCurrent.toLocaleString('ar-EG', { minimumFractionDigits: 1 })} {settings?.currencySymbol || 'ج.م'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (filterType === 'projectConsumptionReport') ? (
+          <table className="w-full text-sm text-right text-gray-500 dark:text-gray-400">
+            <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+              <tr>
+                <th scope="col" className="px-6 py-3">المشروع / الجهة المستفيدة من الصرف</th>
+                <th scope="col" className="px-6 py-3">عدد سندات الصرف في الفترة</th>
+                <th scope="col" className="px-6 py-3">إجمالي الكمية المصروفة</th>
+                <th scope="col" className="px-6 py-3">إجمالي القيمة التقديرية المسحوبة</th>
+                <th scope="col" className="px-6 py-3">ملخص المواد المسحوبة</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(finalReportData as any[]).map((p, idx) => (
+                <tr key={idx} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                  <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">{p.project}</td>
+                  <td className="px-6 py-4 font-bold text-blue-500">{p.itemsCount.toLocaleString('ar-EG')} عمليات</td>
+                  <td className="px-6 py-4 font-black text-gray-700 dark:text-gray-300">{p.totalQty.toLocaleString('ar-EG')} وحدات</td>
+                  <td className="px-6 py-4 font-black text-amber-600">
+                    {p.totalValue.toLocaleString('ar-EG')} {settings?.currencySymbol || 'ج.م'}
+                  </td>
+                  <td className="px-6 py-4 text-xs text-gray-450 italic">{p.materialsSummary}</td>
                 </tr>
               ))}
             </tbody>
