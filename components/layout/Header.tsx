@@ -21,7 +21,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, toggleSidebar, onSearch
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isUpdatesOpen, setUpdatesOpen] = useState(false);
   const [hasNewUpdates, setHasNewUpdates] = useState(() => {
-    return localStorage.getItem('seen_updates_reports_2026') !== 'true';
+    return localStorage.getItem('seen_updates_reports_fresh_v3') !== 'true';
   });
 
   const handleToggleUpdates = () => {
@@ -29,7 +29,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, toggleSidebar, onSearch
     setNotificationsOpen(false);
     setDropdownOpen(false);
     if (hasNewUpdates) {
-      localStorage.setItem('seen_updates_reports_2026', 'true');
+      localStorage.setItem('seen_updates_reports_fresh_v3', 'true');
       setHasNewUpdates(false);
     }
   };
@@ -142,7 +142,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, toggleSidebar, onSearch
             <div className="absolute left-0 mt-2 w-80 bg-white rounded-xl shadow-xl py-2 dark:bg-gray-800 z-30 border dark:border-gray-700 max-h-[480px] flex flex-col md:w-96 text-right">
               <div className="px-4 py-3 border-b dark:border-gray-700 flex justify-between items-center bg-emerald-50/50 dark:bg-emerald-950/10 sticky top-0">
                 <h3 className="font-bold text-sm text-gray-950 dark:text-white flex items-center gap-1.5">
-                  <Sparkles size={16} className="text-emerald-500 ml-1.5" />
+                  <Sparkles size={16} className="text-emerald-500 ml-1.5 animate-bounce" />
                   أحدث الإضافات والتحديثات للنظام 🚀
                 </h3>
                 <button 
@@ -153,78 +153,46 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, toggleSidebar, onSearch
                 </button>
               </div>
               <div className="overflow-y-auto flex-1 p-4 space-y-4 text-right">
-                <div className="bg-sky-50 dark:bg-sky-950/20 border border-sky-100 dark:border-sky-900/50 rounded-lg p-3 text-xs leading-relaxed text-gray-700 dark:text-gray-300">
-                  <span className="font-bold text-sky-800 dark:text-sky-400 block mb-1">📢 تنويه مهم للمستخدمين</span>
-                  رغبةً في زيادة أمان النظام والرقابة على حركة المستودع، تم إضافة تقارير وإجراءات حماية جديدة بالكامل للتدقيق وتتبع الحركة لتقليل الفروقات المالية وحماية العهدة.
+                <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/50 rounded-lg p-3 text-xs leading-relaxed text-emerald-800 dark:text-emerald-300 font-medium">
+                  <span className="font-bold block mb-1">📢 تحديثات الرقابة، الجرد والبحث الفوري (جديد!)</span>
+                  لقد أضفنا باقة تحسينات كبرى بطلبكم لتبسيط التدقيق والتحكم ومنع الأخطاء في جرد المخزون، مع إتاحة خيارات طباعة وحفظ احترافية ودقيقة لكافة الجداول!
                 </div>
 
                 <div className="space-y-3">
                   <h4 className="font-bold text-xs text-gray-800 dark:text-gray-200 border-b dark:border-gray-700 pb-1 flex items-center gap-1.5">
-                    <span>📊</span> باقة تقارير الرقابة والتدقيق الجديدة بالكامل
+                    <span>✨</span> الميزات الجديدة المضافة حديثاً
                   </h4>
                   
                   <div className="space-y-3 pr-1">
                     <div className="flex items-start gap-2 text-xs">
-                      <span className="text-emerald-500 font-bold">●</span>
+                      <span className="text-rose-500 font-bold text-sm leading-none">•</span>
                       <div>
-                        <strong className="text-gray-900 dark:text-white block">تقرير المواد بدون تسعير أو تكلفة</strong>
-                        <span className="text-gray-500 dark:text-gray-400 text-[11px] block mt-0.5">رصد فوري لكافة الأصناف المسجلة بسعر صفر أو بدون تكلفة مالية لمنع الخلل في التقييم.</span>
+                        <strong className="text-gray-900 dark:text-white block">إدخال الجرد الفعلي يدوياً</strong>
+                        <span className="text-gray-500 dark:text-gray-400 text-[11px] block mt-0.5">في تقرير "تتبع دقة المخزون"، تم جعل خانة المخزون الفعلي قابلة للتعديل يدوياً وإدخال الكمية الحقيقية لتقوم الحاسبة فوراً باستخراج الفروقات والانحرافات مع حفظ التقارير في الذاكرة.</span>
                       </div>
                     </div>
 
                     <div className="flex items-start gap-2 text-xs">
-                      <span className="text-emerald-500 font-bold">●</span>
+                      <span className="text-rose-500 font-bold text-sm leading-none">•</span>
                       <div>
-                        <strong className="text-gray-900 dark:text-white block">تقرير تتبع دقيق للدفعات (Batch Tracking)</strong>
-                        <span className="text-gray-500 dark:text-gray-400 text-[11px] block mt-0.5">تتبع الدفعات بالتفصيل من سند التوريد لمسار الصرف للمستلم وحساب الكميات المتبقية.</span>
+                        <strong className="text-gray-900 dark:text-white block">ميزة البحث الفوري الشامل</strong>
+                        <span className="text-gray-500 dark:text-gray-400 text-[11px] block mt-0.5">أضفنا محرك بحث سريع ورئيسي في صنف "التدقيق والتحكم" و "دورة حياة الصنف" لفلترة وتصفية الجداول بدقة واختيار أي مادة أو صنف فوري بنقرة واحدة.</span>
                       </div>
                     </div>
 
                     <div className="flex items-start gap-2 text-xs">
-                      <span className="text-emerald-500 font-bold">●</span>
+                      <span className="text-rose-500 font-bold text-sm leading-none">•</span>
                       <div>
-                        <strong className="text-gray-900 dark:text-white block">تقرير دورة حياة الصنف التاريخية</strong>
-                        <span className="text-gray-500 dark:text-gray-400 text-[11px] block mt-0.5">خط زمني كامل لحركة الصنف الإجمالية والكمية التراكمية من أول إدخال للنظام.</span>
+                        <strong className="text-gray-900 dark:text-white block">طباعة متطابقة 100% لكافة التقارير</strong>
+                        <span className="text-gray-500 dark:text-gray-400 text-[11px] block mt-0.5">تم إصلاح مشكلة عدم تطابق الطباعة لجميع تقارير صنف "التدقيق والتحكم" والتبويب بأكمله و "تقرير مواد مرصدة"، لتصبح مخرجات الـ PDF والطباعة تعكس الجدول المعروض تماماً بذات السطور والأرقام والفرز.</span>
                       </div>
                     </div>
 
                     <div className="flex items-start gap-2 text-xs">
-                      <span className="text-emerald-500 font-bold">●</span>
+                      <span className="text-rose-500 font-bold text-sm leading-none">•</span>
                       <div>
-                        <strong className="text-gray-900 dark:text-white block">تقرير مواقع التخزين (Bin Locations)</strong>
-                        <span className="text-gray-500 dark:text-gray-400 text-[11px] block mt-0.5">رسم تخطيطي للمواقع الداخلية (الأرفف والقطاعات وكمية الرصيد فيها بدقة).</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start gap-2 text-xs">
-                      <span className="text-emerald-500 font-bold">●</span>
-                      <div>
-                        <strong className="text-gray-900 dark:text-white block">تقرير الأحداث والعمليات الملغاة ورقابة التدقيق</strong>
-                        <span className="text-gray-500 dark:text-gray-400 text-[11px] block mt-0.5">سجل تدقيق رقابي للتحقق الأمني من كافة الحركات المحذوفة أو المرفوضة والملاحظات حولها.</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start gap-2 text-xs">
-                      <span className="text-emerald-500 font-bold">●</span>
-                      <div>
-                        <strong className="text-gray-900 dark:text-white block">تقرير التحويلات المقصدية غير المكتملة</strong>
-                        <span className="text-gray-500 dark:text-gray-400 text-[11px] block mt-0.5">متابعة التحويلات المعلقة قيد الشحن أو الترانزيت التي لم يتم تأكيد استلامها.</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start gap-2 text-xs">
-                      <span className="text-emerald-500 font-bold">●</span>
-                      <div>
-                        <strong className="text-gray-900 dark:text-white block">تقرير تكلفة المخزون المتوسطة المتحركة (Moving Average)</strong>
-                        <span className="text-gray-500 dark:text-gray-400 text-[11px] block mt-0.5">احتساب ذكي لتكلفة المخزون المرجحة مع كل عملية توريد مالي جديدة.</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start gap-2 text-xs">
-                      <span className="text-emerald-500 font-bold">●</span>
-                      <div>
-                        <strong className="text-gray-900 dark:text-white block">تقرير استهلاك المواد حسب المشاريع والجهات</strong>
-                        <span className="text-gray-500 dark:text-gray-400 text-[11px] block mt-0.5">تحليل مالي وكمي شامل لكافة المسحوبات وسندات الصرف لكل جهة ومشروع.</span>
+                        <strong className="text-gray-900 dark:text-white block">تسمية دقيقة وسهلة للتقارير</strong>
+                        <span className="text-gray-500 dark:text-gray-400 text-[11px] block mt-0.5">تعديل تسمية تقرير "المواد المرصدة برصيد صفر" ليصبح بمسماه الواضح والمطلوب: "تقرير مواد مرصدة" فقط تيسيراً لعرضه وإرساله لقسم المحاسبة.</span>
                       </div>
                     </div>
                   </div>
@@ -232,13 +200,13 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, toggleSidebar, onSearch
 
                 <div className="space-y-3 pt-2">
                   <h4 className="font-bold text-xs text-gray-800 dark:text-gray-200 border-b dark:border-gray-700 pb-1 flex items-center gap-1.5">
-                    <span>📁</span> تصدير البيانات والتحميل الذكي
+                    <span>📁</span> تصدير مستند مرتجعات الموردين
                   </h4>
                   <div className="flex items-start gap-2 text-xs">
-                    <span className="text-emerald-500 font-bold">●</span>
+                    <span className="text-emerald-500 font-bold text-sm leading-none">•</span>
                     <div>
-                      <strong className="text-gray-900 dark:text-white block">تصدير فوري وبصيغ Excel الاحترافية</strong>
-                      <span className="text-gray-500 dark:text-gray-400 text-[11px] block mt-0.5">تحميل وتصدير مباشر للبيانات والتقارير لمشاركتها مع الإدارات والمحاسبين.</span>
+                      <strong className="text-gray-900 dark:text-white block">سند المرتجع لقسم المحاسبة</strong>
+                      <span className="text-gray-500 dark:text-gray-400 text-[11px] block mt-0.5">إتاحة توليد وحفظ وتصدير سندات مرتجعات الموردين المباشرة (Excel / PDF / صورة) وإرسالها فورياً لإثبات التبادل المالي والكمي.</span>
                     </div>
                   </div>
                 </div>
@@ -248,7 +216,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, toggleSidebar, onSearch
                   onClick={() => setUpdatesOpen(false)}
                   className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm"
                 >
-                  فهمت، شكراً لك! 👍
+                  فهمت الإضافات الجديدة، رائع! 👍
                 </button>
               </div>
             </div>

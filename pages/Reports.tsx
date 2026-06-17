@@ -341,6 +341,30 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
   });
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedMaterialId, setSelectedMaterialId] = useState(materials[0]?.id || '');
+
+  const [manualPhysicalStocks, setManualPhysicalStocks] = useState<Record<string, number>>(() => {
+    try {
+      const stored = localStorage.getItem('reports_actual_physical_stocks');
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const updatePhysicalStock = (materialId: string, val: string) => {
+    const freshVal = val === '' ? NaN : Number(val);
+    const updated = {
+      ...manualPhysicalStocks,
+      [materialId]: freshVal,
+    };
+    setManualPhysicalStocks(updated);
+    try {
+      localStorage.setItem('reports_actual_physical_stocks', JSON.stringify(updated));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const [selectedBarcode, setSelectedBarcode] = useState('');
   const [selectedItemBarcode, setSelectedItemBarcode] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -933,23 +957,25 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
       }
 
       case 'stockAccuracyReport': {
-        const adjustments = getOpeningStockAdjustments();
         return materials.map(m => {
-          const materialAdjs = adjustments.filter(adj => adj.barcode === m.barcode);
-          const discrepancy = materialAdjs.reduce((sum, adj) => sum + adj.difference, 0);
           const systemStock = m.currentStock;
-          const actualStock = Math.max(0, systemStock - discrepancy);
-          const discrepancyAbsolute = Math.abs(discrepancy);
-          const accuracyPercent = systemStock > 0 
-            ? Math.max(0, Math.min(100, (1 - discrepancyAbsolute / (systemStock + discrepancyAbsolute)) * 100))
-            : (discrepancyAbsolute > 0 ? 0 : 100);
+          const enteredActual = manualPhysicalStocks[m.id];
+          const hasEntered = enteredActual !== undefined && !isNaN(enteredActual);
+          const actualStock = hasEntered ? enteredActual : null;
+          const discrepancy = hasEntered ? (enteredActual - systemStock) : null;
+          const discrepancyAbsolute = discrepancy !== null ? Math.abs(discrepancy) : 0;
+          const accuracyPercent = discrepancy !== null 
+            ? (systemStock > 0 
+                ? Math.max(0, Math.min(100, (1 - discrepancyAbsolute / systemStock) * 100))
+                : (discrepancyAbsolute > 0 ? 0 : 100))
+            : null;
           return {
             ...m,
             systemStock,
             actualCountStock: actualStock,
             discrepancy,
-            accuracyPercent: Math.round(accuracyPercent * 10) / 10,
-            adjustmentCount: materialAdjs.length
+            accuracyPercent: accuracyPercent !== null ? Math.round(accuracyPercent * 10) / 10 : null,
+            adjustmentCount: 0
           };
         });
       }
@@ -1209,9 +1235,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
     
     const query = reportSearchQuery.toLowerCase();
     
-    const transactionReports: ReportType[] = ['all', 'daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byColor', 'byBarcode', 'byItemBarcode', 'bySupplier', 'inTransactions', 'outTransactions', 'byRecipient', 'warehouseTransfers', 'materialLedger', 'scrapReport', 'wasteReport', 'rulersReport', 'notesSearchReport'];
-    
-    if (transactionReports.includes(filterType)) {
+    if (['all', 'daily', 'weekly', 'monthly', 'byMaterial', 'byCategory', 'byColor', 'byBarcode', 'byItemBarcode', 'bySupplier', 'inTransactions', 'outTransactions', 'byRecipient', 'warehouseTransfers', 'materialLedger', 'scrapReport', 'wasteReport', 'rulersReport', 'notesSearchReport', 'supplierReturns'].includes(filterType)) {
       return (data as Transaction[]).filter(t => 
         t.materialName?.toLowerCase().includes(query) ||
         t.barcode?.toLowerCase().includes(query) ||
@@ -1223,14 +1247,61 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
       );
     }
     
-    const materialReports: ReportType[] = ['totalCount', 'lowStock', 'inactive', 'deadStock', 'expiryReport', 'reservedStockReport', 'inventoryValue', 'supplierInventoryValue', 'openingStockReport', 'closingStockReport'];
-    if (materialReports.includes(filterType)) {
-        return (data as Material[]).filter(m => 
+    if (['totalCount', 'lowStock', 'inactive', 'deadStock', 'expiryReport', 'reservedStockReport', 'inventoryValue', 'supplierInventoryValue', 'openingStockReport', 'closingStockReport', 'reorderLevelReport', 'stockAccuracyReport', 'noPriceMaterialsReport', 'binLocationReport', 'movingAverageCostReport', 'zeroStockReport'].includes(filterType)) {
+        return (data as any[]).filter(m => 
             m.name?.toLowerCase().includes(query) ||
             m.barcode?.toLowerCase().includes(query) ||
             m.category?.toLowerCase().includes(query) ||
-            m.supplier?.toLowerCase().includes(query)
+            m.supplier?.toLowerCase().includes(query) ||
+            m.binLocation?.toLowerCase().includes(query) ||
+            m.lastTxUser?.toLowerCase().includes(query) ||
+            m.lastTxNotes?.toLowerCase().includes(query)
         );
+    }
+
+    if (filterType === 'batchTrackingReport') {
+      return (data as any[]).filter(b => 
+        b.batchNumber?.toLowerCase().includes(query) ||
+        b.materialName?.toLowerCase().includes(query) ||
+        b.supplier?.toLowerCase().includes(query) ||
+        b.recipients?.toLowerCase().includes(query) ||
+        b.status?.toLowerCase().includes(query)
+      );
+    }
+
+    if (filterType === 'itemLifecycleReport') {
+      return (data as any[]).filter(t => 
+        t.materialName?.toLowerCase().includes(query) ||
+        t.barcode?.toLowerCase().includes(query) ||
+        t.typeLabel?.toLowerCase().includes(query) ||
+        t.recipient?.toLowerCase().includes(query) ||
+        t.notes?.toLowerCase().includes(query)
+      );
+    }
+
+    if (filterType === 'cancelledRejectedReport') {
+      return (data as any[]).filter(op => 
+        op.user?.toLowerCase().includes(query) ||
+        op.action?.toLowerCase().includes(query) ||
+        op.details?.toLowerCase().includes(query) ||
+        op.notes?.toLowerCase().includes(query)
+      );
+    }
+
+    if (filterType === 'incompleteTransfersReport') {
+      return (data as any[]).filter(t => 
+        t.materialName?.toLowerCase().includes(query) ||
+        t.fromWarehouse?.toLowerCase().includes(query) ||
+        t.toWarehouse?.toLowerCase().includes(query) ||
+        t.status?.toLowerCase().includes(query)
+      );
+    }
+
+    if (filterType === 'projectConsumptionReport') {
+      return (data as any[]).filter(p => 
+        p.project?.toLowerCase().includes(query) ||
+        p.materialsSummary?.toLowerCase().includes(query)
+      );
     }
 
     return data;
@@ -1441,6 +1512,69 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
             tableHeaders = `<th>الوقت والتاريخ</th><th>المسؤول</th><th>اسم المادة</th><th>الباركود</th><th>المستودع</th><th>الكمية القديمة</th><th>الكمية الجديدة</th><th>الفرق</th><th>نوع التعديل</th>`;
             tableContent = (finalReportData as any[]).map(adj => `<tr><td>${new Date(adj.date).toLocaleString('ar-EG')}</td><td>${adj.modifiedBy}</td><td>${adj.materialName}</td><td>${adj.barcode}</td><td>${adj.warehouseName}</td><td>${adj.oldQuantity}</td><td>${adj.newQuantity}</td><td style="color: ${adj.difference > 0 ? 'green' : 'red'}; font-weight: bold;">${adj.difference > 0 ? '+' : ''}${adj.difference}</td><td>${adj.isCorrection ? 'تصحيح مباشر (Correction)' : 'تعديل رصيد مضاف (Adjustment)'}</td></tr>`).join('');
             break;
+        case 'zeroStockReport':
+            reportTitle = `تقرير مواد مرصدة (رصيد صفر)`;
+            tableHeaders = `<th>اسم المادة</th><th>الباركود</th><th>فئة المادة</th><th>آخر حركة مسجلة</th><th>المسؤول والمستلم</th><th>ملاحظات الحركة الأخيرة</th>`;
+            tableContent = (finalReportData as any[]).map(m => `<tr><td>${m.name}</td><td>${m.barcode}</td><td>${m.category}</td><td>${m.lastTxQty} ${m.unit} (${m.lastTxType})</td><td>${m.lastTxUser}</td><td>${m.lastTxNotes}</td></tr>`).join('');
+            break;
+        case 'reorderLevelReport':
+            reportTitle = `تقرير الحدود الدنيا وإعادة الطلب`;
+            tableHeaders = `<th>اسم المادة</th><th>الباركود</th><th>الفئة</th><th>المخزون الحالي</th><th>الحد الأدنى للمادة</th><th>الحالة والخطورة</th><th>الكميات المقترحة لإعادة الطلب</th>`;
+            tableContent = (finalReportData as any[]).map(m => `<tr><td>${m.name}</td><td>${m.barcode}</td><td>${m.category}</td><td>${m.currentStock} ${m.unit}</td><td>${m.minStock} ${m.unit}</td><td>${m.status}</td><td>+ ${m.suggestedReorder} ${m.unit}</td></tr>`).join('');
+            break;
+        case 'stockAccuracyReport':
+            reportTitle = `تقرير دقة وجرد المخزون (Stock Accuracy Report)`;
+            tableHeaders = `<th>اسم المادة</th><th>الباركود</th><th>المخزون النظامي</th><th>المخزون الفعلي المثبت</th><th>الفروقات والانحراف الجردي</th><th>نسبة دقة الجرد الكلية</th><th>حالة التدقيق الجردية</th>`;
+            tableContent = (finalReportData as any[]).map(m => {
+              const discVal = m.discrepancy === null ? 'بانتظار الجرد' : m.discrepancy === 0 ? '0' : m.discrepancy > 0 ? `+${m.discrepancy}` : `${m.discrepancy}`;
+              const accVal = m.accuracyPercent !== null ? `${m.accuracyPercent}%` : '---';
+              const statusVal = m.discrepancy === null ? 'بانتظار الإدخال' : m.discrepancy === 0 ? 'مطابق (Perfect)' : m.discrepancy > 0 ? 'زيادة في الجرد' : 'عجز جرد سلبي';
+              const inputVal = m.actualCountStock !== null ? `${m.actualCountStock} ${m.unit}` : 'لم يحدد بعد';
+              return `<tr><td>${m.name}</td><td>${m.barcode}</td><td>${m.systemStock} ${m.unit}</td><td>${inputVal}</td><td>${discVal}</td><td>${accVal}</td><td>${statusVal}</td></tr>`;
+            }).join('');
+            break;
+        case 'noPriceMaterialsReport':
+            reportTitle = `تقرير المواد غير المسعرة أو المنعدمة التكلفة`;
+            tableHeaders = `<th>اسم المادة</th><th>الباركود</th><th>الفئة والمجموعة</th><th>المورد المعتمد</th><th>المخزون الحالي</th><th>التسعير الحالي بالعملة الرسمية</th>`;
+            tableContent = (finalReportData as any[]).map(m => `<tr><td>${m.name}</td><td>${m.barcode}</td><td>${m.category}</td><td>${m.supplier}</td><td>${m.currentStock} ${m.unit}</td><td style="color: red; font-weight: bold;">0.00</td></tr>`).join('');
+            break;
+        case 'batchTrackingReport':
+            reportTitle = `تقرير تتبع حركة الدفعات والمستلمين (Batch / Lot Tracking)`;
+            tableHeaders = `<th>رقم الدفعة / السند</th><th>تاريخ الدخول</th><th>اسم المادة</th><th>الباركود</th><th>المورد المورد</th><th>الكمية المقيدة</th><th>إجمالي الصرف</th><th>الكمية المتبقية</th><th>الجهات والمستلمين</th><th>حالة الدفعة الحالية</th>`;
+            tableContent = (finalReportData as any[]).map(b => `<tr><td>${b.batchNumber}</td><td>${new Date(b.date).toLocaleDateString('ar-EG')}</td><td>${b.materialName}</td><td>${b.barcode}</td><td>${b.supplier}</td><td>${b.quantity} ${b.unit}</td><td>${b.outQty} ${b.unit}</td><td>${b.remainingQty} ${b.unit}</td><td>${b.recipients}</td><td>${b.status}</td></tr>`).join('');
+            break;
+        case 'itemLifecycleReport':
+            reportTitle = `سجل دورة حركة المادة الزمنية الكاملة: ${materials.find(m => m.id === selectedMaterialId)?.name || 'غير محدد'}`;
+            tableHeaders = `<th>التاريخ والوقت</th><th>نوع الحركة</th><th>رقم السند المرجعي</th><th>الكمية بالتعديل</th><th>وحدة القياس</th><th>المستلم أو الوجهة</th><th>المستودع/الجهة</th><th>الرصيد التراكمي الراكض</th><th>ملاحظات الحركة</th>`;
+            tableContent = (finalReportData as any[]).map(t => {
+              const diffSign = (t.type === 'in' || t.type === 'return_in') ? `+${t.quantity}` : `-${t.quantity}`;
+              return `<tr><td>${new Date(t.date).toLocaleString('ar-EG')}</td><td>${t.typeLabel}</td><td>${t.referenceNo || '-'}</td><td style="font-weight: bold;">${diffSign}</td><td>${t.unit}</td><td>${t.recipient || '-'}</td><td>${t.warehouseName || t.toWarehouse || '-'}</td><td style="font-weight: bold; color: blue;">${t.runningStock}</td><td>${t.notes || ''}</td></tr>`;
+            }).join('');
+            break;
+        case 'binLocationReport':
+            reportTitle = `تقرير مواقع وتوزع المخزون في الأقسام والرفوف`;
+            tableHeaders = `<th>اسم المادة</th><th>الباركود الوحيد</th><th>الفئة</th><th>المورد المعتمد</th><th>المخزون المتوفر</th><th>موقع التخزين المعتمد (الرف/القطاع)</th>`;
+            tableContent = (finalReportData as any[]).map(m => `<tr><td>${m.name}</td><td>${m.barcode}</td><td>${m.category}</td><td>${m.supplier}</td><td>${m.currentStock} ${m.unit}</td><td style="font-weight: bold; color: green;">${m.binLocation}</td></tr>`).join('');
+            break;
+        case 'cancelledRejectedReport':
+            reportTitle = `تقرير العمليات الملغاة والمرفوضة (سجل الرقابة)`;
+            tableHeaders = `<th>تاريخ التدقيق والجرد للكسر</th><th>المسؤول القائم بالإجراء</th><th>العملية الملغاة</th><th>تفاصيل وبيانات الحركة</th><th>الملاحظات الإدارية</th>`;
+            tableContent = (finalReportData as any[]).map(op => `<tr><td>${new Date(op.date).toLocaleString('ar-EG')}</td><td>${op.user}</td><td>${op.action}</td><td>${op.details}</td><td>${op.notes || ''}</td></tr>`).join('');
+            break;
+        case 'incompleteTransfersReport':
+            reportTitle = `سجل التحويلات قيد الانتقال والانتظار بين الفروع`;
+            tableHeaders = `<th>تاريخ النقل والتسجيل</th><th>اسم المادة</th><th>الباركود</th><th>الكمية المرسلة</th><th>المستودع المصدر</th><th>المستودع الوجهة</th><th>الحالة والموقف للعهد</th>`;
+            tableContent = (finalReportData as any[]).map(t => `<tr><td>${new Date(t.date).toLocaleString('ar-EG')}</td><td>${t.materialName}</td><td>${t.barcode}</td><td>${t.quantity} ${t.unit}</td><td>${t.fromWarehouse}</td><td>${t.toWarehouse}</td><td style="color: darkorange; font-weight: bold;">${t.status}</td></tr>`).join('');
+            break;
+        case 'movingAverageCostReport':
+            reportTitle = `تقرير المتوسط المرجح التراكمي المتحركة (Moving Average Cost)`;
+            tableHeaders = `<th>اسم المادة</th><th>الباركود المرفق</th><th>الفئة والمجموعة</th><th>المورد الرئيسي</th><th>الرصيد الإجمالي</th><th>التكلفة الفردية المباشرة</th><th>المتوسط المرجح المتحرك</th><th>إجمالي قيمة البضاعة المقدرة</th>`;
+            tableContent = (finalReportData as any[]).map(m => `<tr><td>${m.name}</td><td>${m.barcode}</td><td>${m.category}</td><td>${m.supplier}</td><td>${m.currentStock} ${m.unit}</td><td>${(m.price || 0).toLocaleString('ar-EG')}</td><td>${(m.movingAverageCost || m.price || 0).toLocaleString('ar-EG')}</td><td style="font-weight: bold;">${(m.totalValue || 0).toLocaleString('ar-EG')} ${settings?.currencySymbol || ''}</td></tr>`).join('');
+            break;
+        case 'projectConsumptionReport':
+            reportTitle = `تحليل استهلاك المواد على مستوى المشاريع وأوامر العمل`;
+            tableHeaders = `<th>اسم المشروع أو جهة الصرف</th><th>إجمالي عدد المواد المصروفة</th><th>تفاصيل وبنود المواد المصروفة تراكمياً</th>`;
+            tableContent = (finalReportData as any[]).map(p => `<tr><td>${p.project}</td><td>${p.materialCount}</td><td>${p.materialsSummary}</td></tr>`).join('');
         default: // Transaction reports
             reportTitle = `تقرير حركات`;
             tableHeaders = `<th>التاريخ والوقت</th><th>اسم المادة</th><th>باركود المادة</th><th>باركود الصنف</th><th>المورد</th><th>الكمية</th><th>نوع الإخراج</th><th>المستلم</th><th>ملاحظات</th>`;
@@ -1612,7 +1746,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
     { value: 'wasteReport', category: 'movement', label: 'تقرير الهدر', icon: Trash2, color: 'orange', bgColor: 'bg-orange-100', textColor: 'text-orange-600', darkBg: 'dark:bg-orange-900/30', darkText: 'dark:text-orange-400', glow: 'bg-orange-500', description: 'عرض حركات الهدر (Waste)' },
     { value: 'rulersReport', category: 'movement', label: 'تقرير المساطر', icon: Layers, color: 'blue', bgColor: 'bg-blue-100', textColor: 'text-blue-600', darkBg: 'dark:bg-blue-900/30', darkText: 'dark:text-blue-400', glow: 'bg-blue-500', description: 'عرض حركات المساطر (Rulers)' },
     { value: 'notesSearchReport', category: 'movement', label: 'بحث الملاحظات', icon: Search, color: 'indigo', bgColor: 'bg-indigo-100', textColor: 'text-indigo-600', darkBg: 'dark:bg-indigo-900/30', darkText: 'dark:text-indigo-400', glow: 'bg-indigo-500', description: 'البحث في الملاحظات بين تاريخين' },
-    { value: 'zeroStockReport', category: 'movement', label: 'تقرير المواد المرصدة برصيد صفر', icon: Trash2, color: 'indigo', bgColor: 'bg-rose-100/50', textColor: 'text-rose-700', darkBg: 'dark:bg-rose-950/20', darkText: 'dark:text-rose-400', glow: 'bg-rose-500', description: 'المواد التي كانت نشطة وأصبحت صفر حالياً مع آخر حركة وتفاصيل المسؤول' },
+    { value: 'zeroStockReport', category: 'movement', label: 'تقرير مواد مرصدة', icon: Trash2, color: 'indigo', bgColor: 'bg-rose-100/50', textColor: 'text-rose-700', darkBg: 'dark:bg-rose-950/20', darkText: 'dark:text-rose-400', glow: 'bg-rose-500', description: 'المواد التي كانت نشطة وأصبحت صفر حالياً مع آخر حركة وتفاصيل المسؤول' },
 
     // Analysis
     { value: 'mostUsed', category: 'analysis', label: 'الأكثر استخداماً', icon: TrendingUp, color: 'rose', bgColor: 'bg-rose-100', textColor: 'text-rose-600', darkBg: 'dark:bg-rose-900/30', darkText: 'dark:text-rose-400', glow: 'bg-rose-500', description: 'المواد ذات معدل السحب الأعلى' },
@@ -2042,7 +2176,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
                 </div>
               )}
 
-              {['byMaterial', 'materialLedger'].includes(filterType) && (
+              {['byMaterial', 'materialLedger', 'itemLifecycleReport'].includes(filterType) && (
                   <div className="space-y-1">
                       <label className="text-xs font-bold text-gray-400 block mr-1">اختر المادة</label>
                       <div className="flex gap-2">
@@ -2153,14 +2287,14 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
                   </div>
               )}
 
-              {['scrapReport', 'wasteReport', 'rulersReport', 'notesSearchReport', 'openingStockReport', 'closingStockReport'].includes(filterType) && (
+              {(['scrapReport', 'wasteReport', 'rulersReport', 'notesSearchReport', 'openingStockReport', 'closingStockReport', 'zeroStockReport', 'reorderLevelReport', 'stockAccuracyReport', 'noPriceMaterialsReport', 'batchTrackingReport', 'itemLifecycleReport', 'binLocationReport', 'cancelledRejectedReport', 'incompleteTransfersReport', 'movingAverageCostReport', 'projectConsumptionReport'].includes(filterType) || selectedReportCategory === 'auditControl') && (
                   <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-400 block mr-1">بحث في النتائج</label>
+                      <label className="text-xs font-bold text-gray-400 block mr-1">البحث السريع في هذا التقرير</label>
                       <div className="relative">
                         <Search className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
                         <input 
                           type="text" 
-                          placeholder="ابحث عن مادة، باركود، مستلم، ملاحظات..." 
+                          placeholder="ابحث عن مادة، باركود، مستخدم، رف، تفاصيل..." 
                           value={reportSearchQuery} 
                           onChange={e => setReportSearchQuery(e.target.value)} 
                           className="p-2 pr-8 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white w-64 focus:ring-2 focus:ring-blue-500 outline-none" 
@@ -2577,18 +2711,27 @@ const Reports: React.FC<ReportsProps> = ({ transactions, materials, warehouses, 
                   <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">{m.name}</td>
                   <td className="px-6 py-4 font-mono text-xs">{m.barcode}</td>
                   <td className="px-6 py-4 font-bold">{m.systemStock.toLocaleString('ar-EG')}</td>
-                  <td className="px-6 py-4 font-bold text-blue-600 dark:text-blue-400">{m.actualCountStock.toLocaleString('ar-EG')}</td>
-                  <td className={`px-6 py-4 font-black ${m.discrepancy === 0 ? 'text-gray-500' : m.discrepancy < 0 ? 'text-red-500' : 'text-emerald-500'}`}>
-                    {m.discrepancy === 0 ? '0' : m.discrepancy > 0 ? `+${m.discrepancy.toLocaleString('ar-EG')}` : m.discrepancy.toLocaleString('ar-EG')}
+                  <td className="px-6 py-4">
+                    <input
+                      type="number"
+                      placeholder="أدخل الجرد الفعلي..."
+                      value={manualPhysicalStocks[m.id] === undefined || isNaN(manualPhysicalStocks[m.id]) ? '' : manualPhysicalStocks[m.id]}
+                      onChange={e => updatePhysicalStock(m.id, e.target.value)}
+                      className="w-32 p-1.5 border rounded-lg text-sm bg-gray-50 dark:bg-gray-700/50 dark:border-gray-600 dark:text-white text-center font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </td>
+                  <td className={`px-6 py-4 font-black ${m.discrepancy === null ? 'text-gray-400' : m.discrepancy === 0 ? 'text-gray-500' : m.discrepancy < 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                    {m.discrepancy === null ? 'بانتظار الجرد' : m.discrepancy === 0 ? '0' : m.discrepancy > 0 ? `+${m.discrepancy.toLocaleString('ar-EG')}` : m.discrepancy.toLocaleString('ar-EG')}
                   </td>
                   <td className="px-6 py-4 font-black text-indigo-500">
-                    {m.accuracyPercent.toLocaleString('ar-EG', { maximumFractionDigits: 1 })}%
+                    {m.accuracyPercent !== null ? `${m.accuracyPercent.toLocaleString('ar-EG', { maximumFractionDigits: 1 })}%` : '---'}
                   </td>
                   <td className="px-6 py-4 text-xs">
                     <span className={`px-2 py-1 rounded font-bold ${
+                      m.discrepancy === null ? 'bg-gray-150 text-gray-500 dark:bg-gray-800 dark:text-gray-400' :
                       m.discrepancy === 0 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-400' : 'bg-red-100 text-red-800 dark:bg-red-950/20 dark:text-red-400'
                     }`}>
-                      {m.discrepancy === 0 ? 'مطابق (Perfect)' : 'انحراف جرد سلبي'}
+                      {m.discrepancy === null ? 'بانتظار الإدخال' : m.discrepancy === 0 ? 'مطابق (Perfect)' : m.discrepancy > 0 ? 'زيادة في الجرد' : 'عجز جرد سلبي'}
                     </span>
                   </td>
                 </tr>
