@@ -12,6 +12,7 @@
   "dependencies": {
     "express": "^5.2.1",
     "html2canvas": "^1.4.1",
+    "html5-qrcode": "^2.3.8",
     "lucide-react": "^0.552.0",
     "motion": "^12.34.4",
     "node-fetch": "^2.7.0",

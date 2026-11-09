@@ -154,59 +154,54 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, toggleSidebar, onSearch
               </div>
               <div className="overflow-y-auto flex-1 p-4 space-y-4 text-right">
                 <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/50 rounded-lg p-3 text-xs leading-relaxed text-emerald-800 dark:text-emerald-300 font-medium">
-                  <span className="font-bold block mb-1">📢 تحديثات الرقابة، الجرد والبحث الفوري (جديد!)</span>
-                  لقد أضفنا باقة تحسينات كبرى بطلبكم لتبسيط التدقيق والتحكم ومنع الأخطاء في جرد المخزون، مع إتاحة خيارات طباعة وحفظ احترافية ودقيقة لكافة الجداول!
+                  <span className="font-bold block mb-1">📢 باقة الميزات الاحترافية الجديدة (تحديث شامل!)</span>
+                  تم اكتمال منظومة السندات الرسمية الموحدة، وماسح الباركود الحي بالكاميرا، ومساعد إعادة الطلب والشراء الذكي، وسندات إدخال المواد الجديدة!
                 </div>
 
                 <div className="space-y-3">
                   <h4 className="font-bold text-xs text-gray-800 dark:text-gray-200 border-b dark:border-gray-700 pb-1 flex items-center gap-1.5">
-                    <span>✨</span> الميزات الجديدة المضافة حديثاً
+                    <span>✨</span> أبرز الإضافات الجديدة
                   </h4>
                   
                   <div className="space-y-3 pr-1">
                     <div className="flex items-start gap-2 text-xs">
-                      <span className="text-rose-500 font-bold text-sm leading-none">•</span>
+                      <span className="text-sky-500 font-bold text-sm leading-none">•</span>
                       <div>
-                        <strong className="text-gray-900 dark:text-white block">إدخال الجرد الفعلي يدوياً</strong>
-                        <span className="text-gray-500 dark:text-gray-400 text-[11px] block mt-0.5">في تقرير "تتبع دقة المخزون"، تم جعل خانة المخزون الفعلي قابلة للتعديل يدوياً وإدخال الكمية الحقيقية لتقوم الحاسبة فوراً باستخراج الفروقات والانحرافات مع حفظ التقارير في الذاكرة.</span>
+                        <strong className="text-gray-900 dark:text-white block">سند إدخال مواد ومخزون (فردي ومجمع)</strong>
+                        <span className="text-gray-500 dark:text-gray-400 text-[11px] block mt-0.5">في قسم "إدخالات جديدة"، زر توليد سند لكل صنف وزر "سند مجمع" لكافة المواد مع طباعة PDF وتحميل كصورة PNG وإكسل XLSX معتمد لقسم المحاسبة.</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-2 text-xs">
+                      <span className="text-indigo-500 font-bold text-sm leading-none">•</span>
+                      <div>
+                        <strong className="text-gray-900 dark:text-white block">منظومة السندات الرسمية الموحدة للحركات</strong>
+                        <span className="text-gray-500 dark:text-gray-400 text-[11px] block mt-0.5">في "الحركات اليومية"، توليد سندات رسمية لكافة الحركات (سند صرف، سند تحويل ومناقلة مخزنية، سند توريد، سند إرجاع) بتواقيع ثلاثية وخيارات تصدير متكاملة.</span>
                       </div>
                     </div>
 
                     <div className="flex items-start gap-2 text-xs">
                       <span className="text-rose-500 font-bold text-sm leading-none">•</span>
                       <div>
-                        <strong className="text-gray-900 dark:text-white block">ميزة البحث الفوري الشامل</strong>
-                        <span className="text-gray-500 dark:text-gray-400 text-[11px] block mt-0.5">أضفنا محرك بحث سريع ورئيسي في صنف "التدقيق والتحكم" و "دورة حياة الصنف" لفلترة وتصفية الجداول بدقة واختيار أي مادة أو صنف فوري بنقرة واحدة.</span>
+                        <strong className="text-gray-900 dark:text-white block">ماسح الباركود المباشر بكاميرا الجهاز</strong>
+                        <span className="text-gray-500 dark:text-gray-400 text-[11px] block mt-0.5">مسح مباشر بالكاميرا بدون أجهزة إضافية، مع صوت تنبيه (Beep) عند التقاط الكود، متوفر في إضافة الحركة، البحث في الحركات، نظرة سريعة، وإعادة الطلب.</span>
                       </div>
                     </div>
 
                     <div className="flex items-start gap-2 text-xs">
-                      <span className="text-rose-500 font-bold text-sm leading-none">•</span>
+                      <span className="text-emerald-500 font-bold text-sm leading-none">•</span>
                       <div>
-                        <strong className="text-gray-900 dark:text-white block">طباعة متطابقة 100% لكافة التقارير</strong>
-                        <span className="text-gray-500 dark:text-gray-400 text-[11px] block mt-0.5">تم إصلاح مشكلة عدم تطابق الطباعة لجميع تقارير صنف "التدقيق والتحكم" والتبويب بأكمله و "تقرير مواد مرصدة"، لتصبح مخرجات الـ PDF والطباعة تعكس الجدول المعروض تماماً بذات السطور والأرقام والفرز.</span>
+                        <strong className="text-gray-900 dark:text-white block">مساعد إعادة الطلب وطلبات الشراء الذكية</strong>
+                        <span className="text-gray-500 dark:text-gray-400 text-[11px] block mt-0.5">قسم جديد لتحليل العجز ونفاد المخزون واقتراح كميات الشراء وتوليد "أمر شراء وتوريد رسمي" للموردين بضغطة زر وتصديره فوري.</span>
                       </div>
                     </div>
 
                     <div className="flex items-start gap-2 text-xs">
-                      <span className="text-rose-500 font-bold text-sm leading-none">•</span>
+                      <span className="text-amber-500 font-bold text-sm leading-none">•</span>
                       <div>
-                        <strong className="text-gray-900 dark:text-white block">تسمية دقيقة وسهلة للتقارير</strong>
-                        <span className="text-gray-500 dark:text-gray-400 text-[11px] block mt-0.5">تعديل تسمية تقرير "المواد المرصدة برصيد صفر" ليصبح بمسماه الواضح والمطلوب: "تقرير مواد مرصدة" فقط تيسيراً لعرضه وإرساله لقسم المحاسبة.</span>
+                        <strong className="text-gray-900 dark:text-white block">إدخال الجرد الفعلي يدوياً ومحرك البحث</strong>
+                        <span className="text-gray-500 dark:text-gray-400 text-[11px] block mt-0.5">تعديل الجرد الفعلي في تقرير دقة المخزون ومحرك بحث فوري في تقارير التدقيق والتحكم ودورة حياة الصنف وطباعة متطابقة 100%.</span>
                       </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-3 pt-2">
-                  <h4 className="font-bold text-xs text-gray-800 dark:text-gray-200 border-b dark:border-gray-700 pb-1 flex items-center gap-1.5">
-                    <span>📁</span> تصدير مستند مرتجعات الموردين
-                  </h4>
-                  <div className="flex items-start gap-2 text-xs">
-                    <span className="text-emerald-500 font-bold text-sm leading-none">•</span>
-                    <div>
-                      <strong className="text-gray-900 dark:text-white block">سند المرتجع لقسم المحاسبة</strong>
-                      <span className="text-gray-500 dark:text-gray-400 text-[11px] block mt-0.5">إتاحة توليد وحفظ وتصدير سندات مرتجعات الموردين المباشرة (Excel / PDF / صورة) وإرسالها فورياً لإثبات التبادل المالي والكمي.</span>
                     </div>
                   </div>
                 </div>
@@ -329,3 +324,4 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, toggleSidebar, onSearch
 };
 
 export default Header;
+

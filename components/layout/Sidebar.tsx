@@ -1,6 +1,6 @@
 import React from 'react';
 import { Page, User } from '@/types';
-import { BarChart2, Package, Truck, FileText, X, Settings, Archive, Users, RotateCcw, Calculator, Weight, Building2, Table } from 'lucide-react';
+import { BarChart2, Package, Truck, FileText, X, Settings, Archive, Users, RotateCcw, Calculator, Weight, Building2, Table, ShoppingBag } from 'lucide-react';
 
 interface SidebarProps {
   user: User;
@@ -80,6 +80,9 @@ const Sidebar: React.FC<SidebarProps> = ({ user, currentPage, onNavigate, isOpen
             )}
             {(user.role === 'admin' || user.permissions?.allowedPages.includes('supplier-returns')) && (
               <NavItem icon={<RotateCcw />} label="مرتجعات الموردين" isActive={currentPage === 'supplier-returns'} onClick={() => handleNavigation('supplier-returns')} />
+            )}
+            {(user.role === 'admin' || user.permissions?.allowedPages.includes('reorder-assistant')) && (
+              <NavItem icon={<ShoppingBag />} label="إعادة الطلب والشراء" isActive={currentPage === 'reorder-assistant'} onClick={() => handleNavigation('reorder-assistant')} />
             )}
             <hr className="my-2 border-gray-200 dark:border-gray-600" />
             {(user.role === 'admin' || user.permissions?.allowedPages.includes('cost-meter')) && (

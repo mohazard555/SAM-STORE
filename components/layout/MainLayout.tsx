@@ -15,6 +15,7 @@ import CostMeter from '@/pages/CostMeter';
 import CostWeight from '@/pages/CostWeight';
 import Warehouses from '@/pages/Warehouses';
 import QuickLook from '@/pages/QuickLook';
+import ReorderAssistant from '@/pages/ReorderAssistant';
 import { User, Page, Material, Transaction, SettingsData, Warehouse } from '@/types';
 import { getMaterials, getTransactions, getSettings, getWarehouses } from '@/services/mockApi';
 import { usePrint } from '@/services/PrintContext';
@@ -97,11 +98,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, onLogout, darkMode, setDa
       case 'settings':
         return <Settings onDataChange={refreshData} user={user} />;
       case 'new-entries':
-        return <NewEntries materials={materials.filter(m => m.isNew)} user={user} settings={settings || undefined} />;
+        return <NewEntries materials={materials.filter(m => m.isNew)} user={user} settings={settings || undefined} warehouses={warehouses} />;
       case 'users':
         return <Users />;
       case 'supplier-returns':
         return <SupplierReturns materials={materials} transactions={transactions} warehouses={warehouses} user={user} settings={settings || undefined} />;
+      case 'reorder-assistant':
+        return <ReorderAssistant materials={materials} transactions={transactions} warehouses={warehouses} user={user} settings={settings} />;
       case 'cost-meter':
         return <CostMeter materials={materials} user={user} settings={settings || undefined} />;
       case 'cost-weight':
@@ -146,3 +149,4 @@ const MainLayout: React.FC<MainLayoutProps> = ({ user, onLogout, darkMode, setDa
 };
 
 export default MainLayout;
+

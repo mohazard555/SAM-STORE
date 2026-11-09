@@ -3,9 +3,10 @@ import React, { useState, useMemo } from 'react';
 import { Material, Transaction, User, SettingsData } from '@/types';
 import { usePrint } from '@/services/PrintContext';
 import { 
-  Table, Filter, Search, ChevronUp, ChevronDown, Printer, Download 
+  Table, Filter, Search, ChevronUp, ChevronDown, Printer, Download, Camera 
 } from 'lucide-react';
 import { exportToExcel } from '@/utils/excelExport';
+import CameraBarcodeScannerModal from '@/components/common/CameraBarcodeScannerModal';
 
 interface QuickLookProps {
   materials: Material[];
@@ -20,6 +21,7 @@ const QuickLook: React.FC<QuickLookProps> = ({ materials, transactions, user, se
   const [filterSupplier, setFilterSupplier] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   const suppliers = useMemo(() => Array.from(new Set(materials.map(m => m.supplier))), [materials]);
   const categories = useMemo(() => Array.from(new Set(materials.map(m => m.category))), [materials]);
@@ -181,10 +183,18 @@ const QuickLook: React.FC<QuickLookProps> = ({ materials, transactions, user, se
                 <input 
                   type="text" 
                   placeholder="بحث عن مادة أو باركود..." 
-                  className="w-full pr-10 pl-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none"
+                  className="w-full pr-10 pl-10 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
+                <button
+                  type="button"
+                  onClick={() => setIsScannerOpen(true)}
+                  className="absolute left-2.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors"
+                  title="مسح الباركود بالكاميرا"
+                >
+                  <Camera size={18} />
+                </button>
               </div>
               <select 
                 className="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white outline-none"
@@ -261,8 +271,18 @@ const QuickLook: React.FC<QuickLookProps> = ({ materials, transactions, user, se
             </table>
           </div>
         </div>
+
+        {/* Camera Scanner Modal */}
+        <CameraBarcodeScannerModal
+          isOpen={isScannerOpen}
+          onClose={() => setIsScannerOpen(false)}
+          onScan={(scanned) => setSearchTerm(scanned)}
+          title="مسح باركود المادة"
+          description="وجّه الكاميرا نحو باركود الصنف لمعرفة رصيده وحركاته فوراً"
+        />
     </div>
   );
 };
 
 export default QuickLook;
+

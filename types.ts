@@ -80,7 +80,8 @@ export type Page =
   | 'cost-meter'
   | 'cost-weight'
   | 'warehouses'
-  | 'quick-look';
+  | 'quick-look'
+  | 'reorder-assistant';
 
 export type ThemeType = 'default' | 'emerald' | 'rose' | 'amber' | 'violet';
 
