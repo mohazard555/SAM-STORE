@@ -188,7 +188,7 @@ const ReorderAssistant: React.FC<ReorderAssistantProps> = ({
 
   // Generate Purchase Order
   const handleGeneratePurchaseOrder = (targetSupplier?: string) => {
-    const itemsToOrder = filteredList.filter(i => {
+    const itemsToOrder = reorderList.filter(i => {
       if (targetSupplier) {
         return i.material.supplier === targetSupplier && i.selected;
       }
