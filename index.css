@@ -42,36 +42,75 @@ html, body, #root {
   animation-name: slide-in-from-right;
 }
 
-/* Print Styles */
+/* Print Styles - Multi-page Flow & Zero Truncation */
 @media print {
-  html, body {
-    height: auto !important;
-    overflow: visible !important;
+  @page {
+    margin: 10mm;
+    size: auto;
   }
-  
+
+  html, body, #root, #root > div {
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Hide app layout elements and leave only the print section */
+  #root > div > *:not(#print-section) {
+    display: none !important;
+  }
+
   body * {
     visibility: hidden;
   }
-  
+
   #print-section {
-    visibility: visible;
     display: block !important;
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    margin: 0;
-    padding: 0;
+    visibility: visible !important;
+    position: static !important;
+    float: none !important;
+    left: auto !important;
+    top: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
     background: white !important;
     color: black !important;
-    z-index: 9999;
+    page-break-after: auto;
+    page-break-inside: auto;
   }
-  
+
   #print-section * {
-    visibility: visible;
+    visibility: visible !important;
   }
-  
-  /* Hide UI elements during print */
+
+  /* Ensure tables repeat headers on every printed page */
+  #print-section table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto !important;
+  }
+
+  #print-section thead {
+    display: table-header-group !important;
+  }
+
+  #print-section tr {
+    page-break-inside: avoid !important;
+    page-break-after: auto !important;
+  }
+
+  /* Hide UI controls during print */
   .no-print {
     display: none !important;
   }
@@ -79,6 +118,41 @@ html, body, #root {
 
 #print-section {
   display: none;
+}
+
+/* Custom Visible Scrollbar for Preview Modals */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #0284c7 #f1f5f9;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 8px;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #0284c7;
+  border-radius: 8px;
+  border: 2px solid #f1f5f9;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #0ea5e9;
+  border: 2px solid #1e293b;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #0369a1;
 }
 
 /* Theme Variables */

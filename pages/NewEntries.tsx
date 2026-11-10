@@ -2,7 +2,8 @@ import React, { useState, useMemo, useRef } from 'react';
 import { Material, User, SettingsData, Warehouse } from '@/types';
 import { 
   AlertTriangle, Search, Printer, Download, Calendar, 
-  FileText, X, Image as ImageIcon, FileSpreadsheet, Sparkles, Layers 
+  FileText, X, Image as ImageIcon, FileSpreadsheet, Sparkles, Layers,
+  ArrowUp, ArrowDown, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { usePrint } from '@/services/PrintContext';
 import { exportToExcel } from '@/utils/excelExport';
@@ -47,7 +48,9 @@ const NewEntries: React.FC<NewEntriesProps> = ({ materials, user, settings, ware
   // Voucher preview modal state
   const [selectedVoucher, setSelectedVoucher] = useState<EntryVoucherData | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [printOrientation, setPrintOrientation] = useState<'portrait' | 'landscape' | 'auto'>('auto');
   const previewRef = useRef<HTMLDivElement>(null);
+  const previewScrollRef = useRef<HTMLDivElement>(null);
 
   const filteredMaterials = useMemo(() => {
     return materials.filter(m => {
@@ -176,36 +179,44 @@ const NewEntries: React.FC<NewEntriesProps> = ({ materials, user, settings, ware
       </tr>
     `).join('');
 
+    const pageOrientationRule = printOrientation === 'landscape'
+      ? '@page { size: landscape; margin: 8mm; }'
+      : printOrientation === 'portrait'
+        ? '@page { size: portrait; margin: 10mm; }'
+        : '@page { size: auto; margin: 10mm; }';
+
     const html = `
       <div class="print-container">
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
           * { box-sizing: border-box; }
           body { font-family: 'Cairo', sans-serif; direction: rtl; margin: 0; padding: 0; color: #1e293b; background: white; -webkit-print-color-adjust: exact; }
-          @page { size: A4 portrait; margin: 10mm; }
-          .print-container { width: 100% !important; max-width: 100% !important; padding: 10px !important; margin: 0 !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; }
-          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px double #cbd5e1; padding-bottom: 15px; margin-bottom: 20px; }
+          ${pageOrientationRule}
+          .print-container { width: 100% !important; max-width: 100% !important; padding: 5px !important; margin: 0 !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; }
+          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px double #cbd5e1; padding-bottom: 12px; margin-bottom: 15px; }
           .logo-placeholder { font-size: 2.5rem; }
-          .company-info h2 { font-size: 1.5rem; font-weight: 700; margin: 0 0 5px 0; color: #0f172a; }
+          .company-info h2 { font-size: 1.4rem; font-weight: 700; margin: 0 0 5px 0; color: #0f172a; }
           .company-info p { font-size: 0.85rem; margin: 0; color: #64748b; }
-          .doc-title { text-align: center; margin: 15px 0; }
-          .doc-title h1 { display: inline-block; font-size: 1.3rem; font-weight: 700; color: #0284c7; border: 2px solid #0284c7; padding: 6px 20px; border-radius: 6px; background-color: #f0f9ff; margin: 0; }
-          .metadata-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; margin-bottom: 20px; }
-          .meta-item { font-size: 0.9rem; }
+          .doc-title { text-align: center; margin: 12px 0; }
+          .doc-title h1 { display: inline-block; font-size: 1.25rem; font-weight: 700; color: #0284c7; border: 2px solid #0284c7; padding: 6px 20px; border-radius: 6px; background-color: #f0f9ff; margin: 0; }
+          .metadata-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; margin-bottom: 15px; }
+          .meta-item { font-size: 0.85rem; }
           .meta-label { font-weight: 700; color: #475569; margin-left: 5px; }
           .meta-val { color: #0f172a; }
-          table { width: 100% !important; border-collapse: collapse !important; margin-bottom: 20px; page-break-inside: auto; table-layout: fixed; }
-          tr { page-break-inside: avoid; page-break-after: auto; }
-          th, td { border: 1px solid #cbd5e1 !important; padding: 8px 6px !important; text-align: right; font-size: 0.85rem !important; word-break: break-word; overflow: hidden; }
+          table { width: 100% !important; border-collapse: collapse !important; margin-bottom: 15px; page-break-inside: auto !important; }
+          thead { display: table-header-group !important; }
+          tfoot { display: table-footer-group !important; }
+          tr { page-break-inside: avoid !important; page-break-after: auto !important; }
+          th, td { border: 1px solid #cbd5e1 !important; padding: 6px 8px !important; text-align: right; font-size: 0.85rem !important; }
           th { background-color: #f1f5f9 !important; color: #334155 !important; font-weight: 700; }
           td { color: #0f172a !important; }
-          .totals-section { display: flex; justify-content: flex-end; margin-bottom: 25px; page-break-inside: avoid; }
+          .totals-section { display: flex; justify-content: flex-end; margin-bottom: 20px; page-break-inside: avoid; }
           .totals-box { border: 1px solid #cbd5e1; border-radius: 6px; background-color: #fafafa; width: 320px; }
-          .totals-row { display: flex; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-size: 0.9rem; }
-          .totals-row:last-child { border-bottom: none; font-weight: 700; font-size: 1rem; color: #0284c7; background-color: #f0f9ff; border-radius: 0 0 6px 6px; }
-          .notes-box { border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px; background-color: #f8fafc; margin-bottom: 30px; font-size: 0.85rem; page-break-inside: avoid; }
-          .notes-title { font-weight: 700; color: #475569; margin-bottom: 5px; }
-          .signatures { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 40px; text-align: center; page-break-inside: avoid; }
+          .totals-row { display: flex; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-size: 0.85rem; }
+          .totals-row:last-child { border-bottom: none; font-weight: 700; font-size: 0.95rem; color: #0284c7; background-color: #f0f9ff; border-radius: 0 0 6px 6px; }
+          .notes-box { border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; background-color: #f8fafc; margin-bottom: 20px; font-size: 0.85rem; page-break-inside: avoid; }
+          .notes-title { font-weight: 700; color: #475569; margin-bottom: 4px; }
+          .signatures { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 25px; text-align: center; page-break-inside: avoid; }
           .sig-item p { margin: 0 0 35px 0; font-weight: 700; color: #475569; font-size: 0.85rem; }
           .sig-line { border-top: 1.5px dashed #94a3b8; width: 80%; margin: 0 auto; }
         </style>
@@ -640,6 +651,35 @@ const NewEntries: React.FC<NewEntriesProps> = ({ materials, user, settings, ware
                   </p>
                 </div>
 
+                {/* Page Orientation Selector */}
+                <div className="bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-3 mb-4 text-xs">
+                  <span className="font-bold text-gray-700 dark:text-gray-300 block mb-2">توجيه صفحة الطباعة (Layout):</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPrintOrientation('portrait')}
+                      className={`py-1.5 px-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1 border transition-all ${
+                        printOrientation === 'portrait'
+                          ? 'bg-sky-600 text-white border-sky-600 shadow-sm'
+                          : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      طولي (عمودي)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPrintOrientation('landscape')}
+                      className={`py-1.5 px-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1 border transition-all ${
+                        printOrientation === 'landscape'
+                          ? 'bg-sky-600 text-white border-sky-600 shadow-sm'
+                          : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      عرضي (أفقي)
+                    </button>
+                  </div>
+                </div>
+
                 <div className="space-y-3">
                   <button 
                     onClick={() => handlePrintSingleVoucher(selectedVoucher)}
@@ -689,8 +729,67 @@ const NewEntries: React.FC<NewEntriesProps> = ({ materials, user, settings, ware
             </div>
 
             {/* Document Live Preview Area */}
-            <div className="flex-1 p-6 lg:p-10 overflow-y-auto max-h-[80vh] flex justify-center bg-gray-100 dark:bg-gray-950">
-              <div className="shadow-xl rounded-lg overflow-hidden border dark:border-gray-800 bg-white text-gray-900 w-full max-w-[850px] shrink-0 p-8 relative flex flex-col">
+            <div 
+              ref={previewScrollRef}
+              className="flex-1 p-4 lg:p-8 overflow-y-auto max-h-[85vh] flex flex-col items-center bg-gray-100 dark:bg-gray-950 relative custom-scrollbar"
+            >
+              {/* Sticky Top Navigation & Scroll Controls Bar */}
+              <div className="sticky top-0 z-20 w-full max-w-[850px] bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border border-gray-200 dark:border-gray-700 px-4 py-2.5 rounded-xl shadow-md mb-4 flex items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-gray-800 dark:text-gray-200">
+                    معاينة السند الكامل:
+                  </span>
+                  <span className="font-black text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/40 px-2 py-0.5 rounded-full border border-sky-200 dark:border-sky-800">
+                    {selectedVoucher.items.length} صنف
+                  </span>
+                  <span className="hidden sm:inline text-gray-500 text-[11px]">
+                    (تظهر كافة الأصناف بالتمرير)
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => previewScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
+                    className="flex items-center gap-1 px-3 py-1.5 font-bold bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg transition-all shadow-sm"
+                    title="الرجوع لأعلى السند"
+                  >
+                    <ArrowUp size={14} className="text-sky-600" />
+                    <span>للأعلى ↑</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => previewScrollRef.current?.scrollTo({ top: previewScrollRef.current.scrollHeight, behavior: 'smooth' })}
+                    className="flex items-center gap-1 px-3 py-1.5 font-bold bg-sky-600 hover:bg-sky-700 text-white rounded-lg shadow-sm transition-all"
+                    title="الانتقال لأسفل السند لرؤية كافة الأصناف والمجاميع والتواقيع"
+                  >
+                    <ArrowDown size={14} />
+                    <span>للأسفل (التواقيع) ↓</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Floating Action Scroll Buttons */}
+              <div className="sticky top-20 left-4 self-start z-30 flex flex-col gap-2 no-print -mr-12 mb-[-80px]">
+                <button
+                  type="button"
+                  onClick={() => previewScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
+                  className="p-3 bg-white dark:bg-gray-800 hover:bg-gray-50 text-gray-700 dark:text-gray-200 rounded-full shadow-2xl border-2 border-sky-500 transition-all hover:scale-110 active:scale-95"
+                  title="الرجوع لأعلى المستند"
+                >
+                  <ChevronUp size={22} className="text-sky-600" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => previewScrollRef.current?.scrollTo({ top: previewScrollRef.current.scrollHeight, behavior: 'smooth' })}
+                  className="p-3 bg-sky-600 hover:bg-sky-700 text-white rounded-full shadow-2xl transition-all hover:scale-110 active:scale-95"
+                  title="الانتقال لأسفل المستند لرؤية باقي المواد والتواقيع"
+                >
+                  <ChevronDown size={22} />
+                </button>
+              </div>
+
+              <div className={`shadow-xl rounded-lg overflow-hidden border dark:border-gray-800 bg-white text-gray-900 w-full ${printOrientation === 'landscape' ? 'max-w-[1100px]' : 'max-w-[850px]'} shrink-0 p-8 relative flex flex-col`}>
                 
                 {/* HTML Capture Target */}
                 <div id="entry-invoice-capture" ref={previewRef} className="p-6 bg-white text-gray-900 w-full flex-1 flex flex-col text-right" style={{ direction: 'rtl' }}>
