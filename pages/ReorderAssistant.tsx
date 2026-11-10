@@ -259,28 +259,30 @@ const ReorderAssistant: React.FC<ReorderAssistantProps> = ({
           @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
           * { box-sizing: border-box; }
           body { font-family: 'Cairo', sans-serif; direction: rtl; margin: 0; padding: 0; color: #1e293b; background: white; -webkit-print-color-adjust: exact; }
-          .print-container { padding: 40px; max-width: 800px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; }
-          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px double #cbd5e1; padding-bottom: 20px; margin-bottom: 25px; }
-          .company-info h2 { font-size: 1.6rem; font-weight: 700; margin: 0 0 5px 0; color: #0f172a; }
-          .company-info p { font-size: 0.9rem; margin: 0; color: #64748b; }
-          .doc-title { text-align: center; margin: 20px 0; }
-          .doc-title h1 { display: inline-block; font-size: 1.4rem; font-weight: 700; color: #0284c7; border: 2px solid #0284c7; padding: 8px 24px; border-radius: 6px; background-color: #f0f9ff; margin: 0; }
-          .metadata-grid { display: grid; grid-template-cols: repeat(2, 1fr); gap: 15px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 25px; }
-          .meta-item { font-size: 0.95rem; }
+          @page { size: A4 portrait; margin: 10mm; }
+          .print-container { width: 100% !important; max-width: 100% !important; padding: 10px !important; margin: 0 !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; }
+          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px double #cbd5e1; padding-bottom: 15px; margin-bottom: 20px; }
+          .company-info h2 { font-size: 1.5rem; font-weight: 700; margin: 0 0 5px 0; color: #0f172a; }
+          .company-info p { font-size: 0.85rem; margin: 0; color: #64748b; }
+          .doc-title { text-align: center; margin: 15px 0; }
+          .doc-title h1 { display: inline-block; font-size: 1.3rem; font-weight: 700; color: #0284c7; border: 2px solid #0284c7; padding: 6px 20px; border-radius: 6px; background-color: #f0f9ff; margin: 0; }
+          .metadata-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; margin-bottom: 20px; }
+          .meta-item { font-size: 0.9rem; }
           .meta-label { font-weight: 700; color: #475569; margin-left: 5px; }
           .meta-val { color: #0f172a; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
-          th, td { border: 1px solid #cbd5e1; padding: 12px; text-align: right; font-size: 0.95rem; }
-          th { background-color: #f1f5f9; color: #334155; font-weight: 700; }
-          td { color: #0f172a; }
-          .totals-section { display: flex; justify-content: flex-end; margin-bottom: 30px; }
-          .totals-box { border: 1px solid #cbd5e1; border-radius: 8px; background-color: #fafafa; width: 320px; }
-          .totals-row { display: flex; justify-content: space-between; padding: 10px 15px; border-bottom: 1px solid #e2e8f0; font-size: 0.95rem; }
-          .totals-row:last-child { border-bottom: none; font-weight: 700; font-size: 1.1rem; color: #0284c7; background-color: #f0f9ff; border-radius: 0 0 8px 8px; }
-          .notes-box { border: 1px solid #cbd5e1; border-radius: 8px; padding: 15px; background-color: #f8fafc; margin-bottom: 40px; font-size: 0.9rem; }
+          table { width: 100% !important; border-collapse: collapse !important; margin-bottom: 20px; page-break-inside: auto; table-layout: fixed; }
+          tr { page-break-inside: avoid; page-break-after: auto; }
+          th, td { border: 1px solid #cbd5e1 !important; padding: 8px 6px !important; text-align: right; font-size: 0.85rem !important; word-break: break-word; overflow: hidden; }
+          th { background-color: #f1f5f9 !important; color: #334155 !important; font-weight: 700; }
+          td { color: #0f172a !important; }
+          .totals-section { display: flex; justify-content: flex-end; margin-bottom: 25px; page-break-inside: avoid; }
+          .totals-box { border: 1px solid #cbd5e1; border-radius: 6px; background-color: #fafafa; width: 320px; }
+          .totals-row { display: flex; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-size: 0.9rem; }
+          .totals-row:last-child { border-bottom: none; font-weight: 700; font-size: 1rem; color: #0284c7; background-color: #f0f9ff; border-radius: 0 0 6px 6px; }
+          .notes-box { border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px; background-color: #f8fafc; margin-bottom: 30px; font-size: 0.85rem; page-break-inside: avoid; }
           .notes-title { font-weight: 700; color: #475569; margin-bottom: 5px; }
-          .signatures { display: grid; grid-template-cols: repeat(3, 1fr); gap: 20px; margin-top: 50px; text-align: center; }
-          .sig-item p { margin: 0 0 45px 0; font-weight: 700; color: #475569; font-size: 0.9rem; }
+          .signatures { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 40px; text-align: center; page-break-inside: avoid; }
+          .sig-item p { margin: 0 0 35px 0; font-weight: 700; color: #475569; font-size: 0.85rem; }
           .sig-line { border-top: 1.5px dashed #94a3b8; width: 80%; margin: 0 auto; }
         </style>
         <div class="header">
@@ -824,7 +826,7 @@ const ReorderAssistant: React.FC<ReorderAssistantProps> = ({
 
             {/* Document Live Preview Area */}
             <div className="flex-1 p-6 lg:p-10 overflow-y-auto max-h-[80vh] flex justify-center bg-gray-100 dark:bg-gray-950">
-              <div className="shadow-xl rounded-lg overflow-hidden border dark:border-gray-800 bg-white text-gray-900 w-full max-w-[720px] shrink-0 p-8 relative flex flex-col" style={{ minHeight: '842px' }}>
+              <div className="shadow-xl rounded-lg overflow-hidden border dark:border-gray-800 bg-white text-gray-900 w-full max-w-[850px] shrink-0 p-8 relative flex flex-col">
                 
                 {/* HTML Capture Target */}
                 <div id="purchase-order-capture" ref={previewRef} className="p-6 bg-white text-gray-900 w-full flex-1 flex flex-col text-right" style={{ direction: 'rtl' }}>

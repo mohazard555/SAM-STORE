@@ -46,6 +46,7 @@ const TransactionModal: React.FC<{
     const [warehouseId, setWarehouseId] = useState(editTransaction?.warehouseId || (warehouses.length > 0 ? warehouses[0].id : ''));
     const [toWarehouseId, setToWarehouseId] = useState(editTransaction?.toWarehouseId || '');
     const [quantity, setQuantity] = useState(editTransaction?.quantity || 1);
+    const [quantityStr, setQuantityStr] = useState(editTransaction ? String(editTransaction.quantity) : '1');
     const [outputType, setOutputType] = useState<'scrap' | 'rulers' | 'waste' | 'none'>(editTransaction?.outputType || 'none');
     const [recipient, setRecipient] = useState(editTransaction?.recipient || '');
     const [itemBarcode, setItemBarcode] = useState(editTransaction?.itemBarcode || '');
@@ -275,11 +276,15 @@ const TransactionModal: React.FC<{
                                 الكمية ({selectedMaterial?.unit || 'وحدة'})
                             </label>
                             <input 
-                                type="number" 
-                                min="0.01" 
-                                step="any" 
-                                value={quantity} 
-                                onChange={(e) => setQuantity(parseFloat(e.target.value) || 0)} 
+                                type="text" 
+                                inputMode="decimal"
+                                value={quantityStr} 
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    setQuantityStr(val);
+                                    setQuantity(parseFloat(val.replace(/,/g, '.')) || 0);
+                                }} 
+                                placeholder="الكمية..."
                                 required 
                                 className="w-full p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-sky-500 outline-none text-sm font-bold" 
                             />
