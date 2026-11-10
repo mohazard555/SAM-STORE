@@ -626,6 +626,20 @@ const NewEntries: React.FC<NewEntriesProps> = ({ materials, user, settings, ware
                   </p>
                 </div>
 
+                <div className="bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl p-3.5 mb-6 text-xs space-y-2">
+                  <div className="flex justify-between items-center font-bold text-gray-700 dark:text-gray-300">
+                    <span>إجمالي الأصناف:</span>
+                    <span className="text-sky-600 dark:text-sky-400 font-black">{selectedVoucher.items.length} صنف</span>
+                  </div>
+                  <div className="flex justify-between items-center font-bold text-gray-700 dark:text-gray-300">
+                    <span>الصفحات المتوقعة للطباعة:</span>
+                    <span className="text-indigo-600 dark:text-indigo-400 font-black">~{Math.max(1, Math.ceil(selectedVoucher.items.length / 10))} صفحة A4</span>
+                  </div>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 pt-1 border-t border-gray-200 dark:border-gray-700">
+                    💡 يمكنك التمرير (Scroll) لأسفل نافذة المعاينة لمراجعة كافة الصفحات والمجاميع والتواقيع قبل الطباعة.
+                  </p>
+                </div>
+
                 <div className="space-y-3">
                   <button 
                     onClick={() => handlePrintSingleVoucher(selectedVoucher)}
